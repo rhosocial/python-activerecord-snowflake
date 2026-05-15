@@ -1,0 +1,159 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Environments
+.env
+.venv*
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+**.local.yml
+**.local.yaml
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm
+.idea/
+
+# PyPI configuration file
+.pypirc
+
+# macOS
+**.DS_Store
+
+# Examples - but allow specific docs examples to be tracked
+examples/
+!docs/examples/
+!src/**/examples/
+
+# Configuration files - to prevent accidental commit of sensitive information
+snowflake_config.yaml
+snowflake_config.yml
+snowflake_config.toml
+snowflake_config.template.yaml
+snowflake_config.template.yml
+snowflake_config.template.toml
+local_snowflake_config.yaml
+local_snowflake_config.yml
+local_snowflake_config.toml
+local_snowflake_config.example.yaml
+local_snowflake_config.example.yml
+local_snowflake_config.example.toml
+**/.rhosocial/snowflake_config.yaml
+**/.rhosocial/snowflake_config.yml
+**/.rhosocial/snowflake_config.toml
+
+# Default config file
+config.toml
+config.yaml
+config.yml
+local_config.toml
+local_config.yaml
+local_config.yml
+
+# Snowflake scenario config files
+tests/config/snowflake_scenarios.yaml
+tests/config/snowflake_scenarios.yml
+**/feature/backend/config/snowflake_scenarios.yaml
+**/feature/backend/config/snowflake_scenarios.yml
+
+# Claude Code temporary files (local only)
+.claude/tmp/
+.claude/plans/
+.claude/plan/
+
+# Integration tests (contain local development paths and credentials)
+tests/rhosocial/activerecord_snowflake_test/feature/backend/test_backend_integration.py

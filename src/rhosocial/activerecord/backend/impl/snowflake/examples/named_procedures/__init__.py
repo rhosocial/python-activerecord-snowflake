@@ -1,0 +1,1 @@
+"""Snowflake named procedure examples."""
