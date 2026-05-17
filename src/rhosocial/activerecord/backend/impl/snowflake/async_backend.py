@@ -230,3 +230,8 @@ class AsyncSnowflakeBackend(
     async def introspect_and_adapt(self) -> None:
         """Introspect the Snowflake database and adapt type mappings."""
         pass
+
+    def _create_introspector(self):
+        """Create an AsyncSnowflakeIntrospector with a thread-pool executor."""
+        from .introspection import AsyncSnowflakeIntrospector, _SnowflakeAsyncIntrospectorExecutor
+        return AsyncSnowflakeIntrospector(self, _SnowflakeAsyncIntrospectorExecutor(self))

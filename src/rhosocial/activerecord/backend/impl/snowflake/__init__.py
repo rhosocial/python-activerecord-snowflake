@@ -45,6 +45,11 @@ from .mixins import (
     SnowflakeStageMixin,
 )
 from .field import SnowflakePKMixin
+from .introspection import (
+    SnowflakeIntrospectorMixin,
+    SyncSnowflakeIntrospector,
+    AsyncSnowflakeIntrospector,
+)
 
 __all__ = [
     # Backend classes
@@ -80,4 +85,8 @@ __all__ = [
     "SnowflakeStageMixin",
     # Field Mixins
     "SnowflakePKMixin",
+    # Introspection
+    "SnowflakeIntrospectorMixin",
+    "SyncSnowflakeIntrospector",
+    "AsyncSnowflakeIntrospector",
 ]
