@@ -246,8 +246,13 @@ class SnowflakeDialect(
         return True
 
     def supports_returning_clause(self) -> bool:
-        """Snowflake does not support RETURNING clause."""
-        return False
+        """Snowflake supports RETURNING clause from version 7.32.0+.
+
+        RETURNING was introduced as a Preview feature and has been
+        progressively GA'd. Users on older versions can override
+        via SnowflakeConnectionConfig.enable_returning.
+        """
+        return self.version >= (7, 32, 0)
 
     # ========== Snowflake-Specific Capability Detection ==========
 

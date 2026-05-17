@@ -74,10 +74,15 @@ class SnowflakeArrayAdapter(SQLTypeAdapter):
 class SnowflakeTimestampAdapter(SQLTypeAdapter):
     """Adapts Python datetime to Snowflake TIMESTAMP types.
 
-    Snowflake supports multiple timestamp types:
-    - TIMESTAMP_LTZ (local timezone)
-    - TIMESTAMP_NTZ (no timezone)
-    - TIMESTAMP_TZ (with timezone)
+    Snowflake supports three timestamp variants:
+    - TIMESTAMP_LTZ: Local timezone — stored in UTC, displayed in local TZ
+    - TIMESTAMP_NTZ: No timezone — stored and displayed as-is
+    - TIMESTAMP_TZ: With timezone — preserves the original timezone offset
+
+    The ``timestamp_type`` option controls behavior:
+    - "ntz" (default): Naive datetimes, no TZ conversion
+    - "ltz": Convert to UTC for storage, display in session TZ
+    - "tz": Preserve timezone offset alongside the timestamp
     """
 
     @property
@@ -90,6 +95,20 @@ class SnowflakeTimestampAdapter(SQLTypeAdapter):
     ) -> Any:
         if value is None:
             return None
+        import datetime
+        if not isinstance(value, datetime.datetime):
+            return value
+
+        ts_type = (options or {}).get("timestamp_type", "ntz")
+        if ts_type == "ltz":
+            # LTZ: normalize to UTC for storage
+            if value.tzinfo is not None:
+                value = value.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        elif ts_type == "tz":
+            # TZ: ensure timezone-aware for Snowflake to preserve offset
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=datetime.timezone.utc)
+        # NTZ: store as-is
         return value
 
     def from_database(
@@ -97,6 +116,26 @@ class SnowflakeTimestampAdapter(SQLTypeAdapter):
     ) -> Any:
         if value is None:
             return None
+        import datetime
+        if not isinstance(value, datetime.datetime):
+            if isinstance(value, str):
+                # Attempt ISO format parse
+                try:
+                    value = datetime.datetime.fromisoformat(value)
+                except (ValueError, TypeError):
+                    return value
+            else:
+                return value
+
+        ts_type = (options or {}).get("timestamp_type", "ntz")
+        if ts_type == "ltz":
+            # LTZ: database returns UTC, attach UTC tzinfo for proper local conversion
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=datetime.timezone.utc)
+        elif ts_type == "tz":
+            # TZ: value already carries timezone from Snowflake
+            pass
+        # NTZ: return as-is (naive datetime)
         return value
 
 
