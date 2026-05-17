@@ -1,0 +1,21 @@
+CREATE TABLE type_cases (
+    id VARCHAR(36) NOT NULL PRIMARY KEY,
+    username VARCHAR NOT NULL,
+    email VARCHAR NOT NULL,
+    tiny_int VARCHAR,
+    small_int VARCHAR,
+    big_int VARCHAR,
+    float_val VARCHAR,
+    double_val VARCHAR,
+    decimal_val VARCHAR,
+    char_val VARCHAR,
+    varchar_val VARCHAR,
+    text_val VARCHAR,
+    date_val VARCHAR,
+    time_val VARCHAR,
+    timestamp_val VARCHAR,
+    blob_val VARCHAR,
+    json_val VARIANT,
+    array_val ARRAY,
+    is_active VARCHAR
+)

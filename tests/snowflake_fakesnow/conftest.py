@@ -23,16 +23,38 @@ FAKESNOW_NOP_PATTERNS = [
 
 @pytest.fixture
 def _fakesnow_patch():
-    """Per-test fakesnow patch (function scope)."""
-    with _fakesnow.patch(nop_regexes=FAKESNOW_NOP_PATTERNS):
+    """Per-test fakesnow patch (function scope).
+
+    Detects if a fakesnow patch is already active (e.g. from
+    tests/providers/scenarios.py) and skips re-patching to avoid
+    conflicts (fakesnow.patch is not re-entrant).
+    """
+    if _is_fakesnow_already_patched():
         yield
+    else:
+        with _fakesnow.patch(nop_regexes=FAKESNOW_NOP_PATTERNS):
+            yield
 
 
 @pytest.fixture(scope="session")
 def _fakesnow_session_patch():
     """Session-scoped fakesnow patch."""
-    with _fakesnow.patch(nop_regexes=FAKESNOW_NOP_PATTERNS):
+    if _is_fakesnow_already_patched():
         yield
+    else:
+        with _fakesnow.patch(nop_regexes=FAKESNOW_NOP_PATTERNS):
+            yield
+
+
+def _is_fakesnow_already_patched():
+    """Check if fakesnow has already patched snowflake.connector."""
+    try:
+        import snowflake.connector
+        # fakesnow replaces snowflake.connector.connect with FakeSnowflakeFlakeConnection
+        return hasattr(snowflake.connector, 'connect') and \
+               snowflake.connector.connect.__module__ != 'snowflake.connector'
+    except ImportError:
+        return False
 
 
 @pytest.fixture

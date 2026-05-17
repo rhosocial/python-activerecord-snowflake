@@ -161,6 +161,45 @@ class SnowflakeBackendMixin:
 
         return 'unknown'
 
+    def get_default_adapter_suggestions(self) -> Dict[Type, Tuple[SQLTypeAdapter, Type]]:
+        """Provide default type adapter suggestions for Snowflake.
+
+        Maps Python types to their Snowflake-compatible driver representations
+        by retrieving registered adapters from the adapter_registry.
+        Types that are natively compatible (str, int, float) are omitted.
+        """
+        from datetime import date, datetime, time
+        from decimal import Decimal
+        from uuid import UUID
+        from enum import Enum
+
+        suggestions: Dict[Type, Tuple[SQLTypeAdapter, Type]] = {}
+
+        type_mappings = [
+            (bool, int),        # Python bool -> DB driver int (Snowflake BOOLEAN stored as int)
+            (datetime, str),    # Python datetime -> DB driver str (Snowflake TIMESTAMP)
+            (date, str),        # Python date -> DB driver str (Snowflake DATE)
+            (time, str),        # Python time -> DB driver str (Snowflake TIME)
+            (Decimal, float),   # Python Decimal -> DB driver float (Snowflake NUMBER)
+            (UUID, str),        # Python UUID -> DB driver str (Snowflake VARCHAR)
+            (dict, str),        # Python dict -> DB driver str (Snowflake VARIANT)
+            (list, str),        # Python list -> DB driver str (Snowflake ARRAY)
+            (Enum, str),        # Python Enum -> DB driver str (Snowflake VARCHAR)
+        ]
+
+        for py_type, db_type in type_mappings:
+            adapter = self.adapter_registry.get_adapter(py_type, db_type)
+            if adapter:
+                suggestions[py_type] = (adapter, db_type)
+            else:
+                self.log(
+                    logging.DEBUG,
+                    f"No adapter found for ({py_type.__name__}, {db_type.__name__}). "
+                    "Suggestion will not be provided for this type."
+                )
+
+        return suggestions
+
     def get_default_schema(self) -> Optional[str]:
         """Get the default schema for Snowflake.
 

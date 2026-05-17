@@ -34,8 +34,12 @@ class SnowflakePKMixin:
 
     _snowflake_sequence_name: ClassVar[str] = "default_id_seq"
 
-    def prepare_save_data(self, data: Dict[str, Any], is_new: bool) -> Dict[str, Any]:
-        """Pre-fetch SEQUENCE value and inject into save data for new records."""
+    def prepare_save_data(self, data: Dict[str, Any], is_new: bool) -> None:
+        """Pre-fetch SEQUENCE value and inject into save data for new records.
+
+        Modifies ``data`` in-place per the ``prepare_save_data`` protocol
+        (returns ``None``). Chains to parent via ``super()``.
+        """
         pk_field = self.primary_key()
 
         if is_new and data.get(pk_field) is None:
@@ -51,8 +55,6 @@ class SnowflakePKMixin:
                         data[pk_field] = int(next_id)
                         setattr(self, pk_field, data[pk_field])
 
-        parent_prepare = super().prepare_save_data if hasattr(super(), "prepare_save_data") else None
+        parent_prepare = getattr(super(), "prepare_save_data", None)
         if parent_prepare:
-            data = parent_prepare(data, is_new)
-
-        return data
+            parent_prepare(data, is_new)

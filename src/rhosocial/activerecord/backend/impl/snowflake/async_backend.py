@@ -220,8 +220,10 @@ class AsyncSnowflakeBackend(
                 if row:
                     version_str = row[0]
                     parts = version_str.split('.')
-                    self._server_version_cache = tuple(int(p) for p in parts if p.isdigit())
-                    return self._server_version_cache
+                    server_version = tuple(int(p) for p in parts if p.isdigit())
+                    if server_version and server_version[0] > 0:
+                        self._server_version_cache = server_version
+                        return self._server_version_cache
             except Exception:
                 pass
 
@@ -230,6 +232,36 @@ class AsyncSnowflakeBackend(
     async def introspect_and_adapt(self) -> None:
         """Introspect the Snowflake database and adapt type mappings."""
         pass
+
+    async def _process_result_set(self, cursor, is_select, column_adapters=None, column_mapping=None):
+        """Process result set with Snowflake column name normalization.
+
+        Snowflake stores unquoted identifiers as UPPERCASE, and
+        ``cursor.description`` returns them as such.  Python model
+        field names are lowercase by convention, so we normalise
+        column names to lowercase before building row dicts so that
+        ``_map_columns_to_fields()`` and ``_remap_row_columns()`` can
+        match them correctly.
+        """
+        if not is_select:
+            return None
+        try:
+            rows = await cursor.fetchall()
+            if not rows:
+                return []
+            column_names = [desc[0].strip('"').lower() for desc in cursor.description]
+            final_results = []
+            adapters = column_adapters or {}
+            mapping = column_mapping or {}
+            for row in rows:
+                row_dict = dict(zip(column_names, row))
+                adapted_row = self._adapt_row_types(row_dict, adapters)
+                final_row = self._remap_row_columns(adapted_row, mapping)
+                final_results.append(final_row)
+            return final_results
+        except Exception as e:
+            self.logger.error(f"Error processing async result set: {str(e)}", exc_info=True)
+            raise
 
     def _create_introspector(self):
         """Create an AsyncSnowflakeIntrospector with a thread-pool executor."""
