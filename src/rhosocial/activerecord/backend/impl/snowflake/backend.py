@@ -201,3 +201,22 @@ class SnowflakeBackend(
     def introspect_and_adapt(self) -> None:
         """Introspect the Snowflake database and adapt type mappings."""
         pass
+
+    def _get_cursor(self):
+        """Get a cursor from the current connection.
+
+        Returns:
+            A Snowflake cursor object.
+
+        Raises:
+            ConnectionError: If not connected to Snowflake.
+        """
+        if self._connection is None:
+            raise ConnectionError("Not connected to Snowflake")
+        return self._connection.cursor()
+
+    def _create_introspector(self):
+        """Create a SyncSnowflakeIntrospector backed by a SyncIntrospectorExecutor."""
+        from rhosocial.activerecord.backend.introspection.executor import SyncIntrospectorExecutor
+        from .introspection import SyncSnowflakeIntrospector
+        return SyncSnowflakeIntrospector(self, SyncIntrospectorExecutor(self))

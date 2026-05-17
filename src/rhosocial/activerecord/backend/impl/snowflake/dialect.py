@@ -70,6 +70,7 @@ from .mixins import (
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
     SnowflakeStageMixin,
+    SnowflakeIntrospectionMixin,
 )
 
 if TYPE_CHECKING:
@@ -100,14 +101,15 @@ class SnowflakeDialect(
     IndexMixin,
     TableMixin,
     ConstraintMixin,
-    IntrospectionMixin,
-    # Snowflake-specific mixins
+    # Snowflake-specific mixins (before generic IntrospectionMixin to override methods)
     SnowflakeTransactionMixin,
     SnowflakeTimeTravelMixin,
     SnowflakeVariantMixin,
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
     SnowflakeStageMixin,
+    SnowflakeIntrospectionMixin,  # Must be before IntrospectionMixin
+    IntrospectionMixin,
     # Protocol supports (for isinstance checks)
     CTESupport,
     FilterClauseSupport,
