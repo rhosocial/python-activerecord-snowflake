@@ -16,26 +16,26 @@ def main():
     parser.add_argument(
         "--version",
         action="version",
-        version="rhosocial-activerecord-snowflake 1.0.0.dev1",
+        version="rhosocial-activerecord-snowflake 1.0.0.dev2",
     )
-    parser.add_argument(
-        "command",
-        nargs="?",
-        choices=["info", "query", "introspect"],
-        help="Available commands: info, query, introspect",
-    )
+
+    from .cli import register_commands, get_handler, COMMAND_NAMES
+
+    subparsers = parser.add_subparsers(dest="command")
+    register_commands(subparsers)
 
     args = parser.parse_args()
 
     if args.command is None:
         print(
-            "Error: Please specify a command: 'info', 'query', or 'introspect'",
+            f"Error: Please specify a command: {', '.join(COMMAND_NAMES)}",
             file=sys.stderr,
         )
         print("Use --help for more information.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Command '{args.command}' is not yet implemented.")
+    handler = get_handler(args.command)
+    handler(args)
 
 
 if __name__ == "__main__":
