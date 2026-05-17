@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rhosocial-activerecord-snowflake"
-version = "1.0.0.dev1"
+version = "1.0.0.dev2"
 description = "Snowflake backend implementation for rhosocial-activerecord, providing cloud data warehouse support with VARIANT, ARRAY, and time travel features."
 readme = "README.md"
 license = { file = "LICENSE" }
