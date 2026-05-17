@@ -191,8 +191,10 @@ class SnowflakeBackend(
                 if row:
                     version_str = row[0]
                     parts = version_str.split('.')
-                    self._server_version_cache = tuple(int(p) for p in parts if p.isdigit())
-                    return self._server_version_cache
+                    server_version = tuple(int(p) for p in parts if p.isdigit())
+                    if server_version and server_version[0] > 0:
+                        self._server_version_cache = server_version
+                        return self._server_version_cache
             except Exception:
                 pass
 
@@ -214,6 +216,88 @@ class SnowflakeBackend(
         if self._connection is None:
             raise ConnectionError("Not connected to Snowflake")
         return self._connection.cursor()
+
+    def _build_query_result(self, cursor, data, duration):
+        """Build QueryResult, handling fakesnow/DuckDB RETURNING quirks.
+
+        fakesnow (DuckDB-based emulator) has two issues with RETURNING:
+
+        1. Column names are DuckDB metadata names instead of actual column
+           names: "number of rows inserted", "number of rows updated",
+           "number of rows deleted", "number of multi-joined rows updated".
+
+        2. cursor.rowcount accumulates across operations on the same cursor,
+           making it unreliable for DML affected_rows.
+
+        When we detect these metadata column names we fix both issues:
+        extract last_insert_id from INSERT data, and use the result-set
+        length instead of cursor.rowcount for affected_rows.
+        """
+        from rhosocial.activerecord.backend.result import QueryResult
+
+        last_insert_id = getattr(cursor, "lastrowid", None)
+        affected_rows = getattr(cursor, "rowcount", 0)
+
+        # Detect fakesnow/DuckDB RETURNING quirks
+        _FAKESNOW_COLUMNS = {
+            "number of rows inserted",
+            "number of rows updated",
+            "number of rows deleted",
+            "number of multi-joined rows updated",
+        }
+
+        if data and isinstance(data, list) and len(data) > 0:
+            first_row = data[0]
+            if isinstance(first_row, dict):
+                row_keys = set(first_row.keys())
+                if row_keys & _FAKESNOW_COLUMNS:
+                    # fakesnow RETURNING detected
+                    affected_rows = len(data)
+
+                    # INSERT: extract PK value as last_insert_id
+                    nri = first_row.get("number of rows inserted")
+                    if nri is not None and isinstance(nri, int) and last_insert_id is None:
+                        last_insert_id = nri
+
+                    # Clear misleading data so core uses last_insert_id path
+                    data = None
+
+        return QueryResult(
+            data=data,
+            affected_rows=affected_rows,
+            last_insert_id=last_insert_id,
+            duration=duration,
+        )
+
+    def _process_result_set(self, cursor, is_select, column_adapters=None, column_mapping=None):
+        """Process result set with Snowflake column name normalization.
+
+        Snowflake stores unquoted identifiers as UPPERCASE, and
+        ``cursor.description`` returns them as such.  Python model
+        field names are lowercase by convention, so we normalise
+        column names to lowercase before building row dicts so that
+        ``_map_columns_to_fields()`` and ``_remap_row_columns()`` can
+        match them correctly.
+        """
+        if not is_select:
+            return None
+        try:
+            rows = cursor.fetchall()
+            if not rows:
+                return []
+            column_names = [desc[0].strip('"').lower() for desc in cursor.description]
+            final_results = []
+            adapters = column_adapters or {}
+            mapping = column_mapping or {}
+            for row in rows:
+                row_dict = dict(zip(column_names, row))
+                adapted_row = self._adapt_row_types(row_dict, adapters)
+                final_row = self._remap_row_columns(adapted_row, mapping)
+                final_results.append(final_row)
+            return final_results
+        except Exception as e:
+            self.logger.error(f"Error processing result set: {str(e)}", exc_info=True)
+            raise
 
     def _create_introspector(self):
         """Create a SyncSnowflakeIntrospector backed by a SyncIntrospectorExecutor."""

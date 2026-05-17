@@ -54,6 +54,7 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     TableMixin,
     ConstraintMixin,
     IntrospectionMixin,
+    ReturningMixin,
 )
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from .protocols import (
@@ -101,6 +102,7 @@ class SnowflakeDialect(
     IndexMixin,
     TableMixin,
     ConstraintMixin,
+    ReturningMixin,
     # Snowflake-specific mixins (before generic IntrospectionMixin to override methods)
     SnowflakeTransactionMixin,
     SnowflakeTimeTravelMixin,
@@ -247,13 +249,16 @@ class SnowflakeDialect(
         """Snowflake supports introspection via INFORMATION_SCHEMA."""
         return True
 
-    def supports_returning_clause(self) -> bool:
-        """Snowflake supports RETURNING clause from version 7.32.0+.
+    def supports_returning_insert(self) -> bool:
+        """Snowflake supports RETURNING for INSERT from version 7.32.0+."""
+        return self.version >= (7, 32, 0)
 
-        RETURNING was introduced as a Preview feature and has been
-        progressively GA'd. Users on older versions can override
-        via SnowflakeConnectionConfig.enable_returning.
-        """
+    def supports_returning_update(self) -> bool:
+        """Snowflake supports RETURNING for UPDATE from version 7.32.0+."""
+        return self.version >= (7, 32, 0)
+
+    def supports_returning_delete(self) -> bool:
+        """Snowflake supports RETURNING for DELETE from version 7.32.0+."""
         return self.version >= (7, 32, 0)
 
     # ========== Snowflake-Specific Capability Detection ==========
