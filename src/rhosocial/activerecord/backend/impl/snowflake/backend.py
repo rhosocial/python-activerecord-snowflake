@@ -12,6 +12,7 @@ from rhosocial.activerecord.backend.errors import (
     ConnectionError,
     DatabaseError,
     IntegrityError,
+    OperationalError,
     QueryError,
 )
 from rhosocial.activerecord.backend.result import QueryResult
@@ -155,14 +156,22 @@ class SnowflakeBackend(
             Appropriate rhosocial error based on classification.
         """
         category = self._classify_error(error)
+        error_msg = str(error)
         if category == 'connection':
-            raise ConnectionError(str(error)) from error
+            self.log(logging.ERROR, f"Connection error: {error_msg}")
+            raise ConnectionError(error_msg) from error
         elif category == 'integrity':
-            raise IntegrityError(str(error)) from error
+            self.log(logging.ERROR, f"Integrity error: {error_msg}")
+            raise IntegrityError(error_msg) from error
         elif category == 'query':
-            raise QueryError(str(error)) from error
+            self.log(logging.ERROR, f"Query error: {error_msg}")
+            raise QueryError(error_msg) from error
+        elif category == 'operational':
+            self.log(logging.ERROR, f"Operational error: {error_msg}")
+            raise OperationalError(error_msg) from error
         else:
-            raise DatabaseError(str(error)) from error
+            self.log(logging.ERROR, f"Database error: {error_msg}")
+            raise DatabaseError(error_msg) from error
 
     def get_server_version(self) -> Tuple[int, ...]:
         """Get the Snowflake server version.

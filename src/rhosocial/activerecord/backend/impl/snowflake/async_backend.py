@@ -3,9 +3,29 @@
 This module provides the async Snowflake backend using a thread pool
 wrapper around the synchronous snowflake-connector-python driver,
 since there is no native async driver for Snowflake.
+
+IMPORTANT: This is a pseudo-async implementation. All I/O operations
+are executed in a thread pool executor (``run_in_executor``), which
+means:
+
+1. Under high concurrency, the default ThreadPoolExecutor may become
+   a bottleneck (default size: ``min(32, cpu_count + 4)``).
+2. Performance benefits from uvloop or similar are lost — the
+   underlying snowflake-connector-python calls remain synchronous.
+3. To prevent connection storms, inject a bounded executor:
+
+       from concurrent.futures import ThreadPoolExecutor
+       backend = AsyncSnowflakeBackend(
+           executor=ThreadPoolExecutor(max_workers=10),
+           ...
+       )
+
+When a native async Snowflake connector becomes available, this
+backend will be updated to use it transparently.
 """
 import asyncio
 import logging
+from concurrent.futures import Executor
 from typing import Any, Dict, Optional, Tuple
 
 from rhosocial.activerecord.backend.base import AsyncStorageBackend
@@ -13,6 +33,7 @@ from rhosocial.activerecord.backend.errors import (
     ConnectionError,
     DatabaseError,
     IntegrityError,
+    OperationalError,
     QueryError,
 )
 from rhosocial.activerecord.backend.introspection.backend_mixin import IntrospectorBackendMixin
@@ -34,18 +55,33 @@ class AsyncSnowflakeBackend(
     driver for async compatibility. This follows the project's sync/async parity
     principle, providing the same API surface with async/await syntax.
 
-    Note: Since snowflake-connector-python does not provide a native async driver,
-    all I/O operations are executed in a thread pool executor to avoid blocking
-    the event loop.
+    Caveats:
+        - All I/O operations run in a thread pool executor, not truly async.
+        - High-concurrency scenarios should inject a bounded executor to
+          prevent thread pool exhaustion.
+        - Snowflake warehouse concurrency limits are not automatically
+          respected — configure ``max_workers`` accordingly.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, *, executor: Optional[Executor] = None, **kwargs):
         """Initialize async Snowflake backend with connection configuration.
 
         Args:
+            executor: Optional custom ``concurrent.futures.Executor`` for
+                running synchronous snowflake-connector-python operations.
+                If not provided, the default ``ThreadPoolExecutor`` is used.
+                For production use, inject a bounded executor to prevent
+                connection storms::
+
+                    from concurrent.futures import ThreadPoolExecutor
+                    backend = AsyncSnowflakeBackend(
+                        executor=ThreadPoolExecutor(max_workers=10),
+                        ...
+                    )
             version: Expected Snowflake server version tuple.
                     Defaults to (8, 0, 0). Can be passed as 'version' in kwargs.
         """
+        self._executor = executor
         version = kwargs.pop('version', None) or (8, 0, 0)
 
         connection_config = kwargs.get('connection_config')
@@ -106,7 +142,7 @@ class AsyncSnowflakeBackend(
 
             loop = asyncio.get_event_loop()
             self._connection = await loop.run_in_executor(
-                None, lambda: snowflake.connector.connect(**conn_params)
+                self._executor, lambda: snowflake.connector.connect(**conn_params)
             )
             self._connected = True
             self.log(logging.INFO, "Connected to Snowflake (async)")
@@ -118,7 +154,7 @@ class AsyncSnowflakeBackend(
         if self._connection:
             try:
                 loop = asyncio.get_event_loop()
-                await loop.run_in_executor(None, self._connection.close)
+                await loop.run_in_executor(self._executor, self._connection.close)
                 self.log(logging.INFO, "Disconnected from Snowflake (async)")
             except Exception as e:
                 self.log(logging.WARNING, f"Error disconnecting from Snowflake: {e}")
@@ -135,8 +171,8 @@ class AsyncSnowflakeBackend(
             return False
         try:
             loop = asyncio.get_event_loop()
-            cursor = await loop.run_in_executor(None, self._connection.cursor)
-            await loop.run_in_executor(None, cursor.execute, "SELECT 1")
+            cursor = await loop.run_in_executor(self._executor, self._connection.cursor)
+            await loop.run_in_executor(self._executor, cursor.execute, "SELECT 1")
             cursor.close()
             return True
         except Exception:
@@ -152,14 +188,22 @@ class AsyncSnowflakeBackend(
     async def _handle_error(self, error: Exception) -> None:
         """Handle and classify a Snowflake error."""
         category = self._classify_error(error)
+        error_msg = str(error)
         if category == 'connection':
-            raise ConnectionError(str(error)) from error
+            self.log(logging.ERROR, f"Connection error: {error_msg}")
+            raise ConnectionError(error_msg) from error
         elif category == 'integrity':
-            raise IntegrityError(str(error)) from error
+            self.log(logging.ERROR, f"Integrity error: {error_msg}")
+            raise IntegrityError(error_msg) from error
         elif category == 'query':
-            raise QueryError(str(error)) from error
+            self.log(logging.ERROR, f"Query error: {error_msg}")
+            raise QueryError(error_msg) from error
+        elif category == 'operational':
+            self.log(logging.ERROR, f"Operational error: {error_msg}")
+            raise OperationalError(error_msg) from error
         else:
-            raise DatabaseError(str(error)) from error
+            self.log(logging.ERROR, f"Database error: {error_msg}")
+            raise DatabaseError(error_msg) from error
 
     async def get_server_version(self) -> Tuple[int, ...]:
         """Get the Snowflake server version."""
@@ -169,9 +213,9 @@ class AsyncSnowflakeBackend(
         if self._connection:
             try:
                 loop = asyncio.get_event_loop()
-                cursor = await loop.run_in_executor(None, self._connection.cursor)
-                await loop.run_in_executor(None, cursor.execute, "SELECT CURRENT_VERSION()")
-                row = await loop.run_in_executor(None, cursor.fetchone)
+                cursor = await loop.run_in_executor(self._executor, self._connection.cursor)
+                await loop.run_in_executor(self._executor, cursor.execute, "SELECT CURRENT_VERSION()")
+                row = await loop.run_in_executor(self._executor, cursor.fetchone)
                 cursor.close()
                 if row:
                     version_str = row[0]

@@ -70,8 +70,18 @@ class TestSnowflakeDialectCapabilities:
     def test_supports_introspection(self, dialect):
         assert dialect.supports_introspection() is True
 
-    def test_does_not_support_returning(self, dialect):
-        assert dialect.supports_returning_clause() is False
+    def test_returning_clause_version_dependent(self, dialect):
+        """RETURNING support depends on Snowflake server version."""
+        # Default dialect uses (8, 0, 0) which is >= 7.32.0
+        assert dialect.supports_returning_clause() is True
+
+        # Explicitly old version should not support RETURNING
+        old_dialect = SnowflakeDialect(version=(7, 31, 0))
+        assert old_dialect.supports_returning_clause() is False
+
+        # Boundary version
+        boundary_dialect = SnowflakeDialect(version=(7, 32, 0))
+        assert boundary_dialect.supports_returning_clause() is True
 
 
 class TestSnowflakeSpecificCapabilities:

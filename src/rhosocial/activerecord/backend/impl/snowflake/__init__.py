@@ -44,6 +44,7 @@ from .mixins import (
     SnowflakeCloneMixin,
     SnowflakeStageMixin,
 )
+from .field import SnowflakePKMixin
 
 __all__ = [
     # Backend classes
@@ -77,4 +78,6 @@ __all__ = [
     "SnowflakeArrayMixin",
     "SnowflakeCloneMixin",
     "SnowflakeStageMixin",
+    # Field Mixins
+    "SnowflakePKMixin",
 ]

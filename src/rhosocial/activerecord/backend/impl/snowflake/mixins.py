@@ -56,21 +56,96 @@ class SnowflakeBackendMixin:
     def _classify_error(self, error: Exception) -> str:
         """Classify a Snowflake error into a standard error category.
 
+        Uses snowflake.connector.errors exception type hierarchy for
+        accurate classification, with string matching as fallback for
+        non-Snowflake exceptions.
+
         Args:
             error: The exception to classify.
 
         Returns:
-            String category: 'connection', 'integrity', 'query', or 'unknown'
+            String category: 'connection', 'integrity', 'query',
+            'operational', or 'unknown'
         """
-        error_str = str(error).lower()
-        error_type = type(error).__name__.lower()
+        from snowflake.connector.errors import (
+            Error as SnowflakeError,
+            InterfaceError as SnowflakeInterfaceError,
+            DatabaseError as SnowflakeDatabaseError,
+            OperationalError as SnowflakeOperationalError,
+            ProgrammingError as SnowflakeProgrammingError,
+            IntegrityError as SnowflakeIntegrityError,
+            DataError as SnowflakeDataError,
+            NotSupportedError as SnowflakeNotSupportedError,
+            HttpError as SnowflakeHttpError,
+            GatewayTimeoutError as SnowflakeGatewayTimeoutError,
+            RequestTimeoutError as SnowflakeRequestTimeoutError,
+            ServiceUnavailableError as SnowflakeServiceUnavailableError,
+        )
 
-        if any(s in error_str for s in ['connection', 'network', 'timeout', 'handshake']):
-            return 'connection'
-        if any(s in error_str for s in ['unique', 'constraint', 'duplicate', 'primary key', 'foreign key']):
+        # IntegrityError is most specific, check first
+        if isinstance(error, SnowflakeIntegrityError):
             return 'integrity'
-        if any(s in error_str for s in ['syntax', 'invalid', 'not found', 'does not exist']):
+
+        # Connection-related errors (network, timeout, service unavailable)
+        if isinstance(error, (
+            SnowflakeInterfaceError,
+            SnowflakeGatewayTimeoutError,
+            SnowflakeRequestTimeoutError,
+            SnowflakeServiceUnavailableError,
+        )):
+            return 'connection'
+
+        # OperationalError spans both connection and operational issues;
+        # use string matching to distinguish
+        if isinstance(error, SnowflakeOperationalError):
+            error_msg = str(error).lower()
+            if any(s in error_msg for s in [
+                'connection', 'network', 'timeout',
+                'handshake', 'connect', 'refused',
+            ]):
+                return 'connection'
+            return 'operational'
+
+        # ProgrammingError: syntax errors, invalid SQL, object not found
+        if isinstance(error, SnowflakeProgrammingError):
             return 'query'
+
+        # DataError: data processing errors (type mismatch, value out of range)
+        if isinstance(error, SnowflakeDataError):
+            return 'query'
+
+        # NotSupportedError: unsupported feature usage
+        if isinstance(error, SnowflakeNotSupportedError):
+            return 'query'
+
+        # HttpError: network-level, classify as connection
+        if isinstance(error, SnowflakeHttpError):
+            return 'connection'
+
+        # Generic Snowflake DatabaseError fallback
+        if isinstance(error, SnowflakeDatabaseError):
+            return 'unknown'
+
+        # Generic Snowflake Error fallback
+        if isinstance(error, SnowflakeError):
+            return 'unknown'
+
+        # Non-Snowflake exceptions: fallback to string matching
+        error_msg = str(error).lower()
+        if any(s in error_msg for s in [
+            'connection', 'network', 'timeout', 'handshake',
+        ]):
+            return 'connection'
+        if any(s in error_msg for s in [
+            'unique', 'constraint', 'duplicate',
+            'primary key', 'foreign key',
+        ]):
+            return 'integrity'
+        if any(s in error_msg for s in [
+            'syntax', 'invalid', 'not found', 'does not exist',
+        ]):
+            return 'query'
+
         return 'unknown'
 
     def get_default_schema(self) -> Optional[str]:

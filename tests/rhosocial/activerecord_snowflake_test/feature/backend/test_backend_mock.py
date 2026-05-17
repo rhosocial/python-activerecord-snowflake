@@ -116,7 +116,12 @@ class TestSnowflakeBackendMocked:
 
 
 class TestSnowflakeBackendErrorClassification:
-    """Test error classification in SnowflakeBackendMixin."""
+    """Test error classification in SnowflakeBackendMixin.
+
+    Verifies that structured snowflake.connector.errors exception types
+    are classified correctly, with string matching only as fallback for
+    non-Snowflake exceptions.
+    """
 
     def setup_method(self):
         self.backend = SnowflakeBackend(
@@ -126,26 +131,140 @@ class TestSnowflakeBackendErrorClassification:
             password="test_pass",
         )
 
-    def test_classify_connection_error(self):
+    # --- Structured exception type tests ---
+
+    def test_classify_snowflake_integrity_error(self):
+        from snowflake.connector.errors import IntegrityError
+        err = IntegrityError(msg="Duplicate key", errno=2003)
+        assert self.backend._classify_error(err) == "integrity"
+
+    def test_classify_snowflake_interface_error(self):
+        from snowflake.connector.errors import InterfaceError
+        err = InterfaceError(msg="Connection refused")
+        assert self.backend._classify_error(err) == "connection"
+
+    def test_classify_snowflake_gateway_timeout(self):
+        from snowflake.connector.errors import GatewayTimeoutError
+        err = GatewayTimeoutError(msg="Gateway timeout")
+        assert self.backend._classify_error(err) == "connection"
+
+    def test_classify_snowflake_request_timeout(self):
+        from snowflake.connector.errors import RequestTimeoutError
+        err = RequestTimeoutError(msg="Request timeout")
+        assert self.backend._classify_error(err) == "connection"
+
+    def test_classify_snowflake_service_unavailable(self):
+        from snowflake.connector.errors import ServiceUnavailableError
+        err = ServiceUnavailableError(msg="Service unavailable")
+        assert self.backend._classify_error(err) == "connection"
+
+    def test_classify_snowflake_operational_error_connection(self):
+        from snowflake.connector.errors import OperationalError
+        err = OperationalError(msg="Connection timeout occurred")
+        assert self.backend._classify_error(err) == "connection"
+
+    def test_classify_snowflake_operational_error_generic(self):
+        from snowflake.connector.errors import OperationalError
+        err = OperationalError(msg="Warehouse suspended")
+        assert self.backend._classify_error(err) == "operational"
+
+    def test_classify_snowflake_programming_error(self):
+        from snowflake.connector.errors import ProgrammingError
+        err = ProgrammingError(msg="SQL compilation error")
+        assert self.backend._classify_error(err) == "query"
+
+    def test_classify_snowflake_data_error(self):
+        from snowflake.connector.errors import DataError
+        err = DataError(msg="Value out of range")
+        assert self.backend._classify_error(err) == "query"
+
+    def test_classify_snowflake_not_supported_error(self):
+        from snowflake.connector.errors import NotSupportedError
+        err = NotSupportedError(msg="Feature not supported")
+        assert self.backend._classify_error(err) == "query"
+
+    def test_classify_snowflake_http_error(self):
+        from snowflake.connector.errors import HttpError
+        err = HttpError(msg="HTTP 500 error")
+        assert self.backend._classify_error(err) == "connection"
+
+    def test_classify_snowflake_database_error_fallback(self):
+        from snowflake.connector.errors import DatabaseError
+        err = DatabaseError(msg="Unknown database issue")
+        assert self.backend._classify_error(err) == "unknown"
+
+    def test_classify_snowflake_generic_error(self):
+        from snowflake.connector.errors import Error
+        err = Error(msg="Generic Snowflake error")
+        assert self.backend._classify_error(err) == "unknown"
+
+    # --- String matching fallback (non-Snowflake exceptions) ---
+
+    def test_classify_connection_error_string(self):
         assert self.backend._classify_error(Exception("connection refused")) == "connection"
 
-    def test_classify_network_error(self):
+    def test_classify_network_error_string(self):
         assert self.backend._classify_error(Exception("network timeout")) == "connection"
 
-    def test_classify_integrity_error(self):
+    def test_classify_integrity_error_string(self):
         assert self.backend._classify_error(Exception("unique constraint violation")) == "integrity"
 
-    def test_classify_duplicate_key_error(self):
+    def test_classify_duplicate_key_error_string(self):
         assert self.backend._classify_error(Exception("duplicate key value")) == "integrity"
 
-    def test_classify_query_error(self):
+    def test_classify_query_error_string(self):
         assert self.backend._classify_error(Exception("syntax error")) == "query"
 
-    def test_classify_not_found_error(self):
+    def test_classify_not_found_error_string(self):
         assert self.backend._classify_error(Exception("table does not exist")) == "query"
 
-    def test_classify_unknown_error(self):
+    def test_classify_unknown_error_string(self):
         assert self.backend._classify_error(Exception("something unexpected")) == "unknown"
+
+    # --- _handle_error integration tests ---
+
+    def test_handle_error_raises_connection_error(self):
+        from snowflake.connector.errors import InterfaceError
+        from rhosocial.activerecord.backend.errors import ConnectionError
+        err = InterfaceError(msg="Connection refused")
+        with pytest.raises(ConnectionError):
+            self.backend._handle_error(err)
+
+    def test_handle_error_raises_integrity_error(self):
+        from snowflake.connector.errors import IntegrityError as SFIntegrityError
+        from rhosocial.activerecord.backend.errors import IntegrityError
+        err = SFIntegrityError(msg="Duplicate key", errno=2003)
+        with pytest.raises(IntegrityError):
+            self.backend._handle_error(err)
+
+    def test_handle_error_raises_query_error(self):
+        from snowflake.connector.errors import ProgrammingError
+        from rhosocial.activerecord.backend.errors import QueryError
+        err = ProgrammingError(msg="SQL compilation error")
+        with pytest.raises(QueryError):
+            self.backend._handle_error(err)
+
+    def test_handle_error_raises_operational_error(self):
+        from snowflake.connector.errors import OperationalError as SFOperationalError
+        from rhosocial.activerecord.backend.errors import OperationalError
+        err = SFOperationalError("Warehouse suspended")
+        with pytest.raises(OperationalError):
+            self.backend._handle_error(err)
+
+    def test_handle_error_raises_database_error_for_unknown(self):
+        from snowflake.connector.errors import DatabaseError
+        from rhosocial.activerecord.backend.errors import DatabaseError as ARDatabaseError
+        err = DatabaseError(msg="Unknown issue")
+        with pytest.raises(ARDatabaseError):
+            self.backend._handle_error(err)
+
+    def test_handle_error_preserves_chain(self):
+        from snowflake.connector.errors import ProgrammingError
+        from rhosocial.activerecord.backend.errors import QueryError
+        original = ProgrammingError(msg="SQL error")
+        with pytest.raises(QueryError) as exc_info:
+            self.backend._handle_error(original)
+        assert exc_info.value.__cause__ is original
 
 
 class TestSnowflakeBackendAdapters:
