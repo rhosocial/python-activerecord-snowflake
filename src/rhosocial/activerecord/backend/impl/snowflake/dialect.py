@@ -78,6 +78,7 @@ from .mixins import (
 )
 
 if TYPE_CHECKING:
+    from rhosocial.activerecord.backend.expression.collation import CollationName
     from rhosocial.activerecord.backend.expression.statements import (
         CreateTableExpression, CreateViewExpression, DropViewExpression,
         ColumnDefinition, TableConstraint, IndexDefinition,
@@ -200,7 +201,7 @@ class SnowflakeDialect(
         """Snowflake supports expression-level COLLATE."""
         return True
 
-    def validate_collation_name(self, collation) -> str:
+    def validate_collation_name(self, collation: "CollationName") -> str:
         """Validate Snowflake collation specs and return their SQL representation."""
         if collation.schema is not None or collation.keyword is not None:
             raise UnsupportedFeatureError(self.name, "schema-qualified or keyword COLLATE")
