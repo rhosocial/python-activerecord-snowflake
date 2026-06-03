@@ -8,7 +8,6 @@ import os
 import pytest
 
 from rhosocial.activerecord.backend.expression import Column, Literal
-from rhosocial.activerecord.backend.expression.collation import CollationName
 from rhosocial.activerecord.backend.impl.snowflake import (
     SnowflakeBackend,
     SnowflakeCollation,
@@ -95,15 +94,15 @@ class TestSnowflakeCollationExpression:
         assert params == ("Alice",)
 
     def test_rejects_schema_qualified_collation(self, dialect):
-        expr = Column(dialect, "name").collate(CollationName("en-ci", schema="PUBLIC"))
+        expr = Column(dialect, "name").collate("en-ci", schema="PUBLIC")
 
-        with pytest.raises(Exception, match="schema-qualified or keyword COLLATE"):
+        with pytest.raises(Exception, match="COLLATE options: schema"):
             expr.to_sql()
 
     def test_rejects_keyword_collation(self, dialect):
-        expr = Column(dialect, "name").collate(CollationName.as_keyword("upper"))
+        expr = Column(dialect, "name").collate("upper", keyword=True)
 
-        with pytest.raises(Exception, match="schema-qualified or keyword COLLATE"):
+        with pytest.raises(Exception, match="COLLATE options: keyword"):
             expr.to_sql()
 
     def test_rejects_unsupported_collation(self, dialect):
