@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
 from rhosocial.activerecord.backend.dialect.protocols import (
+    CollationSupport,
     CTESupport,
     FilterClauseSupport,
     WindowFunctionSupport,
@@ -36,6 +37,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     JSONSupport,
 )
 from rhosocial.activerecord.backend.dialect.mixins import (
+    CollationMixin,
     CTEMixin,
     FilterClauseMixin,
     WindowFunctionMixin,
@@ -57,6 +59,7 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     ReturningMixin,
 )
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
+from .collation import validate_snowflake_collation_name
 from .protocols import (
     SnowflakeTimeTravelSupport,
     SnowflakeVariantSupport,
@@ -85,6 +88,7 @@ if TYPE_CHECKING:
 class SnowflakeDialect(
     SQLDialectBase,
     # Standard SQL mixins
+    CollationMixin,
     CTEMixin,
     FilterClauseMixin,
     WindowFunctionMixin,
@@ -113,6 +117,7 @@ class SnowflakeDialect(
     SnowflakeIntrospectionMixin,  # Must be before IntrospectionMixin
     IntrospectionMixin,
     # Protocol supports (for isinstance checks)
+    CollationSupport,
     CTESupport,
     FilterClauseSupport,
     WindowFunctionSupport,
@@ -190,6 +195,17 @@ class SnowflakeDialect(
             The parameter placeholder string.
         """
         return "%s"
+
+    def supports_collate_expression(self) -> bool:
+        """Snowflake supports expression-level COLLATE."""
+        return True
+
+    def format_collation_name(self, collation) -> str:
+        """Format Snowflake collation specs as validated string literals."""
+        if collation.schema is not None or collation.keyword is not None:
+            raise UnsupportedFeatureError(self.name, "schema-qualified or keyword COLLATE")
+        spec = validate_snowflake_collation_name(collation.name, getattr(self, "version", None))
+        return f"'{self._escape_sql_string(spec)}'"
 
     # ========== Capability Detection ==========
 

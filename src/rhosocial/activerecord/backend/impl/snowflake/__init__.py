@@ -19,6 +19,7 @@ Architecture:
 from .backend import SnowflakeBackend
 from .async_backend import AsyncSnowflakeBackend
 from .config import SnowflakeConnectionConfig
+from .collation import SnowflakeCollation
 from .dialect import SnowflakeDialect
 from .transaction import SnowflakeTransactionManager
 from .async_transaction import AsyncSnowflakeTransactionManager
@@ -59,6 +60,7 @@ __all__ = [
     "SnowflakeConnectionConfig",
     # Dialect
     "SnowflakeDialect",
+    "SnowflakeCollation",
     # Transaction managers
     "SnowflakeTransactionManager",
     "AsyncSnowflakeTransactionManager",
