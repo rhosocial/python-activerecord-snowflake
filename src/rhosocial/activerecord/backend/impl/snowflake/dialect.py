@@ -200,8 +200,8 @@ class SnowflakeDialect(
         """Snowflake supports expression-level COLLATE."""
         return True
 
-    def format_collation_name(self, collation) -> str:
-        """Format Snowflake collation specs as validated string literals."""
+    def validate_collation_name(self, collation) -> str:
+        """Validate Snowflake collation specs and return their SQL representation."""
         if collation.schema is not None or collation.keyword is not None:
             raise UnsupportedFeatureError(self.name, "schema-qualified or keyword COLLATE")
         spec = validate_snowflake_collation_name(collation.name, getattr(self, "version", None))
