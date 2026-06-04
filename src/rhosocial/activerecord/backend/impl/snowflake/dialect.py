@@ -197,6 +197,33 @@ class SnowflakeDialect(
         """
         return "%s"
 
+    def format_interval_expression(self, expr: "Any") -> Tuple[str, Tuple]:
+        value = self._escape_sql_string(str(expr.value))
+        sql = f"INTERVAL '{value}' {expr.unit.value.upper()}"
+        return self._apply_value_expression_modifiers(sql, (), expr)
+
+    def format_datetime_add_expression(self, expr: "Any") -> Tuple[str, Tuple]:
+        source_sql, source_params = expr.source.to_sql()
+        unit = expr.interval.unit.value.upper()
+        sql = f"DATEADD({unit}, %s, {source_sql})"
+        return self._apply_value_expression_modifiers(
+            sql, (expr.interval.value,) + source_params, expr
+        )
+
+    def format_datetime_subtract_expression(self, expr: "Any") -> Tuple[str, Tuple]:
+        source_sql, source_params = expr.source.to_sql()
+        unit = expr.interval.unit.value.upper()
+        sql = f"DATEADD({unit}, %s, {source_sql})"
+        return self._apply_value_expression_modifiers(
+            sql, (-expr.interval.value,) + source_params, expr
+        )
+
+    def format_datetime_diff_expression(self, expr: "Any") -> Tuple[str, Tuple]:
+        start_sql, start_params = expr.start.to_sql()
+        end_sql, end_params = expr.end.to_sql()
+        sql = f"DATEDIFF({expr.unit.value.upper()}, {start_sql}, {end_sql})"
+        return self._apply_value_expression_modifiers(sql, start_params + end_params, expr)
+
     def supports_collate_expression(self) -> bool:
         """Snowflake supports expression-level COLLATE."""
         return True
