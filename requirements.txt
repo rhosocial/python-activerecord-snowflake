@@ -1,2 +1,6 @@
-rhosocial-activerecord>=0.9.0,<2.0.0
+# requirements.txt
+# Backend-specific dependencies only
+# Core dependency (rhosocial-activerecord) is installed via CI workflow from git
+
+# Snowflake driver
 snowflake-connector-python>=3.0.0
