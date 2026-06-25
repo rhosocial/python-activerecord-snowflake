@@ -1,0 +1,117 @@
+# .github/workflows/changelog-check.yml
+name: Changelog Fragment Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - 'release/v**'
+      - 'maint/**'
+  push:
+    branches:
+      - 'release/v**'
+      - 'maint/**'
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check-fragment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check for changelog fragment
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title || '' }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          # For push events, check if there are uncommitted changelog fragments
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            echo "Push event detected - checking for changelog fragments in last commit"
+
+            # Check if last commit already contains a changelog fragment
+            LAST_COMMIT_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
+
+            if echo "$LAST_COMMIT_FILES" | grep -q "^changelog.d/[0-9].*\.md$"; then
+              echo "✓ Changelog fragment found in last commit"
+              exit 0
+            fi
+
+            # Check if last commit is a version bump or changelog build
+            LAST_MSG=$(git log -1 --pretty=%B)
+            if [[ "$LAST_MSG" =~ ^chore:\ bump\ version ]] || [[ "$LAST_MSG" =~ ^docs:\ update\ CHANGELOG ]]; then
+              echo "✓ Version bump or changelog update commit, fragment not required"
+              exit 0
+            fi
+
+            # Check if there are any source code changes (excluding tests/docs)
+            if echo "$LAST_COMMIT_FILES" | grep -qE "^src/.*\.py$"; then
+              echo "⚠ Warning: Source code changes without changelog fragment"
+              echo "Consider adding a changelog fragment for traceability"
+              echo "Changed files: $LAST_COMMIT_FILES"
+              # Warning only, don't fail the build
+              exit 0
+            fi
+
+            echo "✓ No source code changes requiring fragment"
+            exit 0
+          fi
+
+          # For pull_request events, use the original logic
+
+          # Fetch the base branch explicitly to ensure it's available for comparison
+          git fetch origin ${{ github.base_ref }}
+
+          # Compare the head of the PR (current HEAD) with the base branch's remote tracking ref
+          CHANGED_FILES=$(git diff --name-only --diff-filter=A origin/${{ github.base_ref }}...HEAD)
+
+          # Debugging: Print the diff command and its output
+          echo "Executing: git diff --name-only --diff-filter=A origin/${{ github.base_ref }}...HEAD"
+          echo "Changed files (added only): $CHANGED_FILES"
+
+          # --- EXEMPTION FOR CHANGELOG BUILD PRS ---
+          if [[ "$PR_TITLE" =~ ^docs:\ update\ CHANGELOG ]]; then
+            echo "✓ PR title indicates changelog update, fragment check skipped"
+            exit 0
+          fi
+
+          # Check if any changelog fragment was added
+          if echo "$CHANGED_FILES" | grep -q "^changelog.d/[0-9].*\.md$"; then
+            echo "✓ Changelog fragment found"
+            exit 0
+          fi
+
+          # Check if this is an internal change (exempt from fragment requirement)
+          if echo "$CHANGED_FILES" | grep -qE "^(tests/|docs/|\.github/)"; then
+            echo "✓ Internal change, fragment not required"
+            exit 0
+          fi
+
+          # Check if PR is marked as trivial
+          if [[ "$PR_TITLE" =~ \[trivial\] ]]; then
+            echo "✓ PR marked as trivial, fragment not required"
+            exit 0
+          fi
+
+          echo "✗ Missing changelog fragment"
+          echo "Please add a changelog fragment in changelog.d/"
+          echo "Example: changelog.d/${{ github.event.number }}.fixed.md"
+          echo ""
+          echo "Fragment types:"
+          echo "  - added.md      - New features"
+          echo "  - fixed.md      - Bug fixes"
+          echo "  - changed.md    - Behavior changes"
+          echo "  - deprecated.md - Deprecations"
+          echo "  - removed.md    - Removed features"
+          echo "  - security.md   - Security fixes"
+          echo ""
+          echo "If this PR does not need a changelog entry, add [trivial] to the title."
+          exit 1
