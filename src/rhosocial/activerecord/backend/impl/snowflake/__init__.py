@@ -9,6 +9,8 @@ This module provides:
 - Snowflake dialect and expression handling
 - Snowflake-specific type helpers (VARIANT, ARRAY)
 - Snowflake-specific type adapters
+- Snowflake DDL DataType subclasses
+- Snowflake-specific SQL function factories
 
 Architecture:
 - SnowflakeBackend: Synchronous implementation using snowflake-connector-python
@@ -51,6 +53,48 @@ from .introspection import (
     SyncSnowflakeIntrospector,
     AsyncSnowflakeIntrospector,
 )
+from .expression.types import (
+    SnowflakeArrayType,
+    SnowflakeBinaryType,
+    SnowflakeBooleanType,
+    SnowflakeDateType,
+    SnowflakeGeographyType,
+    SnowflakeGeometryType,
+    SnowflakeNumberType,
+    SnowflakeObjectType,
+    SnowflakeTimeType,
+    SnowflakeTimestampLtzType,
+    SnowflakeTimestampNtzType,
+    SnowflakeTimestampTzType,
+    SnowflakeVarcharType,
+    SnowflakeVariantType,
+)
+from .functions import (
+    array_append,
+    array_agg,
+    array_construct,
+    array_contains,
+    array_insert,
+    array_remove,
+    array_size,
+    flatten,
+    get_path,
+    object_construct,
+    object_delete,
+    object_keys,
+    parse_json,
+    st_as_geojson,
+    st_as_text,
+    st_contains,
+    st_distance,
+    st_intersects,
+    st_make_point,
+    st_within,
+    to_array,
+    to_object,
+    to_variant,
+    try_parse_json,
+)
 
 __all__ = [
     # Backend classes
@@ -91,4 +135,46 @@ __all__ = [
     "SnowflakeIntrospectorMixin",
     "SyncSnowflakeIntrospector",
     "AsyncSnowflakeIntrospector",
+    # DDL DataType subclasses
+    "SnowflakeVarcharType",
+    "SnowflakeNumberType",
+    "SnowflakeBooleanType",
+    "SnowflakeTimestampLtzType",
+    "SnowflakeTimestampNtzType",
+    "SnowflakeTimestampTzType",
+    "SnowflakeDateType",
+    "SnowflakeTimeType",
+    "SnowflakeBinaryType",
+    "SnowflakeVariantType",
+    "SnowflakeArrayType",
+    "SnowflakeObjectType",
+    "SnowflakeGeographyType",
+    "SnowflakeGeometryType",
+    # ARRAY functions
+    "array_construct",
+    "array_append",
+    "array_insert",
+    "array_remove",
+    "array_size",
+    "array_contains",
+    "array_agg",
+    # Semi-structured functions
+    "flatten",
+    "get_path",
+    "object_construct",
+    "object_keys",
+    "object_delete",
+    "parse_json",
+    "to_array",
+    "to_object",
+    "to_variant",
+    "try_parse_json",
+    # Geospatial functions
+    "st_make_point",
+    "st_distance",
+    "st_within",
+    "st_contains",
+    "st_intersects",
+    "st_as_text",
+    "st_as_geojson",
 ]
