@@ -19,6 +19,7 @@ from .transaction import (
     SnowflakeTransactionMixin,
 )
 from .variant import SnowflakeVariantMixin
+from .types import SnowflakeTypeSupportMixin
 
 __all__ = [
     "SnowflakeArrayMixin",
@@ -31,4 +32,5 @@ __all__ = [
     "SnowflakeConcurrencyMixin",
     "AsyncSnowflakeConcurrencyMixin",
     "SnowflakeVariantMixin",
+    "SnowflakeTypeSupportMixin",
 ]
