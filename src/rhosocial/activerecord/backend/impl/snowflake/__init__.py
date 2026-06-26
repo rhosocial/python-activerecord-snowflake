@@ -46,6 +46,9 @@ from .mixins import (
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
     SnowflakeStageMixin,
+    SnowflakeConcurrencyMixin,
+    AsyncSnowflakeConcurrencyMixin,
+    SnowflakeTypeSupportMixin,
 )
 from .field import SnowflakePKMixin
 from .introspection import (
@@ -96,6 +99,9 @@ from .functions import (
     try_parse_json,
 )
 
+from .explain import SnowflakeExplainRow, SnowflakeExplainResult
+from .schema import SnowflakeSchemaDiffer
+
 __all__ = [
     # Backend classes
     "SnowflakeBackend",
@@ -129,6 +135,9 @@ __all__ = [
     "SnowflakeArrayMixin",
     "SnowflakeCloneMixin",
     "SnowflakeStageMixin",
+    "SnowflakeConcurrencyMixin",
+    "AsyncSnowflakeConcurrencyMixin",
+    "SnowflakeTypeSupportMixin",
     # Field Mixins
     "SnowflakePKMixin",
     # Introspection
@@ -177,4 +186,9 @@ __all__ = [
     "st_intersects",
     "st_as_text",
     "st_as_geojson",
+    # EXPLAIN
+    "SnowflakeExplainRow",
+    "SnowflakeExplainResult",
+    # Schema differ
+    "SnowflakeSchemaDiffer",
 ]
