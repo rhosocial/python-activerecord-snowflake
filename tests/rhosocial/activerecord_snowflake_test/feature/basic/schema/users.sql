@@ -1,0 +1,10 @@
+CREATE TABLE users (
+    id INTEGER AUTOINCREMENT PRIMARY KEY,
+    username VARCHAR(191) NOT NULL,
+    email VARCHAR(191) NOT NULL,
+    age INTEGER,
+    balance DOUBLE NOT NULL DEFAULT 0.0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at VARCHAR(100),
+    updated_at VARCHAR(100)
+)

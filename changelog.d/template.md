@@ -1,16 +1,39 @@
-{% if versiondata.name %}## [{{ versiondata.version }}] - {{ versiondata.date }}
-{% else %}
-## [{{ versiondata.version }}] - {{ versiondata.date }}
-{% endif %}
-{% for category, changelog in sections.items() %}
-{% if category %}%{{ category }}%
+{% if sections %}
+{% for section, _ in sections.items() %}
+{% set underline = underlines[0] %}{% if section %}{{section}}
+{{ underline * section|length }}{% set underline = underlines[1] %}
 
-{% for text, values in changelog.items() %}
-- {{ text }} ({% for value in values %}[{{ value }}]({{ issue_url }}{{ value }}){% if not loop.last %}, {% endif %}{% endfor %})
+{% endif %}
+{% if sections[section] %}
+{% for category, val in definitions.items() if category in sections[section] %}
+
+### {{ definitions[category]['name'] }}
+
+{% if definitions[category]['showcontent'] %}
+{% for text, values in sections[section][category].items() %}
+- {{ text }} ({{ values|join(', ') }})
+{% endfor %}
+
+{% else %}
+- {{ sections[section][category]['']|join(', ') }}
+
+{% endif %}
+{% if sections[section][category]|length == 0 %}
+
+No significant changes.
+
+{% else %}
+{% endif %}
+
 {% endfor %}
 {% else %}
-{% for text, values in changelog.items() %}
-- {{ text }} ({% for value in values %}[{{ value }}]({{ issue_url }}{{ value }}){% if not loop.last %}, {% endif %}{% endfor %})
-{% endfor %}
+
+No significant changes.
+
 {% endif %}
 {% endfor %}
+{% else %}
+
+No significant changes.
+
+{% endif %}
