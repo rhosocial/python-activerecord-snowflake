@@ -1,0 +1,9 @@
+CREATE TABLE comments (
+    id INTEGER AUTOINCREMENT PRIMARY KEY,
+    post_ref INTEGER NOT NULL,
+    author INTEGER NOT NULL,
+    text VARCHAR NOT NULL,
+    created_at VARCHAR(100) NOT NULL,
+    updated_at VARCHAR(100),
+    approved BOOLEAN DEFAULT FALSE
+)

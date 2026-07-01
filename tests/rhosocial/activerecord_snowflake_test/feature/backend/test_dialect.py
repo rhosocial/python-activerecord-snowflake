@@ -2,6 +2,22 @@
 import pytest
 
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
+from rhosocial.activerecord.backend.impl.snowflake.expression.types import (
+    SnowflakeVarcharType,
+    SnowflakeNumberType,
+    SnowflakeBooleanType,
+    SnowflakeTimestampLtzType,
+    SnowflakeTimestampNtzType,
+    SnowflakeTimestampTzType,
+    SnowflakeDateType,
+    SnowflakeTimeType,
+    SnowflakeBinaryType,
+    SnowflakeVariantType,
+    SnowflakeArrayType,
+    SnowflakeObjectType,
+    SnowflakeGeographyType,
+    SnowflakeGeometryType,
+)
 
 
 @pytest.fixture
@@ -70,8 +86,61 @@ class TestSnowflakeDialectCapabilities:
     def test_supports_introspection(self, dialect):
         assert dialect.supports_introspection() is True
 
-    def test_does_not_support_returning(self, dialect):
-        assert dialect.supports_returning_clause() is False
+    def test_supports_filter_clause(self, dialect):
+        assert dialect.supports_filter_clause() is True
+
+    def test_supports_indexes(self, dialect):
+        assert dialect.supports_indexes() is True
+
+    def test_supports_constraints(self, dialect):
+        assert dialect.supports_constraints() is True
+
+    def test_supports_sequences(self, dialect):
+        assert dialect.supports_sequences() is True
+
+    def test_supports_explicit_inner_join(self, dialect):
+        assert dialect.supports_explicit_inner_join() is True
+
+    def test_supports_modify_column(self, dialect):
+        assert dialect.supports_modify_column() is True
+
+    def test_returning_clause_version_dependent(self, dialect):
+        """RETURNING support depends on Snowflake server version."""
+        assert dialect.supports_returning_clause() is True
+        assert dialect.supports_returning_insert() is True
+        assert dialect.supports_returning_update() is True
+        assert dialect.supports_returning_delete() is True
+
+        old_dialect = SnowflakeDialect(version=(7, 31, 0))
+        assert old_dialect.supports_returning_clause() is False
+        assert old_dialect.supports_returning_insert() is False
+
+        boundary_dialect = SnowflakeDialect(version=(7, 32, 0))
+        assert boundary_dialect.supports_returning_clause() is True
+
+    def test_supports_offset_without_limit(self, dialect):
+        assert dialect.supports_offset_without_limit() is True
+
+    def test_supports_for_update(self, dialect):
+        assert dialect.supports_for_update() is False
+
+    def test_supports_union(self, dialect):
+        assert dialect.supports_union() is True
+
+    def test_supports_intersect(self, dialect):
+        assert dialect.supports_intersect() is True
+
+    def test_supports_except(self, dialect):
+        assert dialect.supports_except() is True
+
+    def test_supports_set_operation_order_by(self, dialect):
+        assert dialect.supports_set_operation_order_by() is True
+
+    def test_supports_set_operation_limit_offset(self, dialect):
+        assert dialect.supports_set_operation_limit_offset() is True
+
+    def test_supports_set_operation_for_update(self, dialect):
+        assert dialect.supports_set_operation_for_update() is False
 
 
 class TestSnowflakeSpecificCapabilities:
@@ -135,6 +204,131 @@ class TestSnowflakeSpecificFormatting:
     def test_format_copy_into_table_with_format(self, dialect):
         result = dialect.format_copy_into_table("my_table", "my_stage", "TYPE = 'CSV'")
         assert result == "COPY INTO my_table FROM @my_stage FILE_FORMAT = (TYPE = 'CSV')"
+
+
+class TestSnowflakeDataTypeFormatting:
+    """Test Snowflake-specific DataType subclass formatting."""
+
+    def test_varchar_type(self, dialect):
+        t = SnowflakeVarcharType(length=256)
+        sql, params = dialect.format_data_type(t)
+        assert sql == "VARCHAR(256)"
+        assert params == ()
+
+    def test_varchar_type_default(self, dialect):
+        t = SnowflakeVarcharType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "VARCHAR"
+        assert params == ()
+
+    def test_number_type(self, dialect):
+        t = SnowflakeNumberType(precision=38, scale=2)
+        sql, params = dialect.format_data_type(t)
+        assert sql == "NUMBER(38, 2)"
+
+    def test_number_type_precision_only(self, dialect):
+        t = SnowflakeNumberType(precision=10)
+        sql, params = dialect.format_data_type(t)
+        assert sql == "NUMBER(10)"
+
+    def test_number_type_default(self, dialect):
+        t = SnowflakeNumberType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "NUMBER"
+
+    def test_boolean_type(self, dialect):
+        t = SnowflakeBooleanType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "BOOLEAN"
+
+    def test_timestamp_ltz(self, dialect):
+        t = SnowflakeTimestampLtzType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "TIMESTAMP_LTZ"
+
+    def test_timestamp_ltz_with_precision(self, dialect):
+        t = SnowflakeTimestampLtzType(precision=3)
+        sql, params = dialect.format_data_type(t)
+        assert sql == "TIMESTAMP_LTZ(3)"
+
+    def test_timestamp_ntz(self, dialect):
+        t = SnowflakeTimestampNtzType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "TIMESTAMP_NTZ"
+
+    def test_timestamp_tz(self, dialect):
+        t = SnowflakeTimestampTzType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "TIMESTAMP_TZ"
+
+    def test_date_type(self, dialect):
+        t = SnowflakeDateType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "DATE"
+
+    def test_time_type(self, dialect):
+        t = SnowflakeTimeType(precision=6)
+        sql, params = dialect.format_data_type(t)
+        assert sql == "TIME(6)"
+
+    def test_time_type_default(self, dialect):
+        t = SnowflakeTimeType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "TIME"
+
+    def test_binary_type(self, dialect):
+        t = SnowflakeBinaryType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "BINARY"
+
+    def test_binary_type_with_length(self, dialect):
+        t = SnowflakeBinaryType(length=1024)
+        sql, params = dialect.format_data_type(t)
+        assert sql == "BINARY(1024)"
+
+    def test_variant_type(self, dialect):
+        t = SnowflakeVariantType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "VARIANT"
+
+    def test_array_type(self, dialect):
+        t = SnowflakeArrayType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "ARRAY"
+
+    def test_object_type(self, dialect):
+        t = SnowflakeObjectType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "OBJECT"
+
+    def test_geography_type(self, dialect):
+        t = SnowflakeGeographyType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "GEOGRAPHY"
+
+    def test_geometry_type(self, dialect):
+        t = SnowflakeGeometryType()
+        sql, params = dialect.format_data_type(t)
+        assert sql == "GEOMETRY"
+
+    def test_supports_data_types(self, dialect):
+        result = dialect.supports_data_types()
+        assert len(result) == 14
+        names = [name for _, name in result]
+        assert "VARCHAR" in names
+        assert "NUMBER" in names
+        assert "BOOLEAN" in names
+        assert "TIMESTAMP_LTZ" in names
+        assert "TIMESTAMP_NTZ" in names
+        assert "TIMESTAMP_TZ" in names
+        assert "VARIANT" in names
+        assert "ARRAY" in names
+        assert "OBJECT" in names
+        assert "GEOGRAPHY" in names
+        assert "GEOMETRY" in names
+        assert "DATE" in names
+        assert "TIME" in names
+        assert "BINARY" in names
 
 
 class TestSnowflakeDialectVersion:
