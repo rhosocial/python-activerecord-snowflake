@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- towncrier release notes start -->
 
+## [1.0.0.dev2] - 2026-07-01
+
+### Added
+
+- Snowflake partition DDL support: `SnowflakePartitionMixin`, `SnowflakePartitionClause`, `SnowflakePartitionSupport` protocol, and dialect MRO integration.
+- Integrate `SnowflakeTypeSupportMixin` into dialect MRO and fix `parse_type` delegation, populate `parsed_data_type` in introspector.
+- `named-migration` CLI subcommand with sync and `--async` support, bridging to core `AsyncMigrationRunner` via `AsyncSnowflakeBackend`.
+
+### Fixed
+
+- Fix `parse_type` CHAR/VARCHAR distinction: check `VARCHAR` before `CHAR` so `VARCHAR` returns `VarCharType` instead of `CharType`.
+- Fix `parse_type` datetime detection: order TIMESTAMP before TIME to avoid `TIMESTAMP` being parsed as `TimeType`; add DATETIME regex branch.
+- Fix `SnowflakeSchemaDiffer._columns_equivalent` to call `super()` for nullable and default value comparison.
+
+
 ## [v1.0.0.dev1] - 2025-05-16
 
 ### Added

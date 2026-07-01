@@ -4,7 +4,7 @@
 import importlib
 
 COMMAND_NAMES = [
-    'info', 'query', 'introspect',
+    'info', 'query', 'introspect', 'named-migration',
 ]
 
 
@@ -12,8 +12,10 @@ def register_commands(subparsers):
     """Register all subcommands."""
     from .info import create_parser as info_parser
     from .introspect import create_parser as introspect_parser
+    from .named_migration import create_parser as nm_parser
     info_parser(subparsers)
     introspect_parser(subparsers)
+    nm_parser(subparsers)
 
 
 def get_handler(command_name: str):
