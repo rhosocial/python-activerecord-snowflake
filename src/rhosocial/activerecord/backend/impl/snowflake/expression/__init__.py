@@ -18,6 +18,7 @@ from .types import (
     SnowflakeVarcharType,
     SnowflakeVariantType,
 )
+from .partition import SnowflakePartitionClause
 
 __all__ = [
     "SnowflakeArrayType",
@@ -35,4 +36,5 @@ __all__ = [
     "SnowflakeTimestampTzType",
     "SnowflakeVarcharType",
     "SnowflakeVariantType",
+    "SnowflakePartitionClause",
 ]

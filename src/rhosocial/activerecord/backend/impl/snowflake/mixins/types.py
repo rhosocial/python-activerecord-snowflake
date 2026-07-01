@@ -112,7 +112,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
     _SNOW_DECIMAL_TYPES = re.compile(r"^(?:NUMBER|DECIMAL|NUMERIC)\b", re.IGNORECASE)
     _SNOW_STRING_TYPES = re.compile(r"^(?:VARCHAR|CHAR|CHARACTER|STRING|TEXT)\b", re.IGNORECASE)
     _SNOW_BINARY_TYPES = re.compile(r"^(?:BINARY|VARBINARY)\b", re.IGNORECASE)
-    _SNOW_DATE_TYPES = re.compile(r"^(?:DATE|TIME|TIMESTAMP)\b", re.IGNORECASE)
+    _SNOW_DATE_TYPES = re.compile(r"^(?:DATETIME|TIMESTAMP(?:_[A-Z]+)?|DATE|TIME)\b", re.IGNORECASE)
     _SNOW_BOOLEAN_TYPES = re.compile(r"^(?:BOOLEAN)\b", re.IGNORECASE)
     _SNOW_VARIANT_TYPES = re.compile(r"^(?:VARIANT|OBJECT|ARRAY)\b", re.IGNORECASE)
 
@@ -145,14 +145,16 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
                 return TextType()
             length_match = re.search(r"\((\d+)", stripped)
             length = int(length_match.group(1)) if length_match else None
-            if "CHAR" in upper:
-                return CharType(length or 1)
-            return VarCharType(length)
+            if "VARCHAR" in upper:
+                return VarCharType(length or 255)
+            return CharType(length or 1)
 
         if self._SNOW_BINARY_TYPES.match(upper):
             return BlobType()
 
         if self._SNOW_DATE_TYPES.match(upper):
+            if "TIMESTAMP" in upper:
+                return DateTimeType()
             if upper.startswith("TIME"):
                 return TimeType()
             if upper.startswith("DATE"):
