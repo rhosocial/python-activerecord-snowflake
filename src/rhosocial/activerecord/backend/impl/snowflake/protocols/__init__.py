@@ -11,6 +11,7 @@ from .variant import SnowflakeVariantSupport
 from .array import SnowflakeArraySupport
 from .clone import SnowflakeCloneSupport
 from .stage import SnowflakeStageSupport
+from .partition import SnowflakePartitionSupport
 
 __all__ = [
     "SnowflakeTimeTravelSupport",
@@ -18,4 +19,5 @@ __all__ = [
     "SnowflakeArraySupport",
     "SnowflakeCloneSupport",
     "SnowflakeStageSupport",
+    "SnowflakePartitionSupport",
 ]

@@ -29,6 +29,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     JoinSupport,
     LateralJoinSupport,
     MergeSupport,
+    PartitionSupport,
     QualifyClauseSupport,
     ReturningSupport,
     SchemaSupport,
@@ -79,6 +80,7 @@ from .collation import validate_snowflake_collation_name
 from .protocols import (
     SnowflakeArraySupport,
     SnowflakeCloneSupport,
+    SnowflakePartitionSupport,
     SnowflakeStageSupport,
     SnowflakeTimeTravelSupport,
     SnowflakeVariantSupport,
@@ -87,9 +89,11 @@ from .mixins import (
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
     SnowflakeIntrospectionMixin,
+    SnowflakePartitionMixin,
     SnowflakeStageMixin,
     SnowflakeTimeTravelMixin,
     SnowflakeTransactionMixin,
+    SnowflakeTypeSupportMixin,
     SnowflakeVariantMixin,
 )
 
@@ -112,7 +116,7 @@ class SnowflakeDialect(
     DQLMixin,
     DMLMixin,
     DDLColumnMixin,
-    DDLTypeMixin,
+    SnowflakeTypeSupportMixin,
     TransactionControlMixin,
     SetOperationMixin,
     SequenceMixin,
@@ -143,6 +147,7 @@ class SnowflakeDialect(
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
     SnowflakeStageMixin,
+    SnowflakePartitionMixin,
     SnowflakeIntrospectionMixin,  # Must be before IntrospectionMixin
     IntrospectionMixin,
     # Protocol supports (for isinstance checks)
@@ -171,7 +176,9 @@ class SnowflakeDialect(
     ViewSupport,
     WildcardSupport,
     WindowFunctionSupport,
+    PartitionSupport,
     # Snowflake-specific protocol supports
+    SnowflakePartitionSupport,
     SnowflakeTimeTravelSupport,
     SnowflakeVariantSupport,
     SnowflakeArraySupport,
@@ -346,14 +353,16 @@ class SnowflakeDialect(
     def parse_type(self, raw: str) -> "Any":
         """Parse a raw Snowflake type string into a DataType.
 
+        Delegates to SnowflakeTypeSupportMixin.parse_type for
+        structured type parsing.
+
         Args:
             raw: Raw SQL type string.
 
         Returns:
             A DataType instance.
         """
-        from rhosocial.activerecord.backend.expression.types.custom import CustomType
-        return CustomType(raw)
+        return SnowflakeTypeSupportMixin.parse_type(self, raw)
 
     def supports_data_types(self) -> List[Tuple["Any", str]]:
         """List (DataTypeClass, sql_name) pairs supported by this dialect.

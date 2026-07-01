@@ -135,6 +135,8 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         table_name: str,
         schema: str,
     ) -> List[ColumnInfo]:
+        from rhosocial.activerecord.backend.expression.types._base import DataType
+
         columns = []
         for row in rows:
             nullable = (
@@ -143,6 +145,12 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
                 else ColumnNullable.NOT_NULL
             )
             data_type = row.get("DATA_TYPE") or "VARCHAR"
+            dialect = getattr(self._backend, "dialect", None)
+            parsed_data_type = (
+                DataType.parse_data_type_str(dialect, data_type)
+                if dialect
+                else None
+            )
             columns.append(
                 ColumnInfo(
                     name=row["COLUMN_NAME"],
@@ -151,6 +159,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
                     ordinal_position=row.get("ORDINAL_POSITION"),
                     data_type=data_type.lower(),
                     data_type_full=data_type,
+                    parsed_data_type=parsed_data_type,
                     nullable=nullable,
                     default_value=row.get("COLUMN_DEFAULT"),
                     comment=row.get("COMMENT"),
