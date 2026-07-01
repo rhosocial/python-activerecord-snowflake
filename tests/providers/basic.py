@@ -30,6 +30,11 @@ from rhosocial.activerecord.testsuite.feature.basic.fixtures.models import (
     AsyncMappedComment as AsyncMappedCommentBase,
     AsyncColumnMappingModel as AsyncColumnMappingModelBase, AsyncMixedAnnotationModel as AsyncMixedAnnotationModelBase
 )
+from rhosocial.activerecord.testsuite.feature.basic.fixtures.models import (
+    BulkUser as BulkUserBase, AsyncBulkUser as AsyncBulkUserBase,
+    PydanticValidatedModel as PydanticValidatedModelBase,
+    AsyncPydanticValidatedModel as AsyncPydanticValidatedModelBase,
+)
 
 # Conditionally import Python 3.10+ models
 User310 = TypeCase310 = ValidatedFieldUser310 = TypeTestModel310 = ValidatedUser310 = None
@@ -146,6 +151,11 @@ AsyncMappedPost = _select_model_class(AsyncMappedPostBase, AsyncMappedPost312, A
 AsyncMappedComment = _select_model_class(AsyncMappedCommentBase, AsyncMappedComment312, AsyncMappedComment311, AsyncMappedComment310, "AsyncMappedComment")
 AsyncColumnMappingModel = _select_model_class(AsyncColumnMappingModelBase, AsyncColumnMappingModel312, AsyncColumnMappingModel311, AsyncColumnMappingModel310, "AsyncColumnMappingModel")
 AsyncMixedAnnotationModel = _select_model_class(AsyncMixedAnnotationModelBase, AsyncMixedAnnotationModel312, AsyncMixedAnnotationModel311, AsyncMixedAnnotationModel310, "AsyncMixedAnnotationModel")
+
+BulkUser = BulkUserBase
+AsyncBulkUser = AsyncBulkUserBase
+PydanticValidatedModel = PydanticValidatedModelBase
+AsyncPydanticValidatedModel = AsyncPydanticValidatedModelBase
 
 from rhosocial.activerecord.testsuite.feature.basic.interfaces import IBasicProvider
 from rhosocial.activerecord.testsuite.core.protocols import WorkerTestProtocol
@@ -274,6 +284,18 @@ class BasicProvider(IBasicProvider, WorkerTestProtocol):
     async def setup_async_validated_user_model(self, scenario_name: str) -> Type[ActiveRecord]:
         return await self._setup_async_model(AsyncValidatedUser, scenario_name, "validated_users")
 
+    def setup_pydantic_validated_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return self._setup_model(PydanticValidatedModel, scenario_name, "pydantic_validated_models")
+
+    async def setup_async_pydantic_validated_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return await self._setup_async_model(AsyncPydanticValidatedModel, scenario_name, "pydantic_validated_models")
+
+    def setup_bulk_user_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return self._setup_model(BulkUser, scenario_name, "bulk_users")
+
+    async def setup_async_bulk_user_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return await self._setup_async_model(AsyncBulkUser, scenario_name, "bulk_users")
+
     def setup_mapped_models(self, scenario_name: str) -> Tuple[Type[ActiveRecord], Type[ActiveRecord], Type[ActiveRecord]]:
         return self._setup_multiple_models([
             (MappedUser, "users"),
@@ -340,7 +362,8 @@ class BasicProvider(IBasicProvider, WorkerTestProtocol):
         tables_to_drop = [
             'users', 'type_cases', 'type_tests', 'validated_field_users',
             'validated_users', 'type_adapter_tests', 'posts', 'comments',
-            'column_mapping_items', 'mixed_annotation_items'
+            'column_mapping_items', 'mixed_annotation_items',
+            'pydantic_validated_models', 'bulk_users'
         ]
         from rhosocial.activerecord.backend.options import ExecutionOptions
         from rhosocial.activerecord.backend.schema import StatementType
@@ -365,7 +388,8 @@ class BasicProvider(IBasicProvider, WorkerTestProtocol):
         tables_to_drop = [
             'users', 'type_cases', 'type_tests', 'validated_field_users',
             'validated_users', 'type_adapter_tests', 'posts', 'comments',
-            'column_mapping_items', 'mixed_annotation_items'
+            'column_mapping_items', 'mixed_annotation_items',
+            'pydantic_validated_models', 'bulk_users'
         ]
         from rhosocial.activerecord.backend.options import ExecutionOptions
         from rhosocial.activerecord.backend.schema import StatementType
