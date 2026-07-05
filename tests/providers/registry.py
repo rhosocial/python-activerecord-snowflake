@@ -14,3 +14,15 @@ provider_registry.register("feature.basic.IBasicProvider", BasicProvider)
 
 from .basic_connection import BasicConnectionProvider
 provider_registry.register("feature.basic.connection.IBasicConnectionProvider", BasicConnectionProvider)
+
+from .query import QueryProvider
+provider_registry.register("feature.query.IQueryProvider", QueryProvider)
+
+from .events import EventsProvider
+provider_registry.register("feature.events.IEventsProvider", EventsProvider)
+
+from .mixins import MixinsProvider
+provider_registry.register("feature.mixins.IMixinsProvider", MixinsProvider)
+
+from .query_connection import QueryConnectionProvider
+provider_registry.register("feature.query.connection.IQueryConnectionProvider", QueryConnectionProvider)

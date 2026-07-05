@@ -87,6 +87,7 @@ markers = [
     "requires_functions: marks tests requiring specific database functions",
     "snowflake_variant: marks Snowflake-specific VARIANT tests",
     "snowflake_time_travel: marks Snowflake time travel tests",
+    "fakesnow: marks tests using fakesnow Snowflake emulator",
 ]
 
 [tool.coverage.run]
