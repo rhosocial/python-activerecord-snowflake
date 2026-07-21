@@ -1,0 +1,8 @@
+CREATE TABLE searchable_items (
+id INTEGER NOT NULL AUTOINCREMENT,
+name VARCHAR(255),
+tags VARCHAR,
+created_at TIMESTAMP,
+updated_at TIMESTAMP,
+PRIMARY KEY (id)
+);

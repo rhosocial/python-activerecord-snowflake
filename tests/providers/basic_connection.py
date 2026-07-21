@@ -1,9 +1,11 @@
-"""Basic connection test provider for Snowflake backend.
-
-Implements IBasicConnectionProvider for connection pool context awareness
-tests using fakesnow (DuckDB-based Snowflake emulator) or real Snowflake.
+# tests/providers/basic_connection.py
 """
-from typing import Type, Tuple, List, Optional
+Concrete implementation of IBasicConnectionProvider for Snowflake backend.
+
+This provider sets up connection pools and models for testing
+ActiveRecord context awareness.
+"""
+from typing import Type, Tuple, Optional, List
 
 from rhosocial.activerecord.model import ActiveRecord, AsyncActiveRecord
 from rhosocial.activerecord.backend.impl.snowflake import SnowflakeBackend
@@ -32,42 +34,51 @@ class AsyncTestUser(AsyncActiveRecord):
     email: str
 
 
-_TEST_USERS_DDL = """CREATE TABLE test_users (
-    id INTEGER AUTOINCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL
-)"""
-
-
 class BasicConnectionProvider(IBasicConnectionProvider):
-    """Snowflake backend implementation for basic connection pool context tests."""
+    """
+    Snowflake backend implementation for basic connection pool context tests.
+    """
 
     def __init__(self):
         self._active_backends: List = []
         self._active_async_backends: List = []
 
     def get_test_scenarios(self) -> list:
+        """Returns available test scenarios."""
         return list(get_enabled_scenarios().keys())
 
     def _create_test_table(self, backend):
+        """Create the test_users table."""
         try:
-            backend.execute("DROP TABLE IF EXISTS test_users", (),
-                            options=ExecutionOptions(stmt_type=StatementType.DDL))
+            backend.execute("DROP TABLE IF EXISTS test_users", options=ExecutionOptions(stmt_type=StatementType.DDL))
         except Exception:
             pass
-        backend.execute(_TEST_USERS_DDL, (),
-                        options=ExecutionOptions(stmt_type=StatementType.DDL))
+
+        backend.execute("""
+            CREATE TABLE test_users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL
+            )
+        """, options=ExecutionOptions(stmt_type=StatementType.DDL))
 
     async def _create_test_table_async(self, backend):
+        """Create the test_users table asynchronously."""
         try:
-            await backend.execute("DROP TABLE IF EXISTS test_users", (),
-                                  options=ExecutionOptions(stmt_type=StatementType.DDL))
+            await backend.execute("DROP TABLE IF EXISTS test_users", options=ExecutionOptions(stmt_type=StatementType.DDL))
         except Exception:
             pass
-        await backend.execute(_TEST_USERS_DDL, (),
-                              options=ExecutionOptions(stmt_type=StatementType.DDL))
+
+        await backend.execute("""
+            CREATE TABLE test_users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL
+            )
+        """, options=ExecutionOptions(stmt_type=StatementType.DDL))
 
     def setup_sync_pool_and_model(self, scenario_name: str) -> Tuple[BackendPool, Type[ActiveRecord]]:
+        """Setup sync connection pool and model for context tests."""
         _, config = get_scenario(scenario_name)
 
         pool_config = PoolConfig(
@@ -87,6 +98,7 @@ class BasicConnectionProvider(IBasicConnectionProvider):
         return pool, SyncTestUser
 
     async def setup_async_pool_and_model(self, scenario_name: str) -> Tuple[AsyncBackendPool, Type[AsyncActiveRecord]]:
+        """Setup async connection pool and model for context tests."""
         from rhosocial.activerecord.backend.impl.snowflake import AsyncSnowflakeBackend
 
         _, config = get_scenario(scenario_name)
@@ -96,6 +108,7 @@ class BasicConnectionProvider(IBasicConnectionProvider):
             max_size=5,
             backend_factory=lambda: AsyncSnowflakeBackend(connection_config=config)
         )
+
         pool = await AsyncBackendPool.create(pool_config)
 
         async with pool.connection() as backend:
@@ -108,7 +121,9 @@ class BasicConnectionProvider(IBasicConnectionProvider):
         return pool, AsyncTestUser
 
     def cleanup_sync(self, scenario_name: str, pool: BackendPool):
+        """Cleanup after sync tests."""
         pool.close(timeout=1.0)
+
         for backend in self._active_backends:
             try:
                 backend.disconnect()
@@ -117,7 +132,9 @@ class BasicConnectionProvider(IBasicConnectionProvider):
         self._active_backends.clear()
 
     async def cleanup_async(self, scenario_name: str, pool: AsyncBackendPool):
+        """Cleanup after async tests."""
         await pool.close(timeout=1.0)
+
         for backend in self._active_async_backends:
             try:
                 await backend.disconnect()
@@ -126,7 +143,9 @@ class BasicConnectionProvider(IBasicConnectionProvider):
         self._active_async_backends.clear()
 
     def setup_sync_pool_for_crud(self, scenario_name: str) -> Tuple[BackendPool, Type[ActiveRecord]]:
+        """Setup sync connection pool for CRUD tests."""
         return self.setup_sync_pool_and_model(scenario_name)
 
     async def setup_async_pool_for_crud(self, scenario_name: str) -> Tuple[AsyncBackendPool, Type[AsyncActiveRecord]]:
+        """Setup async connection pool for CRUD tests."""
         return await self.setup_async_pool_and_model(scenario_name)
