@@ -11,6 +11,23 @@ try:
 except ImportError:
     yaml = None
 
+_fakesnow_patch_active = False
+_fakesnow_patch_cm = None
+
+
+def _apply_fakesnow_patch():
+    """Apply fakesnow patch if not already active and using fakesnow scenario."""
+    global _fakesnow_patch_active, _fakesnow_patch_cm
+    if _fakesnow_patch_active:
+        return
+    try:
+        import fakesnow
+        _fakesnow_patch_cm = fakesnow.patch()
+        _fakesnow_patch_cm.__enter__()
+        _fakesnow_patch_active = True
+    except ImportError:
+        pass
+
 
 def _load_scenarios():
     """Load Snowflake scenarios from YAML config."""
@@ -70,6 +87,7 @@ def snowflake_config(snowflake_scenarios):
 @pytest.fixture(scope="module")
 def snowflake_backend(snowflake_config):
     """Provide a connected SnowflakeBackend instance (module-scoped)."""
+    _apply_fakesnow_patch()
     from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
 
     backend = SnowflakeBackend(connection_config=snowflake_config)

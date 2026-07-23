@@ -11,6 +11,7 @@ from .array import SnowflakeArrayMixin
 from .backend import SnowflakeBackendMixin
 from .clone import SnowflakeCloneMixin
 from .introspection import SnowflakeIntrospectionMixin
+from .json import SnowflakeJSONMixin
 from .partition import SnowflakePartitionMixin
 from .stage import SnowflakeStageMixin
 from .time_travel import SnowflakeTimeTravelMixin
@@ -27,6 +28,7 @@ __all__ = [
     "SnowflakeBackendMixin",
     "SnowflakeCloneMixin",
     "SnowflakeIntrospectionMixin",
+    "SnowflakeJSONMixin",
     "SnowflakePartitionMixin",
     "SnowflakeStageMixin",
     "SnowflakeTimeTravelMixin",

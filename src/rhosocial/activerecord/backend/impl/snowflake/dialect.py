@@ -89,6 +89,7 @@ from .mixins import (
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
     SnowflakeIntrospectionMixin,
+    SnowflakeJSONMixin,
     SnowflakePartitionMixin,
     SnowflakeStageMixin,
     SnowflakeTimeTravelMixin,
@@ -125,6 +126,7 @@ class SnowflakeDialect(
     CTEMixin,
     FilterClauseMixin,
     WindowFunctionMixin,
+    SnowflakeJSONMixin,     # Must be before JSONMixin to override format_json_expression
     JSONMixin,
     AdvancedGroupingMixin,
     ArrayMixin,
