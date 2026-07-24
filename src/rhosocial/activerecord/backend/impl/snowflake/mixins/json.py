@@ -25,18 +25,12 @@ class SnowflakeJSONMixin:
     used by PostgreSQL/MySQL/MariaDB.
     """
 
-    def format_json_expression(self, expr: "JSONExpression") -> Tuple[str, Tuple]:
+    def format_json_function_expression(self, expr: "JSONExpression") -> Tuple[str, Tuple]:
         """Format JSON expression for Snowflake using VARIANT colon notation.
 
         Snowflake uses `:path` for accessing VARIANT fields and
         `::type` for casting.  The JSONPath prefix `$.` is stripped
         because Snowflake uses simple dot notation.
-
-        Args:
-            expr: JSONExpression instance.
-
-        Returns:
-            Tuple of (SQL string, parameters tuple).
         """
         if isinstance(expr.column, bases.BaseExpression):
             col_sql, col_params = expr.column.to_sql()
