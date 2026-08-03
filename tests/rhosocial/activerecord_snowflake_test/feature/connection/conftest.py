@@ -14,8 +14,8 @@ import pytest
 import pytest_asyncio
 import yaml
 
-from rhosocial.activerecord.backend.impl.mysql import SnowflakeBackend, AsyncSnowflakeBackend
-from rhosocial.activerecord.backend.impl.mysql.config import SnowflakeConnectionConfig
+from rhosocial.activerecord.backend.impl.snowflake import SnowflakeBackend, AsyncSnowflakeBackend
+from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
 from rhosocial.activerecord.connection.pool import (
     PoolConfig,
     BackendPool,
@@ -46,23 +46,24 @@ def register_scenario(name: str, config: Dict[str, Any]):
 def _load_scenarios_from_config():
     """Load scenarios from a configuration file."""
     config_path = None
-    env_config_path = os.getenv("MYSQL_SCENARIOS_CONFIG_PATH")
+    env_config_path = os.getenv("SNOWFLAKE_SCENARIOS_CONFIG_PATH")
 
     if env_config_path and os.path.exists(env_config_path):
         config_path = env_config_path
     else:
-        default_path = os.path.join(os.path.dirname(__file__), "../../../../config", "mysql_scenarios.yaml")
+        default_path = os.path.join(os.path.dirname(__file__), "../../../../config", "snowflake_scenarios.yaml")
         if os.path.exists(default_path):
             config_path = default_path
         elif env_config_path:
-            print(f"Warning: Scenario file specified in MYSQL_SCENARIOS_CONFIG_PATH not found: {env_config_path}")
+            print(f"Warning: Scenario file specified in SNOWFLAKE_SCENARIOS_CONFIG_PATH not found: {env_config_path}")
             return
 
     if not config_path:
-        raise FileNotFoundError(
-            "No Snowflake scenarios configuration file found. "
-            "Set MYSQL_SCENARIOS_CONFIG_PATH or place mysql_scenarios.yaml in tests/config."
-        )
+        # Snowflake CI runs unit tests only (-k "not integration") without a real
+        # Snowflake instance. The connection pool integration tests guarded by
+        # these scenarios are filtered out, so it is safe to skip scenario
+        # registration when no config is provided.
+        return
 
     try:
         with open(config_path, "r", encoding="utf-8") as f:
