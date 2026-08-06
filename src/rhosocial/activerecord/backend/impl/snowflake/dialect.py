@@ -95,6 +95,7 @@ from .mixins import (
     SnowflakeTransactionMixin,
     SnowflakeTypeSupportMixin,
     SnowflakeVariantMixin,
+    SnowflakeAlterColumnModifierMixin,
 )
 
 if TYPE_CHECKING:
@@ -115,6 +116,7 @@ class SnowflakeDialect(
     DateTimeMixin,
     DQLMixin,
     DMLMixin,
+    SnowflakeAlterColumnModifierMixin,  # Before DDLColumnMixin to override format_*_action
     DDLColumnMixin,
     SnowflakeTypeSupportMixin,
     TransactionControlMixin,
