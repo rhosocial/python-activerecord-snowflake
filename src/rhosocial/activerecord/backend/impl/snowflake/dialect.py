@@ -84,6 +84,7 @@ from .protocols import (
     SnowflakeStageSupport,
     SnowflakeTimeTravelSupport,
     SnowflakeVariantSupport,
+    SnowflakeWarehouseSupport,
 )
 from .mixins import (
     SnowflakeArrayMixin,
@@ -96,6 +97,7 @@ from .mixins import (
     SnowflakeTypeSupportMixin,
     SnowflakeVariantMixin,
     SnowflakeAlterColumnModifierMixin,
+    SnowflakeWarehouseMixin,
 )
 
 if TYPE_CHECKING:
@@ -149,6 +151,7 @@ class SnowflakeDialect(
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
     SnowflakeStageMixin,
+    SnowflakeWarehouseMixin,
     SnowflakePartitionMixin,
     SnowflakeIntrospectionMixin,  # Must be before IntrospectionMixin
     IntrospectionMixin,
@@ -186,6 +189,7 @@ class SnowflakeDialect(
     SnowflakeArraySupport,
     SnowflakeCloneSupport,
     SnowflakeStageSupport,
+    SnowflakeWarehouseSupport,
 ):
     """Snowflake SQL dialect implementation.
 
