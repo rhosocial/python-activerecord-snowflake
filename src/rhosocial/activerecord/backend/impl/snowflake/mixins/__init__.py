@@ -11,13 +11,17 @@ undrop, materialized view, table modifiers and dynamic identifier support.
 from .array import SnowflakeArrayMixin
 from .backend import SnowflakeBackendMixin
 from .clone import SnowflakeCloneMixin
+from .dml import SnowflakeDMLMixin
 from .dynamic_identifier import SnowflakeDynamicIdentifierMixin
 from .file_format import SnowflakeFileFormatMixin
 from .introspection import SnowflakeIntrospectionMixin
 from .materialized_view import SnowflakeMaterializedViewMixin
 from .partition import SnowflakePartitionMixin
 from .pipe import SnowflakePipeMixin
+from .pivot import SnowflakePivotMixin
 from .routine import SnowflakeRoutineMixin
+from .sample import SnowflakeSampleMixin
+from .show import SnowflakeShowMixin
 from .stage import SnowflakeStageMixin
 from .stream import SnowflakeStreamMixin
 from .table_modifier import SnowflakeTableModifierMixin
@@ -38,13 +42,17 @@ __all__ = [
     "SnowflakeArrayMixin",
     "SnowflakeBackendMixin",
     "SnowflakeCloneMixin",
+    "SnowflakeDMLMixin",
     "SnowflakeDynamicIdentifierMixin",
     "SnowflakeFileFormatMixin",
     "SnowflakeIntrospectionMixin",
     "SnowflakeMaterializedViewMixin",
     "SnowflakePartitionMixin",
     "SnowflakePipeMixin",
+    "SnowflakePivotMixin",
     "SnowflakeRoutineMixin",
+    "SnowflakeSampleMixin",
+    "SnowflakeShowMixin",
     "SnowflakeStageMixin",
     "SnowflakeStreamMixin",
     "SnowflakeTableModifierMixin",
