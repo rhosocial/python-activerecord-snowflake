@@ -39,6 +39,7 @@ from .protocols import (
     SnowflakeArraySupport,
     SnowflakeCloneSupport,
     SnowflakeStageSupport,
+    SnowflakeWarehouseSupport,
 )
 from .mixins import (
     SnowflakeTimeTravelMixin,
@@ -49,6 +50,7 @@ from .mixins import (
     SnowflakeConcurrencyMixin,
     AsyncSnowflakeConcurrencyMixin,
     SnowflakeTypeSupportMixin,
+    SnowflakeWarehouseMixin,
 )
 from .field import SnowflakePKMixin
 from .introspection import (
@@ -129,6 +131,7 @@ __all__ = [
     "SnowflakeArraySupport",
     "SnowflakeCloneSupport",
     "SnowflakeStageSupport",
+    "SnowflakeWarehouseSupport",
     # Mixins
     "SnowflakeTimeTravelMixin",
     "SnowflakeVariantMixin",
@@ -138,6 +141,7 @@ __all__ = [
     "SnowflakeConcurrencyMixin",
     "AsyncSnowflakeConcurrencyMixin",
     "SnowflakeTypeSupportMixin",
+    "SnowflakeWarehouseMixin",
     # Field Mixins
     "SnowflakePKMixin",
     # Introspection

@@ -21,6 +21,7 @@ from .transaction import (
 )
 from .variant import SnowflakeVariantMixin
 from .types import SnowflakeTypeSupportMixin
+from .warehouse import SnowflakeWarehouseMixin
 from .ddl.alter_table_modifier import SnowflakeAlterColumnModifierMixin
 
 __all__ = [
@@ -36,5 +37,6 @@ __all__ = [
     "AsyncSnowflakeConcurrencyMixin",
     "SnowflakeVariantMixin",
     "SnowflakeTypeSupportMixin",
+    "SnowflakeWarehouseMixin",
     "SnowflakeAlterColumnModifierMixin",
 ]

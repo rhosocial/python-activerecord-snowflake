@@ -19,6 +19,17 @@ from .types import (
     SnowflakeVariantType,
 )
 from .partition import SnowflakePartitionClause
+from .ddl import (
+    SnowflakeAlterWarehouseMode,
+    SnowflakeCreateWarehouseExpression,
+    SnowflakeAlterWarehouseExpression,
+    SnowflakeDropWarehouseExpression,
+    SnowflakeCopyIntoMode,
+    SnowflakeCreateStageExpression,
+    SnowflakeAlterStageExpression,
+    SnowflakeDropStageExpression,
+    SnowflakeCopyIntoExpression,
+)
 
 __all__ = [
     "SnowflakeArrayType",
@@ -37,4 +48,13 @@ __all__ = [
     "SnowflakeVarcharType",
     "SnowflakeVariantType",
     "SnowflakePartitionClause",
+    "SnowflakeAlterWarehouseMode",
+    "SnowflakeCreateWarehouseExpression",
+    "SnowflakeAlterWarehouseExpression",
+    "SnowflakeDropWarehouseExpression",
+    "SnowflakeCopyIntoMode",
+    "SnowflakeCreateStageExpression",
+    "SnowflakeAlterStageExpression",
+    "SnowflakeDropStageExpression",
+    "SnowflakeCopyIntoExpression",
 ]

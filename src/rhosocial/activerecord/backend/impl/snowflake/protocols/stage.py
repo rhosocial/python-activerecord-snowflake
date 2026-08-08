@@ -7,14 +7,23 @@ Snowflake stages are locations where data files are stored for
 loading/unloading:
 - Internal stages: Snowflake-managed storage
 - External stages: Cloud storage (S3, Azure, GCS)
-- PUT/GET: Upload/download files to/from stages
-- COPY INTO: Load data from stages into tables
+- CREATE/ALTER/DROP STAGE: Stage object DDL
+- LIST/REMOVE: Inspect and delete files inside a stage
+- COPY INTO: Load data from stages into tables, or unload into stages
 
 Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/sql/create-stage
 - https://docs.snowflake.com/en/sql-reference/sql/copy-into-table
 """
-from typing import Optional, Protocol, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..expression.ddl.stage import (
+        SnowflakeAlterStageExpression,
+        SnowflakeCopyIntoExpression,
+        SnowflakeCreateStageExpression,
+        SnowflakeDropStageExpression,
+    )
 
 
 @runtime_checkable
@@ -29,4 +38,36 @@ class SnowflakeStageSupport(Protocol):
         self, table: str, stage: str, file_format: Optional[str] = None
     ) -> str:
         """Format COPY INTO table FROM stage statement."""
+        ...
+
+    def format_copy_into_statement(
+        self, expr: "SnowflakeCopyIntoExpression"
+    ) -> str:
+        """Format a full COPY INTO statement (load or unload)."""
+        ...
+
+    def format_create_stage_statement(
+        self, expr: "SnowflakeCreateStageExpression"
+    ) -> str:
+        """Format CREATE STAGE statement."""
+        ...
+
+    def format_alter_stage_statement(
+        self, expr: "SnowflakeAlterStageExpression"
+    ) -> str:
+        """Format ALTER STAGE ... SET statement."""
+        ...
+
+    def format_drop_stage_statement(
+        self, expr: "SnowflakeDropStageExpression"
+    ) -> str:
+        """Format DROP STAGE statement."""
+        ...
+
+    def format_list_stage(self, stage: str) -> str:
+        """Format LIST @stage statement."""
+        ...
+
+    def format_remove_stage(self, stage: str, path: str) -> str:
+        """Format REMOVE @stage/path statement."""
         ...
