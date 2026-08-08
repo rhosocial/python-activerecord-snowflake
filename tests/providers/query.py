@@ -83,12 +83,12 @@ MappedUser = _select_model_class(MappedUserBase, MappedUser312, MappedUser311, M
 MappedPost = _select_model_class(MappedPostBase, MappedPost312, MappedPost311, MappedPost310, "MappedPost")
 MappedComment = _select_model_class(MappedCommentBase, MappedComment312, MappedComment311, MappedComment310, "MappedComment")
 
-from rhosocial.activerecord.testsuite.feature.query.interfaces import IQueryProvider
+from rhosocial.activerecord.testsuite.feature.query.interfaces import IQuerySyncProvider
 from rhosocial.activerecord.testsuite.core.protocols import WorkerTestProtocol
 from .scenarios import get_enabled_scenarios, get_scenario
 
 
-class QueryProvider(IQueryProvider, WorkerTestProtocol):
+class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
 
     def __init__(self):
         self._active_backends = []

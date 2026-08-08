@@ -73,11 +73,11 @@ VersionedProduct = _select_model_class(VersionedProductBase, VersionedProduct312
 Task = _select_model_class(TaskBase, Task312, Task311, Task310, "Task")
 CombinedArticle = _select_model_class(CombinedArticleBase, CombinedArticle312, CombinedArticle311, CombinedArticle310, "CombinedArticle")
 
-from rhosocial.activerecord.testsuite.feature.mixins.interfaces import IMixinsProvider
+from rhosocial.activerecord.testsuite.feature.mixins.interfaces import IMixinsSyncProvider
 from .scenarios import get_enabled_scenarios, get_scenario
 
 
-class MixinsProvider(IMixinsProvider):
+class MixinsProvider(IMixinsSyncProvider):
 
     def __init__(self):
         self._active_backends = []

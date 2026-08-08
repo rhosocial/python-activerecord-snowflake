@@ -63,11 +63,11 @@ def _select_model_class(base_cls, py312_cls, py311_cls, py310_cls, model_name: s
 EventTestModel = _select_model_class(EventTestModelBase, EventTestModel312, EventTestModel311, EventTestModel310, "EventTestModel")
 EventTrackingModel = _select_model_class(EventTrackingModelBase, EventTrackingModel312, EventTrackingModel311, EventTrackingModel310, "EventTrackingModel")
 
-from rhosocial.activerecord.testsuite.feature.events.interfaces import IEventsProvider
+from rhosocial.activerecord.testsuite.feature.events.interfaces import IEventsSyncProvider
 from .scenarios import get_enabled_scenarios, get_scenario
 
 
-class EventsProvider(IEventsProvider):
+class EventsProvider(IEventsSyncProvider):
 
     def __init__(self):
         self._active_backends = []
