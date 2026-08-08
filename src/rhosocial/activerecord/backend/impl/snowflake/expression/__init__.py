@@ -20,6 +20,20 @@ from .types import (
 )
 from .partition import SnowflakePartitionClause
 from .identifier import SnowflakeIdentifierExpression
+from .sample import (
+    SnowflakeSampleExpression,
+    SnowflakeSampleForm,
+    SnowflakeSamplingMethod,
+)
+from .pivot import (
+    SnowflakePivotExpression,
+    SnowflakeUnpivotExpression,
+)
+from .show import (
+    SnowflakeShowExpression,
+    SnowflakeShowObjectType,
+    SnowflakeShowScope,
+)
 from .ddl import (
     SnowflakeAlterWarehouseMode,
     SnowflakeCreateWarehouseExpression,
@@ -75,6 +89,14 @@ __all__ = [
     "SnowflakeVariantType",
     "SnowflakePartitionClause",
     "SnowflakeIdentifierExpression",
+    "SnowflakeSampleExpression",
+    "SnowflakeSampleForm",
+    "SnowflakeSamplingMethod",
+    "SnowflakePivotExpression",
+    "SnowflakeUnpivotExpression",
+    "SnowflakeShowExpression",
+    "SnowflakeShowObjectType",
+    "SnowflakeShowScope",
     "SnowflakeAlterWarehouseMode",
     "SnowflakeCreateWarehouseExpression",
     "SnowflakeAlterWarehouseExpression",
