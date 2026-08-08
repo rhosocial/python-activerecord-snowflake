@@ -5,3 +5,5 @@ from rhosocial.activerecord.testsuite.feature.basic.connection.conftest import (
     async_pool_and_model,
 )
 from rhosocial.activerecord.testsuite.feature.basic.connection.test_active_record_context import *
+from rhosocial.activerecord.testsuite.feature.basic.connection.test_active_record_context_async import *  # noqa: F403
+
