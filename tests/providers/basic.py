@@ -35,6 +35,22 @@ from rhosocial.activerecord.testsuite.feature.basic.fixtures.models import (
     PydanticValidatedModel as PydanticValidatedModelBase,
     AsyncPydanticValidatedModel as AsyncPydanticValidatedModelBase,
 )
+from rhosocial.activerecord.testsuite.feature.basic.fixtures.models import (
+    OrderItem as OrderItemBase,
+    Order as OrderBase,
+    MappedOrderItem as MappedOrderItemBase,
+    AsyncOrderItem as AsyncOrderItemBase,
+    AsyncOrder as AsyncOrderBase,
+    AsyncMappedOrderItem as AsyncMappedOrderItemBase,
+    Product,
+    ProductFormA,
+    ProductWithProxy,
+    ProductWithColumnAndAdapter,
+    AsyncProduct,
+    AsyncProductFormA,
+    AsyncProductWithProxy,
+    AsyncProductWithColumnAndAdapter,
+)
 
 # Conditionally import Python 3.10+ models
 User310 = TypeCase310 = ValidatedFieldUser310 = TypeTestModel310 = ValidatedUser310 = None
@@ -157,12 +173,12 @@ AsyncBulkUser = AsyncBulkUserBase
 PydanticValidatedModel = PydanticValidatedModelBase
 AsyncPydanticValidatedModel = AsyncPydanticValidatedModelBase
 
-from rhosocial.activerecord.testsuite.feature.basic.interfaces import IBasicProvider
+from rhosocial.activerecord.testsuite.feature.basic.interfaces import IBasicSyncProvider, IBasicAsyncProvider
 from rhosocial.activerecord.testsuite.core.protocols import WorkerTestProtocol
 from .scenarios import get_enabled_scenarios, get_scenario
 
 
-class BasicProvider(IBasicProvider, WorkerTestProtocol):
+class BasicProvider(IBasicSyncProvider, IBasicAsyncProvider, WorkerTestProtocol):
     """Snowflake backend implementation for basic feature tests."""
 
     def __init__(self):
@@ -252,7 +268,7 @@ class BasicProvider(IBasicProvider, WorkerTestProtocol):
 
         return tuple(result)
 
-    # --- IBasicProvider interface ---
+    # --- IBasicSyncProvider / IBasicAsyncProvider ---
 
     def setup_user_model(self, scenario_name: str) -> Type[ActiveRecord]:
         return self._setup_model(User, scenario_name, "users")
@@ -295,6 +311,48 @@ class BasicProvider(IBasicProvider, WorkerTestProtocol):
 
     async def setup_async_bulk_user_model(self, scenario_name: str) -> Type[ActiveRecord]:
         return await self._setup_async_model(AsyncBulkUser, scenario_name, "bulk_users")
+
+    def setup_order_item_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return self._setup_model(OrderItemBase, scenario_name, "order_items")
+
+    def setup_order_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return self._setup_model(OrderBase, scenario_name, "orders")
+
+    def setup_mapped_order_item_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return self._setup_model(MappedOrderItemBase, scenario_name, "order_items")
+
+    def setup_product_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return self._setup_model(Product, scenario_name, "product")
+
+    def setup_product_form_a_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return self._setup_model(ProductFormA, scenario_name, "product")
+
+    def setup_product_with_proxy_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return self._setup_model(ProductWithProxy, scenario_name, "product")
+
+    def setup_product_with_column_and_adapter_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return self._setup_model(ProductWithColumnAndAdapter, scenario_name, "product")
+
+    async def setup_order_item_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return await self._setup_async_model(AsyncOrderItemBase, scenario_name, "order_items")
+
+    async def setup_order_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return await self._setup_async_model(AsyncOrderBase, scenario_name, "orders")
+
+    async def setup_mapped_order_item_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return await self._setup_async_model(AsyncMappedOrderItemBase, scenario_name, "order_items")
+
+    async def setup_product_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return await self._setup_async_model(AsyncProduct, scenario_name, "product")
+
+    async def setup_product_form_a_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return await self._setup_async_model(AsyncProductFormA, scenario_name, "product")
+
+    async def setup_product_with_proxy_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return await self._setup_async_model(AsyncProductWithProxy, scenario_name, "product")
+
+    async def setup_product_with_column_and_adapter_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        return await self._setup_async_model(AsyncProductWithColumnAndAdapter, scenario_name, "product")
 
     def setup_mapped_models(self, scenario_name: str) -> Tuple[Type[ActiveRecord], Type[ActiveRecord], Type[ActiveRecord]]:
         return self._setup_multiple_models([
@@ -351,6 +409,18 @@ class BasicProvider(IBasicProvider, WorkerTestProtocol):
 
     def get_yes_no_adapter(self) -> 'BaseSQLTypeAdapter':
         return YesOrNoBooleanAdapter()
+
+    def get_dialect(self, scenario_name: str = "default"):
+        """Return a bare, fully-constructed Snowflake dialect instance.
+
+        Used by the ``feature/basic/ddl`` subtopic (expression/dialect
+        contract). Snowflake supports ``ADD COLUMN IF NOT EXISTS`` and
+        ``DROP COLUMN IF EXISTS``, but not ``DROP CONSTRAINT IF EXISTS``;
+        the capability switches on the dialect reflect that.
+        """
+        from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
+
+        return SnowflakeDialect()
 
     def _load_snowflake_schema(self, filename: str) -> str:
         schema_dir = os.path.join(os.path.dirname(__file__), "..", "rhosocial", "activerecord_snowflake_test", "feature", "basic", "schema")
