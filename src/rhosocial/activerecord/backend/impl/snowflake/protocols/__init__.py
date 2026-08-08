@@ -13,6 +13,15 @@ from .clone import SnowflakeCloneSupport
 from .stage import SnowflakeStageSupport
 from .partition import SnowflakePartitionSupport
 from .warehouse import SnowflakeWarehouseSupport
+from .stream import SnowflakeStreamSupport
+from .task import SnowflakeTaskSupport
+from .pipe import SnowflakePipeSupport
+from .file_format import SnowflakeFileFormatSupport
+from .routine import SnowflakeRoutineSupport
+from .undrop import SnowflakeUndropSupport
+from .materialized_view import SnowflakeMaterializedViewSupport
+from .dynamic_identifier import SnowflakeDynamicIdentifierSupport
+from .table_modifier import SnowflakeTableModifierSupport
 
 __all__ = [
     "SnowflakeTimeTravelSupport",
@@ -22,4 +31,13 @@ __all__ = [
     "SnowflakeStageSupport",
     "SnowflakePartitionSupport",
     "SnowflakeWarehouseSupport",
+    "SnowflakeStreamSupport",
+    "SnowflakeTaskSupport",
+    "SnowflakePipeSupport",
+    "SnowflakeFileFormatSupport",
+    "SnowflakeRoutineSupport",
+    "SnowflakeUndropSupport",
+    "SnowflakeMaterializedViewSupport",
+    "SnowflakeDynamicIdentifierSupport",
+    "SnowflakeTableModifierSupport",
 ]
