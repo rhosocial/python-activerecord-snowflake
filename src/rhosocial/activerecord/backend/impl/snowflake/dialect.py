@@ -80,12 +80,16 @@ from .collation import validate_snowflake_collation_name
 from .protocols import (
     SnowflakeArraySupport,
     SnowflakeCloneSupport,
+    SnowflakeDMLSupport,
     SnowflakeDynamicIdentifierSupport,
     SnowflakeFileFormatSupport,
     SnowflakeMaterializedViewSupport,
     SnowflakePartitionSupport,
     SnowflakePipeSupport,
+    SnowflakePivotSupport,
     SnowflakeRoutineSupport,
+    SnowflakeSampleSupport,
+    SnowflakeShowSupport,
     SnowflakeStageSupport,
     SnowflakeStreamSupport,
     SnowflakeTableModifierSupport,
@@ -98,13 +102,17 @@ from .protocols import (
 from .mixins import (
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
+    SnowflakeDMLMixin,
     SnowflakeDynamicIdentifierMixin,
     SnowflakeFileFormatMixin,
     SnowflakeIntrospectionMixin,
     SnowflakeMaterializedViewMixin,
     SnowflakePartitionMixin,
     SnowflakePipeMixin,
+    SnowflakePivotMixin,
     SnowflakeRoutineMixin,
+    SnowflakeSampleMixin,
+    SnowflakeShowMixin,
     SnowflakeStageMixin,
     SnowflakeStreamMixin,
     SnowflakeTableModifierMixin,
@@ -135,6 +143,7 @@ class SnowflakeDialect(
     ExpressionMixin,
     DateTimeMixin,
     DQLMixin,
+    SnowflakeDMLMixin,  # Before DMLMixin to override INSERT OVERWRITE rendering
     DMLMixin,
     SnowflakeAlterColumnModifierMixin,  # Before DDLColumnMixin to override format_*_action
     DDLColumnMixin,
@@ -180,6 +189,9 @@ class SnowflakeDialect(
     SnowflakeTableModifierMixin,
     SnowflakeDynamicIdentifierMixin,
     SnowflakePartitionMixin,
+    SnowflakeSampleMixin,
+    SnowflakePivotMixin,
+    SnowflakeShowMixin,
     SnowflakeIntrospectionMixin,  # Must be before IntrospectionMixin
     IntrospectionMixin,
     # Protocol supports (for isinstance checks)
@@ -226,6 +238,10 @@ class SnowflakeDialect(
     SnowflakeMaterializedViewSupport,
     SnowflakeDynamicIdentifierSupport,
     SnowflakeTableModifierSupport,
+    SnowflakeSampleSupport,
+    SnowflakePivotSupport,
+    SnowflakeDMLSupport,
+    SnowflakeShowSupport,
 ):
     """Snowflake SQL dialect implementation.
 

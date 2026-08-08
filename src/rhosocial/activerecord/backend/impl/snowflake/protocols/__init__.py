@@ -22,6 +22,10 @@ from .undrop import SnowflakeUndropSupport
 from .materialized_view import SnowflakeMaterializedViewSupport
 from .dynamic_identifier import SnowflakeDynamicIdentifierSupport
 from .table_modifier import SnowflakeTableModifierSupport
+from .sample import SnowflakeSampleSupport
+from .pivot import SnowflakePivotSupport
+from .dml import SnowflakeDMLSupport
+from .show import SnowflakeShowSupport
 
 __all__ = [
     "SnowflakeTimeTravelSupport",
@@ -40,4 +44,8 @@ __all__ = [
     "SnowflakeMaterializedViewSupport",
     "SnowflakeDynamicIdentifierSupport",
     "SnowflakeTableModifierSupport",
+    "SnowflakeSampleSupport",
+    "SnowflakePivotSupport",
+    "SnowflakeDMLSupport",
+    "SnowflakeShowSupport",
 ]
