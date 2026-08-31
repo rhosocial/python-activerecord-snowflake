@@ -99,9 +99,9 @@ class TestSnowflakeSchemaDiffer:
 
     def test_modified_column_type(self):
         old_col = _make_col("name", "VARCHAR", ordinal=1,
-                            parsed_dt=VarCharType(100))
+                            parsed_dt=VarCharType(length=100))
         new_col = _make_col("name", "VARCHAR", ordinal=1,
-                            parsed_dt=VarCharType(200))
+                            parsed_dt=VarCharType(length=200))
 
         old_snap = _make_snapshot({"t": TableInfo(
             name="t", schema="PUBLIC", table_type=TableType.BASE_TABLE,

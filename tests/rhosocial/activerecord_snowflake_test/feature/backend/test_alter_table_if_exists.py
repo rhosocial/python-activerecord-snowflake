@@ -65,7 +65,7 @@ class TestSnowflakeAddColumnIfNotExists:
             dialect,
             ColumnDefinition(
                 "content",
-                VarCharType(50),
+                VarCharType(length=50),
                 constraints=[
                     ColumnConstraint(ColumnConstraintType.DEFAULT, default_value="x")
                 ],
