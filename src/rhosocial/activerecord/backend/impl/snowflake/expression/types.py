@@ -55,7 +55,7 @@ class SnowflakeVarcharType(SnowflakeDataTypeMixin, VarCharType):
     Snowflake VARCHAR supports up to 16,777,216 bytes.
     """
 
-    def __init__(self, length: Optional[int] = None, dialect=None):
+    def __init__(self, dialect=None, *, length: Optional[int] = None):
         super().__init__(length=length, dialect=dialect)
 
     def format_type(self, dialect=None) -> str:
@@ -80,7 +80,7 @@ class SnowflakeNumberType(SnowflakeDataTypeMixin, DecimalType):
     NUMBER(precision, scale) with precision up to 38, scale -84..127.
     """
 
-    def __init__(self, precision: Optional[int] = None, scale: Optional[int] = None, dialect=None):
+    def __init__(self, dialect=None, *, precision: Optional[int] = None, scale: Optional[int] = None):
         super().__init__(precision=precision, scale=scale, dialect=dialect)
 
     def format_type(self, dialect=None) -> str:
@@ -116,7 +116,7 @@ class SnowflakeTimestampLtzType(SnowflakeDataTypeMixin, TimestampType):
     Stored in UTC, displayed in session timezone.
     """
 
-    def __init__(self, precision: Optional[int] = None, dialect=None):
+    def __init__(self, dialect=None, *, precision: Optional[int] = None):
         super().__init__(precision=precision, dialect=dialect)
 
     def format_type(self, dialect=None) -> str:
@@ -139,7 +139,7 @@ class SnowflakeTimestampNtzType(SnowflakeDataTypeMixin, TimestampType):
     Stored and displayed as-is, without timezone conversion.
     """
 
-    def __init__(self, precision: Optional[int] = None, dialect=None):
+    def __init__(self, dialect=None, *, precision: Optional[int] = None):
         super().__init__(precision=precision, dialect=dialect)
 
     def format_type(self, dialect=None) -> str:
@@ -162,7 +162,7 @@ class SnowflakeTimestampTzType(SnowflakeDataTypeMixin, TimestampType):
     Stores the timezone offset alongside the timestamp.
     """
 
-    def __init__(self, precision: Optional[int] = None, dialect=None):
+    def __init__(self, dialect=None, *, precision: Optional[int] = None):
         super().__init__(precision=precision, dialect=dialect)
 
     def format_type(self, dialect=None) -> str:
@@ -191,7 +191,7 @@ class SnowflakeDateType(SnowflakeDataTypeMixin, DateType):
 class SnowflakeTimeType(SnowflakeDataTypeMixin, TimeType):
     """Snowflake TIME type."""
 
-    def __init__(self, precision: Optional[int] = None, dialect=None):
+    def __init__(self, dialect=None, *, precision: Optional[int] = None):
         super().__init__(precision=precision, dialect=dialect)
 
     def format_type(self, dialect=None) -> str:
@@ -216,7 +216,7 @@ class SnowflakeBinaryType(SnowflakeDataTypeMixin, BlobType):
     Maximum size: 8,388,608 bytes.
     """
 
-    def __init__(self, length: Optional[int] = None, dialect=None):
+    def __init__(self, dialect=None, *, length: Optional[int] = None):
         super().__init__(dialect=dialect)
         self._length = length
 
@@ -256,7 +256,7 @@ class SnowflakeObjectType(SnowflakeDataTypeMixin, JsonType):
 class SnowflakeArrayType(SnowflakeDataTypeMixin, ArrayType):
     """Snowflake ARRAY type for ordered sequences."""
 
-    def __init__(self, element_type: Optional[DataType] = None, dialect=None):
+    def __init__(self, dialect=None, *, element_type: Optional[DataType] = None):
         super().__init__(element_type=element_type or IntegerType(), dialect=dialect)
 
     def format_type(self, dialect=None) -> str:

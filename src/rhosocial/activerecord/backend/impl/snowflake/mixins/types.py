@@ -122,51 +122,51 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
 
         if self._SNOW_INTEGER_TYPES.match(upper):
             if upper.startswith("BIGINT"):
-                return BigIntType()
+                return BigIntType(dialect=self)
             if upper.startswith("SMALLINT"):
-                return SmallIntType()
-            return IntegerType()
+                return SmallIntType(dialect=self)
+            return IntegerType(dialect=self)
 
         if self._SNOW_FLOAT_TYPES.match(upper):
             if "DOUBLE" in upper or "REAL" in upper:
-                return DoubleType()
-            return FloatType()
+                return DoubleType(dialect=self)
+            return FloatType(dialect=self)
 
         if self._SNOW_DECIMAL_TYPES.match(upper):
             nums = re.findall(r"\d+", stripped)
             if len(nums) >= 2:
-                return DecimalType(int(nums[0]), int(nums[1]))
+                return DecimalType(dialect=self, precision=int(nums[0]), scale=int(nums[1]))
             if len(nums) == 1:
-                return DecimalType(int(nums[0]))
-            return DecimalType()
+                return DecimalType(dialect=self, precision=int(nums[0]))
+            return DecimalType(dialect=self)
 
         if self._SNOW_STRING_TYPES.match(upper):
             if "TEXT" in upper or "STRING" in upper:
-                return TextType()
+                return TextType(dialect=self)
             length_match = re.search(r"\((\d+)", stripped)
             length = int(length_match.group(1)) if length_match else None
             if "VARCHAR" in upper:
-                return VarCharType(length or 255)
-            return CharType(length or 1)
+                return VarCharType(dialect=self, length=length or 255)
+            return CharType(dialect=self, length=length or 1)
 
         if self._SNOW_BINARY_TYPES.match(upper):
-            return BlobType()
+            return BlobType(dialect=self)
 
         if self._SNOW_DATE_TYPES.match(upper):
             if "TIMESTAMP" in upper:
-                return DateTimeType()
+                return DateTimeType(dialect=self)
             if upper.startswith("TIME"):
-                return TimeType()
+                return TimeType(dialect=self)
             if upper.startswith("DATE"):
                 if upper.strip() == "DATE":
-                    return DateType()
-                return DateTimeType()
-            return DateTimeType()
+                    return DateType(dialect=self)
+                return DateTimeType(dialect=self)
+            return DateTimeType(dialect=self)
 
         if self._SNOW_BOOLEAN_TYPES.match(upper):
-            return BooleanType()
+            return BooleanType(dialect=self)
 
         if self._SNOW_VARIANT_TYPES.match(upper):
-            return JsonType()
+            return JsonType(dialect=self)
 
-        return CustomType(stripped)
+        return CustomType(dialect=self, raw=stripped)
