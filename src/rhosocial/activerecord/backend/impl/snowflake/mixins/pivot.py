@@ -34,7 +34,7 @@ class SnowflakePivotMixin:
 
         """
         value_sql = ", ".join(
-            self._format_pivot_value(value) for value in expr.values
+            self.format_pivot_value(value) for value in expr.values
         )
         sql = (
             f"PIVOT ({expr.aggregate_function}("
@@ -72,7 +72,7 @@ class SnowflakePivotMixin:
             sql += f" {self.format_identifier(expr.alias)}"
         return sql
 
-    def _format_pivot_value(self, value: Any) -> str:
+    def format_pivot_value(self, value: Any) -> str:
         """Render a single PIVOT ``IN`` value as a SQL literal."""
         if isinstance(value, str):
             return f"'{self._escape_sql_string(value)}'"
