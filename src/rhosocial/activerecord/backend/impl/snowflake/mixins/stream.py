@@ -56,9 +56,9 @@ class SnowflakeStreamMixin:
                 f"SHOW_INITIAL_ROWS = {str(bool(expr.show_initial_rows)).upper()}"
             )
         if expr.at is not None:
-            parts.append(self._format_stream_time_point("AT", expr.at))
+            parts.append(self.format_stream_time_point("AT", expr.at))
         if expr.before is not None:
-            parts.append(self._format_stream_time_point("BEFORE", expr.before))
+            parts.append(self.format_stream_time_point("BEFORE", expr.before))
         if expr.copy_grants is not None:
             parts.append(f"COPY_GRANTS = {str(bool(expr.copy_grants)).upper()}")
         if expr.comment is not None:
@@ -85,7 +85,7 @@ class SnowflakeStreamMixin:
         parts.append(self.format_identifier(expr.name))
         return " ".join(parts)
 
-    def _format_stream_time_point(self, keyword: str, spec: Any) -> str:
+    def format_stream_time_point(self, keyword: str, spec: Any) -> str:
         """Render an AT / BEFORE time-travel point.
 
         ``spec`` is a ``(kind, value)`` tuple where kind is one of

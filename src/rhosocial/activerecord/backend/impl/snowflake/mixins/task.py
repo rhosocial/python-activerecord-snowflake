@@ -49,7 +49,7 @@ class SnowflakeTaskMixin:
                 "USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE = "
                 f"{self.format_identifier(expr.user_task_managed_initial_warehouse_size)}"
             )
-        schedule = self._format_task_schedule(expr)
+        schedule = self.format_task_schedule(expr)
         if schedule:
             parts.append(schedule)
         if expr.allow_overlapping_execution is not None:
@@ -116,7 +116,7 @@ class SnowflakeTaskMixin:
             options.append(
                 f"WAREHOUSE = {self.format_identifier(expr.warehouse)}"
             )
-        schedule = self._format_task_schedule(expr)
+        schedule = self.format_task_schedule(expr)
         if schedule:
             options.append(schedule)
         if not options:
@@ -160,7 +160,7 @@ class SnowflakeTaskMixin:
         parts.append(self.format_identifier(expr.name))
         return " ".join(parts)
 
-    def _format_task_schedule(self, expr: Any) -> Optional[str]:
+    def format_task_schedule(self, expr: Any) -> Optional[str]:
         """Render a SCHEDULE clause from interval or cron spec."""
         if expr.using_cron is not None:
             cron = f"USING CRON {expr.using_cron}"

@@ -30,7 +30,7 @@ class SnowflakeSampleMixin:
             The formatted SAMPLE clause SQL string.
 
         """
-        return self._format_sampling_clause(expr, "SAMPLE")
+        return self.format_sampling_clause(expr, "SAMPLE")
 
     def format_tablesample_clause(
         self, expr: "SnowflakeSampleExpression"
@@ -44,9 +44,9 @@ class SnowflakeSampleMixin:
             The formatted TABLESAMPLE clause SQL string.
 
         """
-        return self._format_sampling_clause(expr, "TABLESAMPLE")
+        return self.format_sampling_clause(expr, "TABLESAMPLE")
 
-    def _format_sampling_clause(
+    def format_sampling_clause(
         self, expr: "SnowflakeSampleExpression", keyword: str
     ) -> str:
         """Render a sampling clause under a given keyword.

@@ -37,7 +37,7 @@ class SnowflakeWarehouseMixin:
             parts.append("OR REPLACE")
         parts.append("WAREHOUSE")
         parts.append(self.format_identifier(expr.name))
-        options = self._format_warehouse_options(
+        options = self.format_warehouse_options(
             expr, include_initially_suspended=True
         )
         if options:
@@ -78,7 +78,7 @@ class SnowflakeWarehouseMixin:
                 )
             parts.extend(["RENAME TO", self.format_identifier(expr.new_name)])
             return " ".join(parts)
-        options = self._format_warehouse_options(
+        options = self.format_warehouse_options(
             expr, include_initially_suspended=False
         )
         if not options:
@@ -107,7 +107,7 @@ class SnowflakeWarehouseMixin:
         parts.append(self.format_identifier(expr.name))
         return " ".join(parts)
 
-    def _format_warehouse_options(
+    def format_warehouse_options(
         self,
         expr: Any,
         *,

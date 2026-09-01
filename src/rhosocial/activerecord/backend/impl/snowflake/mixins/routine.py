@@ -35,12 +35,12 @@ class SnowflakeRoutineMixin:
             parts.append("OR REPLACE")
         parts.append("PROCEDURE")
         parts.append(self.format_identifier(expr.name))
-        parts.append(self._format_routine_args(expr.args))
+        parts.append(self.format_routine_args(expr.args))
         parts.append(f"RETURNS {expr.returns}")
         parts.append(f"LANGUAGE {expr.language.value}")
         if expr.execute_as is not None:
             parts.append(f"EXECUTE AS {expr.execute_as.value}")
-        parts.append(self._format_routine_body(expr.body))
+        parts.append(self.format_routine_body(expr.body))
         if expr.comment is not None:
             parts.append(
                 f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
@@ -64,14 +64,14 @@ class SnowflakeRoutineMixin:
             parts.append("OR REPLACE")
         parts.append("FUNCTION")
         parts.append(self.format_identifier(expr.name))
-        parts.append(self._format_routine_args(expr.args))
+        parts.append(self.format_routine_args(expr.args))
         parts.append(f"RETURNS {expr.returns}")
         parts.append(f"LANGUAGE {expr.language.value}")
         if expr.immutable is not None:
             parts.append("IMMUTABLE" if expr.immutable else "VOLATILE")
         if expr.execute_as is not None:
             parts.append(f"EXECUTE AS {expr.execute_as.value}")
-        parts.append(self._format_routine_body(expr.body))
+        parts.append(self.format_routine_body(expr.body))
         if expr.comment is not None:
             parts.append(
                 f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
@@ -96,7 +96,7 @@ class SnowflakeRoutineMixin:
         parts.append(self.format_identifier(expr.name))
         return " ".join(parts)
 
-    def _format_routine_args(self, args: Any) -> str:
+    def format_routine_args(self, args: Any) -> str:
         """Render a routine argument list as ``(name TYPE, ...)``."""
         if not args:
             return "()"
@@ -111,7 +111,7 @@ class SnowflakeRoutineMixin:
                 rendered.append(str(arg_type))
         return "(" + ", ".join(rendered) + ")"
 
-    def _format_routine_body(self, body: Any) -> str:
+    def format_routine_body(self, body: Any) -> str:
         """Render a routine body as a dollar-quoted ``AS $$ ... $$`` clause."""
         if body is None:
             return ""
