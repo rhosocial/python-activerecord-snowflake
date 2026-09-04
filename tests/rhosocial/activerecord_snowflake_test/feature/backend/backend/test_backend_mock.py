@@ -145,17 +145,26 @@ class TestSnowflakeBackendErrorClassification:
         assert self.backend._classify_error(err) == "connection"
 
     def test_classify_snowflake_gateway_timeout(self):
-        from snowflake.connector.errors import GatewayTimeoutError
+        try:
+            from snowflake.connector.errors import GatewayTimeoutError
+        except ImportError:  # older connector (py3.8) lacks HTTP-level errors
+            self.skipTest("GatewayTimeoutError not available in this connector version")
         err = GatewayTimeoutError(msg="Gateway timeout")
         assert self.backend._classify_error(err) == "connection"
 
     def test_classify_snowflake_request_timeout(self):
-        from snowflake.connector.errors import RequestTimeoutError
+        try:
+            from snowflake.connector.errors import RequestTimeoutError
+        except ImportError:  # older connector (py3.8) lacks HTTP-level errors
+            self.skipTest("RequestTimeoutError not available in this connector version")
         err = RequestTimeoutError(msg="Request timeout")
         assert self.backend._classify_error(err) == "connection"
 
     def test_classify_snowflake_service_unavailable(self):
-        from snowflake.connector.errors import ServiceUnavailableError
+        try:
+            from snowflake.connector.errors import ServiceUnavailableError
+        except ImportError:  # older connector (py3.8) lacks HTTP-level errors
+            self.skipTest("ServiceUnavailableError not available in this connector version")
         err = ServiceUnavailableError(msg="Service unavailable")
         assert self.backend._classify_error(err) == "connection"
 
@@ -185,7 +194,10 @@ class TestSnowflakeBackendErrorClassification:
         assert self.backend._classify_error(err) == "query"
 
     def test_classify_snowflake_http_error(self):
-        from snowflake.connector.errors import HttpError
+        try:
+            from snowflake.connector.errors import HttpError
+        except ImportError:  # older connector (py3.8) lacks HTTP-level errors
+            self.skipTest("HttpError not available in this connector version")
         err = HttpError(msg="HTTP 500 error")
         assert self.backend._classify_error(err) == "connection"
 
