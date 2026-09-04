@@ -65,20 +65,22 @@ class SnowflakeBackendMixin:
             String category: 'connection', 'integrity', 'query',
             'operational', or 'unknown'
         """
-        from snowflake.connector.errors import (
-            Error as SnowflakeError,
-            InterfaceError as SnowflakeInterfaceError,
-            DatabaseError as SnowflakeDatabaseError,
-            OperationalError as SnowflakeOperationalError,
-            ProgrammingError as SnowflakeProgrammingError,
-            IntegrityError as SnowflakeIntegrityError,
-            DataError as SnowflakeDataError,
-            NotSupportedError as SnowflakeNotSupportedError,
-            HttpError as SnowflakeHttpError,
-            GatewayTimeoutError as SnowflakeGatewayTimeoutError,
-            RequestTimeoutError as SnowflakeRequestTimeoutError,
-            ServiceUnavailableError as SnowflakeServiceUnavailableError,
-        )
+        import snowflake.connector.errors as _errors
+        SnowflakeError = _errors.Error
+        SnowflakeInterfaceError = _errors.InterfaceError
+        SnowflakeDatabaseError = _errors.DatabaseError
+        SnowflakeOperationalError = _errors.OperationalError
+        SnowflakeProgrammingError = _errors.ProgrammingError
+        SnowflakeIntegrityError = _errors.IntegrityError
+        SnowflakeDataError = _errors.DataError
+        SnowflakeNotSupportedError = _errors.NotSupportedError
+        # HTTP-level errors were added in newer connector versions; older
+        # ones (e.g. on Python 3.8) lack them — fall back to a never-matching
+        # class so the isinstance chain stays intact.
+        SnowflakeHttpError = getattr(_errors, "HttpError", _errors.Error)
+        SnowflakeGatewayTimeoutError = getattr(_errors, "GatewayTimeoutError", _errors.Error)
+        SnowflakeRequestTimeoutError = getattr(_errors, "RequestTimeoutError", _errors.Error)
+        SnowflakeServiceUnavailableError = getattr(_errors, "ServiceUnavailableError", _errors.Error)
 
         if isinstance(error, SnowflakeIntegrityError):
             return 'integrity'
