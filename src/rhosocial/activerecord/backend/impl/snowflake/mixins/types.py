@@ -31,6 +31,22 @@ from rhosocial.activerecord.backend.expression.types import (
     VarCharType,
     BlobType,
 )
+from ..expression.types import (
+    SnowflakeArrayType,
+    SnowflakeBinaryType,
+    SnowflakeBooleanType,
+    SnowflakeDateType,
+    SnowflakeGeographyType,
+    SnowflakeGeometryType,
+    SnowflakeNumberType,
+    SnowflakeObjectType,
+    SnowflakeTimeType,
+    SnowflakeTimestampLtzType,
+    SnowflakeTimestampNtzType,
+    SnowflakeTimestampTzType,
+    SnowflakeVariantType,
+    SnowflakeVarcharType,
+)
 
 
 class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
@@ -104,6 +120,80 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
     @DDLTypeMixin.handles(JsonType)
     def format_data_type_json(self, data_type: JsonType) -> Tuple[str, tuple]:
         return "VARIANT", ()
+
+    # --- Snowflake-specific formatters ---
+
+    @DDLTypeMixin.handles(SnowflakeVarcharType)
+    def format_data_type_snowflake_varchar(self, data_type) -> Tuple[str, tuple]:
+        if data_type.length is not None:
+            return f"VARCHAR({data_type.length})", ()
+        return "VARCHAR", ()
+
+    @DDLTypeMixin.handles(SnowflakeNumberType)
+    def format_data_type_snowflake_number(self, data_type) -> Tuple[str, tuple]:
+        if data_type.precision is not None and data_type.scale is not None:
+            return f"NUMBER({data_type.precision}, {data_type.scale})", ()
+        if data_type.precision is not None:
+            return f"NUMBER({data_type.precision})", ()
+        return "NUMBER", ()
+
+    @DDLTypeMixin.handles(SnowflakeBooleanType)
+    def format_data_type_snowflake_boolean(self, data_type) -> Tuple[str, tuple]:
+        return "BOOLEAN", ()
+
+    @DDLTypeMixin.handles(SnowflakeTimestampLtzType)
+    def format_data_type_snowflake_timestamp_ltz(self, data_type) -> Tuple[str, tuple]:
+        if data_type.precision is not None:
+            return f"TIMESTAMP_LTZ({data_type.precision})", ()
+        return "TIMESTAMP_LTZ", ()
+
+    @DDLTypeMixin.handles(SnowflakeTimestampNtzType)
+    def format_data_type_snowflake_timestamp_ntz(self, data_type) -> Tuple[str, tuple]:
+        if data_type.precision is not None:
+            return f"TIMESTAMP_NTZ({data_type.precision})", ()
+        return "TIMESTAMP_NTZ", ()
+
+    @DDLTypeMixin.handles(SnowflakeTimestampTzType)
+    def format_data_type_snowflake_timestamp_tz(self, data_type) -> Tuple[str, tuple]:
+        if data_type.precision is not None:
+            return f"TIMESTAMP_TZ({data_type.precision})", ()
+        return "TIMESTAMP_TZ", ()
+
+    @DDLTypeMixin.handles(SnowflakeDateType)
+    def format_data_type_snowflake_date(self, data_type) -> Tuple[str, tuple]:
+        return "DATE", ()
+
+    @DDLTypeMixin.handles(SnowflakeTimeType)
+    def format_data_type_snowflake_time(self, data_type) -> Tuple[str, tuple]:
+        if data_type.precision is not None:
+            return f"TIME({data_type.precision})", ()
+        return "TIME", ()
+
+    @DDLTypeMixin.handles(SnowflakeBinaryType)
+    def format_data_type_snowflake_binary(self, data_type) -> Tuple[str, tuple]:
+        if data_type._length is not None:
+            return f"BINARY({data_type._length})", ()
+        return "BINARY", ()
+
+    @DDLTypeMixin.handles(SnowflakeVariantType)
+    def format_data_type_snowflake_variant(self, data_type) -> Tuple[str, tuple]:
+        return "VARIANT", ()
+
+    @DDLTypeMixin.handles(SnowflakeObjectType)
+    def format_data_type_snowflake_object(self, data_type) -> Tuple[str, tuple]:
+        return "OBJECT", ()
+
+    @DDLTypeMixin.handles(SnowflakeArrayType)
+    def format_data_type_snowflake_array(self, data_type) -> Tuple[str, tuple]:
+        return "ARRAY", ()
+
+    @DDLTypeMixin.handles(SnowflakeGeographyType)
+    def format_data_type_snowflake_geography(self, data_type) -> Tuple[str, tuple]:
+        return "GEOGRAPHY", ()
+
+    @DDLTypeMixin.handles(SnowflakeGeometryType)
+    def format_data_type_snowflake_geometry(self, data_type) -> Tuple[str, tuple]:
+        return "GEOMETRY", ()
 
     # --- Parsing ---
 
