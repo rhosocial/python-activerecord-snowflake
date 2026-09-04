@@ -175,6 +175,8 @@ AsyncPydanticValidatedModel = AsyncPydanticValidatedModelBase
 
 from rhosocial.activerecord.testsuite.feature.basic.interfaces import IBasicSyncProvider, IBasicAsyncProvider
 from rhosocial.activerecord.testsuite.core.protocols import WorkerTestProtocol
+import pytest
+
 from .scenarios import get_enabled_scenarios, get_scenario
 
 
@@ -399,12 +401,18 @@ class BasicProvider(IBasicSyncProvider, IBasicAsyncProvider, WorkerTestProtocol)
 
     def setup_type_adapter_model_and_schema(self, scenario_name: Optional[str] = None) -> Type[ActiveRecord]:
         if scenario_name is None:
-            scenario_name = self.get_test_scenarios()[0] if self.get_test_scenarios() else "fakesnow"
+            scenarios = self.get_test_scenarios()
+            if not scenarios:
+                pytest.skip("No Snowflake scenarios configured (fakesnow not installed)")
+            scenario_name = scenarios[0]
         return self._setup_model(TypeAdapterTest, scenario_name, "type_adapter_tests")
 
     async def setup_async_type_adapter_model_and_schema(self, scenario_name: Optional[str] = None) -> Type[ActiveRecord]:
         if scenario_name is None:
-            scenario_name = self.get_test_scenarios()[0] if self.get_test_scenarios() else "fakesnow"
+            scenarios = self.get_test_scenarios()
+            if not scenarios:
+                pytest.skip("No Snowflake scenarios configured (fakesnow not installed)")
+            scenario_name = scenarios[0]
         return await self._setup_async_model(AsyncTypeAdapterTest, scenario_name, "type_adapter_tests")
 
     def get_yes_no_adapter(self) -> 'BaseSQLTypeAdapter':
