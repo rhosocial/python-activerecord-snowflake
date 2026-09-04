@@ -15,7 +15,7 @@ Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/sql/create-stage
 - https://docs.snowflake.com/en/sql-reference/sql/copy-into-table
 """
-from typing import Optional, Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Any, Optional, Protocol, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.stage import (
