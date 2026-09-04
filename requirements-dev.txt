@@ -1,6 +1,6 @@
 pytest
 pyyaml>=6.0
-rhosocial-activerecord-testsuite>=0.9.0,<2.0.0
+# testsuite is installed by CI workflow from git (dev17); PyPI has no 3.8 wheel
 pytest-asyncio
 pydantic[email]>=2.0.0
 pytest-timeout
