@@ -41,8 +41,8 @@ jobs:
 
       - name: Run tests with coverage (unit only, no Snowflake instance)
         run: |
-          pytest tests/ -k "not integration" --tb=short
-          coverage run --source=src -m pytest tests/ -k "not integration" --tb=short
+          pytest tests/ -k "not integration" --ignore=tests/snowflake_fakesnow --tb=short
+          coverage run --source=src -m pytest tests/ -k "not integration" --ignore=tests/snowflake_fakesnow --tb=short
           coverage xml
           coverage report
 
@@ -85,7 +85,7 @@ jobs:
 
       - name: Run tests (unit only, no Snowflake instance)
         run: |
-          pytest tests/ -k "not integration" --tb=short
+          pytest tests/ -k "not integration" --ignore=tests/snowflake_fakesnow --tb=short
 
   test-free-threaded:
     name: Python ${{ matrix.python-version }} (free-threaded)
@@ -117,4 +117,4 @@ jobs:
 
       - name: Run tests (unit only, no Snowflake instance)
         run: |
-          pytest tests/ -k "not integration" --tb=short
+          pytest tests/ -k "not integration" --ignore=tests/snowflake_fakesnow --tb=short
