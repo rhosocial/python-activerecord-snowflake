@@ -130,7 +130,7 @@ class SnowflakeIntrospectionMixin:
     ) -> Tuple[str, tuple]:
         """Format column information query using INFORMATION_SCHEMA.COLUMNS."""
         params = expr.get_params()
-        table_name = params.get("table_name", "")
+        table_name = params.get("table", params.get("table_name", ""))
         schema = params.get("schema", "")
 
         sql = (
@@ -153,7 +153,7 @@ class SnowflakeIntrospectionMixin:
         constraints, which serve as the closest analog.
         """
         params = expr.get_params()
-        table_name = params.get("table_name", "")
+        table_name = params.get("table", params.get("table_name", ""))
         schema = params.get("schema", "")
 
         sql = (
@@ -178,7 +178,7 @@ class SnowflakeIntrospectionMixin:
         TABLE_CONSTRAINTS to resolve referenced table and columns.
         """
         params = expr.get_params()
-        table_name = params.get("table_name", "")
+        table_name = params.get("table", params.get("table_name", ""))
         schema = params.get("schema", "")
 
         sql = (

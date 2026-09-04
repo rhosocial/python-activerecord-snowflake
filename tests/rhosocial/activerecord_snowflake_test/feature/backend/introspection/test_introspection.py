@@ -103,7 +103,7 @@ class TestSnowflakeIntrospectionSQLGeneration:
 
     def test_format_column_info_query(self, dialect):
         from rhosocial.activerecord.backend.expression.introspection import ColumnInfoExpression
-        expr = ColumnInfoExpression(dialect, table_name="users")
+        expr = ColumnInfoExpression(dialect, table="users")
         expr.schema("MY_SCHEMA")
         sql, params = dialect.format_column_info_query(expr)
         assert "INFORMATION_SCHEMA.COLUMNS" in sql
@@ -111,7 +111,7 @@ class TestSnowflakeIntrospectionSQLGeneration:
 
     def test_format_index_info_query(self, dialect):
         from rhosocial.activerecord.backend.expression.introspection import IndexInfoExpression
-        expr = IndexInfoExpression(dialect, table_name="users")
+        expr = IndexInfoExpression(dialect, table="users")
         expr.schema("MY_SCHEMA")
         sql, params = dialect.format_index_info_query(expr)
         assert "INFORMATION_SCHEMA.TABLE_CONSTRAINTS" in sql
@@ -121,7 +121,7 @@ class TestSnowflakeIntrospectionSQLGeneration:
 
     def test_format_foreign_key_query(self, dialect):
         from rhosocial.activerecord.backend.expression.introspection import ForeignKeyExpression
-        expr = ForeignKeyExpression(dialect, table_name="orders")
+        expr = ForeignKeyExpression(dialect, table="orders")
         expr.schema("MY_SCHEMA")
         sql, params = dialect.format_foreign_key_query(expr)
         assert "INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS" in sql
