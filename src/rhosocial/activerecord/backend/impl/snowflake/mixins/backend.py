@@ -75,12 +75,14 @@ class SnowflakeBackendMixin:
         SnowflakeDataError = _errors.DataError
         SnowflakeNotSupportedError = _errors.NotSupportedError
         # HTTP-level errors were added in newer connector versions; older
-        # ones (e.g. on Python 3.8) lack them — fall back to a never-matching
-        # class so the isinstance chain stays intact.
-        SnowflakeHttpError = getattr(_errors, "HttpError", _errors.Error)
-        SnowflakeGatewayTimeoutError = getattr(_errors, "GatewayTimeoutError", _errors.Error)
-        SnowflakeRequestTimeoutError = getattr(_errors, "RequestTimeoutError", _errors.Error)
-        SnowflakeServiceUnavailableError = getattr(_errors, "ServiceUnavailableError", _errors.Error)
+        # ones (e.g. the wheel resolved on Python 3.8) lack them entirely.
+        # Fall back to a private sentinel that matches nothing — NEVER to a
+        # base class like Error, or every subclass would hit this branch.
+        _missing = type("_MissingSnowflakeError", (Exception,), {})
+        SnowflakeHttpError = getattr(_errors, "HttpError", _missing)
+        SnowflakeGatewayTimeoutError = getattr(_errors, "GatewayTimeoutError", _missing)
+        SnowflakeRequestTimeoutError = getattr(_errors, "RequestTimeoutError", _missing)
+        SnowflakeServiceUnavailableError = getattr(_errors, "ServiceUnavailableError", _missing)
 
         if isinstance(error, SnowflakeIntegrityError):
             return 'integrity'
