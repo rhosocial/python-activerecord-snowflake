@@ -71,3 +71,19 @@ class SnowflakeStageSupport(Protocol):
     def format_remove_stage(self, stage: str, path: str) -> str:
         """Format REMOVE @stage/path statement."""
         ...
+
+    def format_copy_into_load(self, expr: Any) -> str:
+        """Format COPY INTO <table> FROM <stage> (load)."""
+        ...
+
+    def format_copy_into_unload(self, expr: Any) -> str:
+        """Format COPY INTO <stage> FROM <table> (unload)."""
+        ...
+
+    def format_file_format(self, file_format: Optional[Any]) -> Optional[str]:
+        """Format FILE_FORMAT clause."""
+        ...
+
+    def format_encryption(self, encryption: Any) -> str:
+        """Format ENCRYPTION option."""
+        ...

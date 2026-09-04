@@ -60,8 +60,17 @@ def _register_default_scenarios():
     """Register default scenarios based on available credentials."""
     if os.getenv("SNOWFLAKE_ACCOUNT"):
         _register_real_scenarios()
-    else:
-        _register_fakesnow_scenarios()
+        return
+    # The fakesnow scenario dials a placeholder account that only works
+    # when fakesnow patches snowflake.connector.  Without the package the
+    # patch never activates and the fake account would hit the real
+    # Snowflake endpoint (404) — so register nothing and let testsuite
+    # parameterization skip cleanly.
+    try:
+        import fakesnow  # noqa: F401
+    except ImportError:
+        return
+    _register_fakesnow_scenarios()
 
 
 def _register_fakesnow_scenarios():
