@@ -594,6 +594,62 @@ class SnowflakeDialect(
         """Snowflake supports ALTER TABLE MODIFY COLUMN."""
         return True
 
+    # region CreateTableExpressionDiffSupport hooks
+
+    def _supports_alter_column_type(self) -> bool:
+        """Snowflake changes a column type in place via ``MODIFY COLUMN``.
+        The accompanying formatter is overridden below."""
+        return True
+
+    def alter_column_type_action(self, old_col, new_col):
+        """Build the in-place type-change action (``MODIFY COLUMN``)."""
+        from rhosocial.activerecord.backend.expression.statements.ddl_alter import ModifyColumn
+
+        return ModifyColumn(self, column=new_col)
+
+    def format_modify_column_action(self, action) -> Tuple[str, tuple]:
+        """Render Snowflake ``ALTER TABLE ... MODIFY COLUMN <col> <type>``.
+
+        Snowflake redefines a column wholesale with ``MODIFY COLUMN`` carrying
+        the full new definition (type + constraints). ``DEFAULT``/``NOT NULL``
+        ride along inside the rendered column spec.
+        """
+        from rhosocial.activerecord.backend.expression.statements.ddl_table import (
+            ColumnConstraintType,
+        )
+
+        col = action.column
+        type_sql, _ = self.format_data_type(col.data_type)
+        parts = [type_sql]
+        for c in col.constraints:
+            if c.constraint_type == ColumnConstraintType.NOT_NULL:
+                parts.append("NOT NULL")
+            elif c.constraint_type == ColumnConstraintType.NULL:
+                parts.append("NULL")
+            elif c.constraint_type == ColumnConstraintType.DEFAULT and c.default_value is not None:
+                from rhosocial.activerecord.backend.expression.core import Literal
+
+                lit_sql, lit_params = Literal(self, c.default_value).to_sql()
+                parts.append(f"DEFAULT {lit_sql}")
+        spec = " ".join(parts)
+        return f"MODIFY COLUMN {self.format_identifier(col.name)} {spec}", ()
+
+    def _supports_alter_column_properties(self) -> bool:
+        """Snowflake has no independent ``ALTER COLUMN SET DEFAULT`` clause;
+        property changes ride inside ``MODIFY COLUMN``. The generic diff path
+        emits standalone ``ALTER COLUMN SET/DROP DEFAULT`` actions, which
+        Snowflake rejects — route property-only changes to a rebuild.
+        """
+        return False
+
+    def _supports_alter_table_index_actions(self) -> bool:
+        """Snowflake has no traditional indexes (only SEARCH INDEX via a
+        separate statement) — index changes route to a rebuild plan.
+        """
+        return False
+
+    # endregion
+
     # ========== Snowflake-Specific Capability Detection ==========
 
     def supports_array_type(self) -> bool:

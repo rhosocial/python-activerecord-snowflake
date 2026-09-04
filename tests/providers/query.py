@@ -227,6 +227,13 @@ class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
             (Profile, "profiles"),
         ], scenario_name)
 
+    def setup_order_item_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        """Set up the composite-PK OrderItem model for the query feature tests."""
+        from rhosocial.activerecord.testsuite.feature.basic.fixtures.models import (
+            OrderItem as CompositeOrderItemBase,
+        )
+        return self._setup_model(CompositeOrderItemBase, scenario_name, "order_items")
+
     async def setup_async_order_fixtures(self, scenario_name: str) -> Tuple[Type[ActiveRecord], Type[ActiveRecord], Type[ActiveRecord]]:
         from rhosocial.activerecord.testsuite.feature.query.fixtures.async_models import AsyncUser, AsyncOrder, AsyncOrderItem
         return await self._setup_multiple_models_async([
@@ -293,6 +300,13 @@ class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
             (AsyncUser, "users"),
             (AsyncProfile, "profiles"),
         ], scenario_name)
+
+    async def setup_order_item_model(self, scenario_name: str) -> Type[ActiveRecord]:
+        """Set up the composite-PK AsyncOrderItem model for the query feature tests."""
+        from rhosocial.activerecord.testsuite.feature.basic.fixtures.models import (
+            AsyncOrderItem as AsyncCompositeOrderItemBase,
+        )
+        return await self._setup_model_async(AsyncCompositeOrderItemBase, scenario_name, "order_items")
 
     async def cleanup_after_test_async(self, scenario_name: str) -> None:
         tables_to_drop = [
