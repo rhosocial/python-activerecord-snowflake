@@ -38,6 +38,9 @@ dependencies = [
     "snowflake-connector-python>=3.0.0"
 ]
 
+[project.scripts]
+rhosocial-activerecord-snowflake = "rhosocial.activerecord.backend.impl.snowflake.__main__:main"
+
 [project.optional-dependencies]
 test = [
     "pytest",
