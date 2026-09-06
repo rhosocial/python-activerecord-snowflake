@@ -42,6 +42,40 @@ class TestSnowflakeDialectFormatting:
         assert dialect.get_parameter_placeholder(5) == "%s"
 
 
+class TestSnowflakeQualifyClauseAssembly:
+    """Test QUALIFY clause rendering within QueryExpression."""
+
+    def test_qualify_before_order_by(self, dialect):
+        """QUALIFY must be emitted once and placed before ORDER BY."""
+        from rhosocial.activerecord.backend.expression import (
+            Column,
+            FunctionCall,
+            Literal,
+            OrderByClause,
+            QualifyClause,
+            QueryExpression,
+            TableExpression,
+        )
+
+        query = QueryExpression(
+            dialect,
+            select=[Column(dialect, "id"), Column(dialect, "name")],
+            from_=TableExpression(dialect, "users"),
+            qualify=QualifyClause(
+                dialect,
+                FunctionCall(dialect, "ROW_NUMBER") <= Literal(dialect, 3),
+            ),
+            order_by=OrderByClause(
+                dialect, expressions=[(Column(dialect, "id"), "ASC")]
+            ),
+        )
+        sql, params = query.to_sql()
+        assert sql.count("QUALIFY") == 1
+        assert sql.index("QUALIFY") < sql.index("ORDER BY")
+        assert "QUALIFY ROW_NUMBER() <= %s ORDER BY" in sql
+        assert params == (3,)
+
+
 class TestSnowflakeDialectCapabilities:
     """Test supports_* capability detection methods."""
 
