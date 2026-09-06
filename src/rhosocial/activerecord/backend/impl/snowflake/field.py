@@ -19,7 +19,7 @@ class SnowflakePKMixin:
     RETURNING clause, both of which have limitations on Snowflake.
 
     Usage:
-        class Order(SnowflakePKMixin, TimestampMixin, ActiveRecord):
+        class Order(SnowflakePKMixin, DefaultTimestampMixin, ActiveRecord):
             _snowflake_sequence_name: ClassVar[str] = "order_id_seq"
             # id field is automatically provided by this Mixin
 
