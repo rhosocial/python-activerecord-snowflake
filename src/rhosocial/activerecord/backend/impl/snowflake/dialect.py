@@ -108,6 +108,7 @@ from .mixins import (
     SnowflakeIntrospectionMixin,
     SnowflakeMaterializedViewMixin,
     SnowflakePartitionMixin,
+    SnowflakeDDLSpecMixin,
     SnowflakePipeMixin,
     SnowflakePivotMixin,
     SnowflakeRoutineMixin,
@@ -189,6 +190,7 @@ class SnowflakeDialect(
     SnowflakeTableModifierMixin,
     SnowflakeDynamicIdentifierMixin,
     SnowflakePartitionMixin,
+    SnowflakeDDLSpecMixin,  # DDL feature-spec claiming (external partition / type Specs)
     SnowflakeSampleMixin,
     SnowflakePivotMixin,
     SnowflakeShowMixin,
