@@ -55,6 +55,8 @@ class SnowflakeVarcharType(SnowflakeDataTypeMixin, VarCharType):
     Snowflake VARCHAR supports up to 16,777,216 bytes.
     """
 
+    name = "snowflake_varchar"
+
     def __init__(self, dialect=None, *, length: Optional[int] = None):
         super().__init__(length=length, dialect=dialect)
 
@@ -80,6 +82,8 @@ class SnowflakeNumberType(SnowflakeDataTypeMixin, DecimalType):
     NUMBER(precision, scale) with precision up to 38, scale -84..127.
     """
 
+    name = "snowflake_number"
+
     def __init__(self, dialect=None, *, precision: Optional[int] = None, scale: Optional[int] = None):
         super().__init__(precision=precision, scale=scale, dialect=dialect)
 
@@ -104,6 +108,8 @@ class SnowflakeNumberType(SnowflakeDataTypeMixin, DecimalType):
 class SnowflakeBooleanType(SnowflakeDataTypeMixin, BooleanType):
     """Snowflake BOOLEAN type."""
 
+    name = "snowflake_boolean"
+
     def format_type(self, dialect=None) -> str:
         return "BOOLEAN"
 
@@ -115,6 +121,8 @@ class SnowflakeTimestampLtzType(SnowflakeDataTypeMixin, TimestampType):
 
     Stored in UTC, displayed in session timezone.
     """
+
+    name = "snowflake_timestamp_ltz"
 
     def __init__(self, dialect=None, *, precision: Optional[int] = None):
         super().__init__(precision=precision, dialect=dialect)
@@ -139,6 +147,8 @@ class SnowflakeTimestampNtzType(SnowflakeDataTypeMixin, TimestampType):
     Stored and displayed as-is, without timezone conversion.
     """
 
+    name = "snowflake_timestamp_ntz"
+
     def __init__(self, dialect=None, *, precision: Optional[int] = None):
         super().__init__(precision=precision, dialect=dialect)
 
@@ -162,6 +172,8 @@ class SnowflakeTimestampTzType(SnowflakeDataTypeMixin, TimestampType):
     Stores the timezone offset alongside the timestamp.
     """
 
+    name = "snowflake_timestamp_tz"
+
     def __init__(self, dialect=None, *, precision: Optional[int] = None):
         super().__init__(precision=precision, dialect=dialect)
 
@@ -184,12 +196,16 @@ class SnowflakeTimestampTzType(SnowflakeDataTypeMixin, TimestampType):
 class SnowflakeDateType(SnowflakeDataTypeMixin, DateType):
     """Snowflake DATE type."""
 
+    name = "snowflake_date"
+
     def format_type(self, dialect=None) -> str:
         return "DATE"
 
 
 class SnowflakeTimeType(SnowflakeDataTypeMixin, TimeType):
     """Snowflake TIME type."""
+
+    name = "snowflake_time"
 
     def __init__(self, dialect=None, *, precision: Optional[int] = None):
         super().__init__(precision=precision, dialect=dialect)
@@ -215,6 +231,8 @@ class SnowflakeBinaryType(SnowflakeDataTypeMixin, BlobType):
 
     Maximum size: 8,388,608 bytes.
     """
+
+    name = "snowflake_binary"
 
     def __init__(self, dialect=None, *, length: Optional[int] = None):
         super().__init__(dialect=dialect)
@@ -242,6 +260,8 @@ class SnowflakeVariantType(SnowflakeDataTypeMixin, JsonType):
     Stores JSON, Avro, ORC, Parquet, or any semi-structured data.
     """
 
+    name = "snowflake_variant"
+
     def format_type(self, dialect=None) -> str:
         return "VARIANT"
 
@@ -249,12 +269,16 @@ class SnowflakeVariantType(SnowflakeDataTypeMixin, JsonType):
 class SnowflakeObjectType(SnowflakeDataTypeMixin, JsonType):
     """Snowflake OBJECT type for key-value structured data."""
 
+    name = "snowflake_object"
+
     def format_type(self, dialect=None) -> str:
         return "OBJECT"
 
 
 class SnowflakeArrayType(SnowflakeDataTypeMixin, ArrayType):
     """Snowflake ARRAY type for ordered sequences."""
+
+    name = "snowflake_array"
 
     def __init__(self, dialect=None, *, element_type: Optional[DataType] = None):
         super().__init__(element_type=element_type or IntegerType(), dialect=dialect)
@@ -281,6 +305,8 @@ class SnowflakeGeographyType(SnowflakeDataTypeMixin, DataType):
     Earth-surface coordinates (WGS 84, latitude/longitude).
     """
 
+    name = "snowflake_geography"
+
     def format_type(self, dialect=None) -> str:
         return "GEOGRAPHY"
 
@@ -290,6 +316,8 @@ class SnowflakeGeometryType(SnowflakeDataTypeMixin, DataType):
 
     Cartesian (flat-plane) coordinates.
     """
+
+    name = "snowflake_geometry"
 
     def format_type(self, dialect=None) -> str:
         return "GEOMETRY"

@@ -310,7 +310,7 @@ class SnowflakeDialect(
         """
         value = self._escape_sql_string(str(expr.value))
         sql = f"INTERVAL '{value}' {expr.unit.value.upper()}"
-        return self._apply_value_expression_modifiers(sql, (), expr)
+        return self.apply_alias(sql, (), expr)
 
     def format_datetime_add_expression(self, expr: "Any") -> Tuple[str, Tuple]:
         """Format a date/time addition expression using Snowflake DATEADD.
@@ -324,7 +324,7 @@ class SnowflakeDialect(
         source_sql, source_params = expr.source.to_sql()
         unit = expr.interval.unit.value.upper()
         sql = f"DATEADD({unit}, %s, {source_sql})"
-        return self._apply_value_expression_modifiers(
+        return self.apply_alias(
             sql, (expr.interval.value,) + source_params, expr
         )
 
@@ -343,7 +343,7 @@ class SnowflakeDialect(
         source_sql, source_params = expr.source.to_sql()
         unit = expr.interval.unit.value.upper()
         sql = f"DATEADD({unit}, %s, {source_sql})"
-        return self._apply_value_expression_modifiers(
+        return self.apply_alias(
             sql, (-expr.interval.value,) + source_params, expr
         )
 
@@ -359,7 +359,7 @@ class SnowflakeDialect(
         start_sql, start_params = expr.start.to_sql()
         end_sql, end_params = expr.end.to_sql()
         sql = f"DATEDIFF({expr.unit.value.upper()}, {start_sql}, {end_sql})"
-        return self._apply_value_expression_modifiers(sql, start_params + end_params, expr)
+        return self.apply_alias(sql, start_params + end_params, expr)
 
     def format_set_transaction(self, expr) -> Tuple[str, tuple]:
         """Format SET TRANSACTION statement for Snowflake.
@@ -392,20 +392,18 @@ class SnowflakeDialect(
     def format_data_type(self, data_type: "Any") -> "Tuple[str, tuple]":
         """Render a DataType into a Snowflake SQL type string.
 
+        Delegates to DDLTypeMixin naming-convention dispatch which routes
+        to ``format_data_type_<name>`` methods on the dialect.
+
         Args:
             data_type: The DataType instance to format.
 
         Returns:
             Tuple of (SQL type string, params).
         """
-        from .expression.types import SnowflakeDataTypeMixin
-        if isinstance(data_type, SnowflakeDataTypeMixin):
-            return data_type.format_type(self), ()
         from rhosocial.activerecord.backend.expression.types._base import DataType
-        if hasattr(data_type, 'ddl') and callable(data_type.ddl):
-            return data_type.ddl, ()
         if isinstance(data_type, DataType):
-            return data_type.__class__.__name__.replace("Type", "").upper(), ()
+            return super().format_data_type(data_type)
         return str(data_type), ()
 
     def parse_type(self, raw: str) -> "Any":
