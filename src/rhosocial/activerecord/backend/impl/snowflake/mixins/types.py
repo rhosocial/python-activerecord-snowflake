@@ -66,118 +66,118 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
     # DDLTypeSupport — formatting (core types)
     # ------------------------------------------------------------------
 
-    def format_data_type_integer(self, data_type: IntegerType) -> Tuple[str, tuple]:
+    def format_data_type_integer(self, expr: IntegerType) -> Tuple[str, tuple]:
         return "INTEGER", ()
 
-    def format_data_type_bigint(self, data_type: BigIntType) -> Tuple[str, tuple]:
+    def format_data_type_bigint(self, expr: BigIntType) -> Tuple[str, tuple]:
         return "BIGINT", ()
 
-    def format_data_type_smallint(self, data_type: SmallIntType) -> Tuple[str, tuple]:
+    def format_data_type_smallint(self, expr: SmallIntType) -> Tuple[str, tuple]:
         return "SMALLINT", ()
 
-    def format_data_type_float(self, data_type: FloatType) -> Tuple[str, tuple]:
+    def format_data_type_float(self, expr: FloatType) -> Tuple[str, tuple]:
         return "FLOAT", ()
 
-    def format_data_type_double(self, data_type: DoubleType) -> Tuple[str, tuple]:
+    def format_data_type_double(self, expr: DoubleType) -> Tuple[str, tuple]:
         return "DOUBLE", ()
 
-    def format_data_type_decimal(self, data_type: DecimalType) -> Tuple[str, tuple]:
-        if data_type.precision is not None and data_type.scale is not None:
-            return f"NUMBER({data_type.precision}, {data_type.scale})", ()
-        if data_type.precision is not None:
-            return f"NUMBER({data_type.precision})", ()
+    def format_data_type_decimal(self, expr: DecimalType) -> Tuple[str, tuple]:
+        if expr.precision is not None and expr.scale is not None:
+            return f"NUMBER({expr.precision}, {expr.scale})", ()
+        if expr.precision is not None:
+            return f"NUMBER({expr.precision})", ()
         return "NUMBER", ()
 
-    def format_data_type_boolean(self, data_type: BooleanType) -> Tuple[str, tuple]:
+    def format_data_type_boolean(self, expr: BooleanType) -> Tuple[str, tuple]:
         return "BOOLEAN", ()
 
-    def format_data_type_varchar(self, data_type: VarCharType) -> Tuple[str, tuple]:
-        if data_type.length is not None:
-            return f"VARCHAR({data_type.length})", ()
+    def format_data_type_varchar(self, expr: VarCharType) -> Tuple[str, tuple]:
+        if expr.length is not None:
+            return f"VARCHAR({expr.length})", ()
         return "VARCHAR", ()
 
-    def format_data_type_char(self, data_type: CharType) -> Tuple[str, tuple]:
-        return (f"CHAR({data_type.length})" if data_type.length is not None else "CHAR(1)"), ()
+    def format_data_type_char(self, expr: CharType) -> Tuple[str, tuple]:
+        return (f"CHAR({expr.length})" if expr.length is not None else "CHAR(1)"), ()
 
-    def format_data_type_text(self, data_type: TextType) -> Tuple[str, tuple]:
+    def format_data_type_text(self, expr: TextType) -> Tuple[str, tuple]:
         return "VARCHAR(16777216)", ()
 
-    def format_data_type_blob(self, data_type: BlobType) -> Tuple[str, tuple]:
+    def format_data_type_blob(self, expr: BlobType) -> Tuple[str, tuple]:
         return "BINARY", ()
 
-    def format_data_type_datetime(self, data_type: DateTimeType) -> Tuple[str, tuple]:
+    def format_data_type_datetime(self, expr: DateTimeType) -> Tuple[str, tuple]:
         return "TIMESTAMP_NTZ", ()
 
-    def format_data_type_date(self, data_type: DateType) -> Tuple[str, tuple]:
+    def format_data_type_date(self, expr: DateType) -> Tuple[str, tuple]:
         return "DATE", ()
 
-    def format_data_type_time(self, data_type: TimeType) -> Tuple[str, tuple]:
+    def format_data_type_time(self, expr: TimeType) -> Tuple[str, tuple]:
         return "TIME", ()
 
-    def format_data_type_timestamp(self, data_type: TimestampType) -> Tuple[str, tuple]:
+    def format_data_type_timestamp(self, expr: TimestampType) -> Tuple[str, tuple]:
         return "TIMESTAMP_NTZ", ()
 
-    def format_data_type_json(self, data_type: JsonType) -> Tuple[str, tuple]:
+    def format_data_type_json(self, expr: JsonType) -> Tuple[str, tuple]:
         return "VARIANT", ()
 
     # --- Snowflake-specific type formatters (dispatch key = type name) ---
 
-    def format_data_type_snowflake_varchar(self, data_type: SnowflakeVarcharType) -> Tuple[str, tuple]:
-        if data_type.length is not None:
-            return f"VARCHAR({data_type.length})", ()
+    def format_data_type_snowflake_varchar(self, expr: SnowflakeVarcharType) -> Tuple[str, tuple]:
+        if expr.length is not None:
+            return f"VARCHAR({expr.length})", ()
         return "VARCHAR", ()
 
-    def format_data_type_snowflake_number(self, data_type: SnowflakeNumberType) -> Tuple[str, tuple]:
-        if data_type.precision is not None and data_type.scale is not None:
-            return f"NUMBER({data_type.precision}, {data_type.scale})", ()
-        if data_type.precision is not None:
-            return f"NUMBER({data_type.precision})", ()
+    def format_data_type_snowflake_number(self, expr: SnowflakeNumberType) -> Tuple[str, tuple]:
+        if expr.precision is not None and expr.scale is not None:
+            return f"NUMBER({expr.precision}, {expr.scale})", ()
+        if expr.precision is not None:
+            return f"NUMBER({expr.precision})", ()
         return "NUMBER", ()
 
-    def format_data_type_snowflake_boolean(self, data_type: SnowflakeBooleanType) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_boolean(self, expr: SnowflakeBooleanType) -> Tuple[str, tuple]:
         return "BOOLEAN", ()
 
-    def format_data_type_snowflake_timestamp_ltz(self, data_type: SnowflakeTimestampLtzType) -> Tuple[str, tuple]:
-        if data_type.precision is not None:
-            return f"TIMESTAMP_LTZ({data_type.precision})", ()
+    def format_data_type_snowflake_timestamp_ltz(self, expr: SnowflakeTimestampLtzType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            return f"TIMESTAMP_LTZ({expr.precision})", ()
         return "TIMESTAMP_LTZ", ()
 
-    def format_data_type_snowflake_timestamp_ntz(self, data_type: SnowflakeTimestampNtzType) -> Tuple[str, tuple]:
-        if data_type.precision is not None:
-            return f"TIMESTAMP_NTZ({data_type.precision})", ()
+    def format_data_type_snowflake_timestamp_ntz(self, expr: SnowflakeTimestampNtzType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            return f"TIMESTAMP_NTZ({expr.precision})", ()
         return "TIMESTAMP_NTZ", ()
 
-    def format_data_type_snowflake_timestamp_tz(self, data_type: SnowflakeTimestampTzType) -> Tuple[str, tuple]:
-        if data_type.precision is not None:
-            return f"TIMESTAMP_TZ({data_type.precision})", ()
+    def format_data_type_snowflake_timestamp_tz(self, expr: SnowflakeTimestampTzType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            return f"TIMESTAMP_TZ({expr.precision})", ()
         return "TIMESTAMP_TZ", ()
 
-    def format_data_type_snowflake_date(self, data_type: SnowflakeDateType) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_date(self, expr: SnowflakeDateType) -> Tuple[str, tuple]:
         return "DATE", ()
 
-    def format_data_type_snowflake_time(self, data_type: SnowflakeTimeType) -> Tuple[str, tuple]:
-        if data_type.precision is not None:
-            return f"TIME({data_type.precision})", ()
+    def format_data_type_snowflake_time(self, expr: SnowflakeTimeType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            return f"TIME({expr.precision})", ()
         return "TIME", ()
 
-    def format_data_type_snowflake_binary(self, data_type: SnowflakeBinaryType) -> Tuple[str, tuple]:
-        if data_type._length is not None:
-            return f"BINARY({data_type._length})", ()
+    def format_data_type_snowflake_binary(self, expr: SnowflakeBinaryType) -> Tuple[str, tuple]:
+        if expr._length is not None:
+            return f"BINARY({expr._length})", ()
         return "BINARY", ()
 
-    def format_data_type_snowflake_variant(self, data_type: SnowflakeVariantType) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_variant(self, expr: SnowflakeVariantType) -> Tuple[str, tuple]:
         return "VARIANT", ()
 
-    def format_data_type_snowflake_object(self, data_type: SnowflakeObjectType) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_object(self, expr: SnowflakeObjectType) -> Tuple[str, tuple]:
         return "OBJECT", ()
 
-    def format_data_type_snowflake_array(self, data_type: SnowflakeArrayType) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_array(self, expr: SnowflakeArrayType) -> Tuple[str, tuple]:
         return "ARRAY", ()
 
-    def format_data_type_snowflake_geography(self, data_type: SnowflakeGeographyType) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_geography(self, expr: SnowflakeGeographyType) -> Tuple[str, tuple]:
         return "GEOGRAPHY", ()
 
-    def format_data_type_snowflake_geometry(self, data_type: SnowflakeGeometryType) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_geometry(self, expr: SnowflakeGeometryType) -> Tuple[str, tuple]:
         return "GEOMETRY", ()
 
     # ------------------------------------------------------------------
