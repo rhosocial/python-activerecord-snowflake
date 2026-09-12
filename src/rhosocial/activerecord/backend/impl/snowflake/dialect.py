@@ -17,18 +17,22 @@ from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
 from rhosocial.activerecord.backend.dialect.protocols import (
     AdvancedGroupingSupport,
     ArraySupport,
+    AutoIncrementSupport,
     CollationSupport,
     ConstraintSupport,
     CTESupport,
     DDLTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
+    GeneratedColumnSupport,
+    ILIKESupport,
     IndexSupport,
     IntrospectionSupport,
     JSONSupport,
     JoinSupport,
     LateralJoinSupport,
     MergeSupport,
+    OrderedSetAggregationSupport,
     PartitionSupport,
     QualifyClauseSupport,
     ReturningSupport,
@@ -37,6 +41,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     SetOperationSupport,
     SQLFunctionSupport,
     TransactionControlSupport,
+    TruncateSupport,
     UpsertSupport,
     ViewSupport,
     WildcardSupport,
@@ -45,6 +50,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
 from rhosocial.activerecord.backend.dialect.mixins import (
     AdvancedGroupingMixin,
     ArrayMixin,
+    AutoIncrementMixin,
     CollationMixin,
     ConstraintMixin,
     CTEMixin,
@@ -57,12 +63,14 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     ExpressionMixin,
     FilterClauseMixin,
     IdentifierMixin,
+    ILIKEMixin,
     IndexMixin,
     IntrospectionMixin,
     JoinMixin,
     JSONMixin,
     LateralJoinMixin,
     MergeMixin,
+    OrderedSetAggregationMixin,
     PredicateMixin,
     QualifyClauseMixin,
     ReturningMixin,
@@ -71,6 +79,7 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     SetOperationMixin,
     TableMixin,
     TransactionControlMixin,
+    TruncateMixin,
     UpsertMixin,
     ViewMixin,
     WindowFunctionMixin,
@@ -145,6 +154,7 @@ class SnowflakeDialect(
     # New Mixins (shared by all modern backends)
     IdentifierMixin,
     PredicateMixin,
+    ILIKEMixin,
     ExpressionMixin,
     DateTimeMixin,
     DQLMixin,
@@ -152,6 +162,7 @@ class SnowflakeDialect(
     DMLMixin,
     SnowflakeAlterColumnModifierMixin,  # Before DDLColumnMixin to override format_*_action
     DDLColumnMixin,
+    AutoIncrementMixin,
     SnowflakeTypeSupportMixin,
     TransactionControlMixin,
     SetOperationMixin,
@@ -163,6 +174,7 @@ class SnowflakeDialect(
     WindowFunctionMixin,
     JSONMixin,
     AdvancedGroupingMixin,
+    OrderedSetAggregationMixin,
     ArrayMixin,
     ExplainMixin,
     MergeMixin,
@@ -172,6 +184,7 @@ class SnowflakeDialect(
     JoinMixin,
     SnowflakeMaterializedViewMixin,  # Before ViewMixin to override materialized view rendering
     ViewMixin,
+    TruncateMixin,
     SchemaMixin,
     IndexMixin,
     TableMixin,
@@ -202,18 +215,22 @@ class SnowflakeDialect(
     # Protocol supports (for isinstance checks)
     AdvancedGroupingSupport,
     ArraySupport,
+    AutoIncrementSupport,
     CollationSupport,
     CTESupport,
     ConstraintSupport,
     DDLTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
+    GeneratedColumnSupport,
+    ILIKESupport,
     IndexSupport,
     IntrospectionSupport,
     JSONSupport,
     JoinSupport,
     LateralJoinSupport,
     MergeSupport,
+    OrderedSetAggregationSupport,
     QualifyClauseSupport,
     ReturningSupport,
     SchemaSupport,
@@ -221,6 +238,7 @@ class SnowflakeDialect(
     SetOperationSupport,
     SQLFunctionSupport,
     TransactionControlSupport,
+    TruncateSupport,
     UpsertSupport,
     ViewSupport,
     WildcardSupport,
@@ -778,6 +796,79 @@ class SnowflakeDialect(
         return False
 
     # endregion
+
+    # ========== Generated Column Support ==========
+
+    def supports_generated_columns(self) -> bool:
+        """Snowflake supports generated (computed) columns."""
+        return True
+
+    def supports_stored_generated_columns(self) -> bool:
+        """Snowflake generated columns are virtual only; STORED is unsupported."""
+        return False
+
+    def supports_virtual_generated_columns(self) -> bool:
+        """Snowflake exposes generated columns as virtual columns.
+
+        Snowflake computes the value at query time from ``[GENERATED ALWAYS]
+        AS (<expr>) [VIRTUAL]``.
+        """
+        return True
+
+    # ========== ILIKE Support ==========
+
+    def supports_ilike(self) -> bool:
+        """Snowflake supports the native ILIKE operator."""
+        return True
+
+    def format_ilike_expression(self, column, pattern: str, negate: bool = False):
+        """Format a native Snowflake ``[NOT] ILIKE`` expression.
+
+        Snowflake's ILIKE operator performs case-insensitive matching, so
+        no LOWER() workaround is needed.
+        """
+        if isinstance(column, str):
+            col_sql = self.format_identifier(column)
+        elif hasattr(column, "to_sql"):
+            col_sql, _ = column.to_sql()
+        else:
+            col_sql = str(column)
+        operator = "NOT ILIKE" if negate else "ILIKE"
+        return f"{col_sql} {operator} %s", (pattern,)
+
+    # ========== Ordered-Set Aggregation Support ==========
+
+    def supports_ordered_set_aggregation(self) -> bool:
+        """Snowflake supports ``WITHIN GROUP (ORDER BY ...)`` aggregates.
+
+        Snowflake renders ordered-set aggregates such as ``LISTAGG`` and
+        ``ARRAY_AGG`` through ``WITHIN GROUP (ORDER BY ...)``; the standard
+        formatting is provided by ``OrderedSetAggregationMixin``.
+        """
+        return True
+
+    # ========== Truncate Support ==========
+
+    def format_truncate_statement(self, expr) -> Tuple[str, tuple]:
+        """Format Snowflake ``TRUNCATE TABLE <name>``.
+
+        Snowflake's TRUNCATE has neither a ``RESTART IDENTITY`` nor a
+        ``CASCADE`` option, so requesting either is rejected rather than
+        silently emitting invalid SQL.
+        """
+        if expr.restart_identity:
+            raise UnsupportedFeatureError(
+                self.name,
+                "TRUNCATE ... RESTART IDENTITY",
+                suggestion="Snowflake TRUNCATE has no RESTART IDENTITY option.",
+            )
+        if expr.cascade:
+            raise UnsupportedFeatureError(
+                self.name,
+                "TRUNCATE ... CASCADE",
+                suggestion="Snowflake TRUNCATE has no CASCADE option.",
+            )
+        return f"TRUNCATE TABLE {self.format_identifier(expr.table_name)}", ()
 
     # ========== Snowflake-Specific Capability Detection ==========
 

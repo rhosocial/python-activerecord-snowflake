@@ -28,18 +28,22 @@ from rhosocial.activerecord.backend.impl.snowflake.mixins import (
 from rhosocial.activerecord.backend.dialect import protocols as dialect_protocols
 from rhosocial.activerecord.backend.dialect.protocols import (
     AdvancedGroupingSupport,
+    AutoIncrementSupport,
     CollationSupport,
     ConstraintSupport,
     CTESupport,
     DDLTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
+    GeneratedColumnSupport,
+    ILIKESupport,
     IndexSupport,
     IntrospectionSupport,
     JSONSupport,
     JoinSupport,
     LateralJoinSupport,
     MergeSupport,
+    OrderedSetAggregationSupport,
     QualifyClauseSupport,
     ReturningSupport,
     SchemaSupport,
@@ -47,6 +51,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     SetOperationSupport,
     SQLFunctionSupport,
     TransactionControlSupport,
+    TruncateSupport,
     UpsertSupport,
     ViewSupport,
     WildcardSupport,
@@ -62,17 +67,21 @@ from rhosocial.activerecord.backend.dialect.protocols import (
 SNOWFLAKE_PROTOCOLS = [
     # Generic protocols
     AdvancedGroupingSupport,
+    AutoIncrementSupport,
     CollationSupport,
     CTESupport,
     DDLTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
+    GeneratedColumnSupport,
+    ILIKESupport,
     IndexSupport,
     IntrospectionSupport,
     JSONSupport,
     JoinSupport,
     LateralJoinSupport,
     MergeSupport,
+    OrderedSetAggregationSupport,
     QualifyClauseSupport,
     ReturningSupport,
     SchemaSupport,
@@ -80,6 +89,7 @@ SNOWFLAKE_PROTOCOLS = [
     SetOperationSupport,
     SQLFunctionSupport,
     TransactionControlSupport,
+    TruncateSupport,
     UpsertSupport,
     ViewSupport,
     WildcardSupport,
@@ -176,27 +186,13 @@ SNOWFLAKE_NOT_IMPLEMENTED = [
     dialect_protocols.LockingSupport,
     # Snowflake does not support triggers.
     dialect_protocols.TriggerSupport,
-    # --- Known gaps (feature exists, generic protocol not yet declared) ---
-    # TODO: Snowflake supports AUTOINCREMENT/IDENTITY; compose AutoIncrementMixin
-    # and move this to SNOWFLAKE_PROTOCOLS.
-    dialect_protocols.AutoIncrementSupport,
-    # TODO: Snowflake supports generated columns; implement
-    # GeneratedColumnMixin overrides and move to SNOWFLAKE_PROTOCOLS.
-    dialect_protocols.GeneratedColumnSupport,
-    # TODO: Snowflake supports TRUNCATE TABLE; declare TruncateSupport and move
-    # this to SNOWFLAKE_PROTOCOLS.
-    dialect_protocols.TruncateSupport,
-    # TODO: Snowflake supports ILIKE; declare ILIKESupport and move this to
-    # SNOWFLAKE_PROTOCOLS.
-    dialect_protocols.ILIKESupport,
-    # TODO: Snowflake supports SQL UDFs; the generic SQL/PSM FunctionSupport is
-    # not declared (Snowflake exposes routines via SnowflakeRoutineSupport).
+    # Snowflake exposes routine DDL through SnowflakeRoutineSupport (SQL,
+    # JavaScript, Java, Python and Scala bodies) rather than the generic
+    # SQL/PSM FunctionSupport, whose statement shape does not match Snowflake.
     dialect_protocols.FunctionSupport,
-    # TODO: Snowflake LISTAGG supports WITHIN GROUP; declare
-    # OrderedSetAggregationSupport and move this to SNOWFLAKE_PROTOCOLS.
-    dialect_protocols.OrderedSetAggregationSupport,
-    # TODO: Snowflake time travel is exposed via SnowflakeTimeTravelSupport;
-    # the generic TemporalTableSupport is not declared.
+    # Snowflake time travel uses AT(TIMESTAMP => ...) / AT(OFFSET => ...) /
+    # BEFORE(...) rather than the SQL-standard FOR SYSTEM_TIME AS OF rendered
+    # by TemporalTableSupport; it is exposed via SnowflakeTimeTravelSupport.
     dialect_protocols.TemporalTableSupport,
 ]
 
