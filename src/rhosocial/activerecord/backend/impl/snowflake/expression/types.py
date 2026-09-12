@@ -19,12 +19,12 @@ Key Snowflake types:
 - GEOGRAPHY
 - GEOMETRY
 """
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from rhosocial.activerecord.backend.expression.types._base import DataType
 from rhosocial.activerecord.backend.expression.types.integer import IntegerType
 from rhosocial.activerecord.backend.expression.types.string import VarCharType
-from rhosocial.activerecord.backend.expression.types.numeric import DecimalType
+from rhosocial.activerecord.backend.expression.types.numeric import DecimalType, FloatType
 from rhosocial.activerecord.backend.expression.types.boolean import BooleanType
 from rhosocial.activerecord.backend.expression.types.binary import BlobType
 from rhosocial.activerecord.backend.expression.types.datetime_ import DateType, TimeType, TimestampType
@@ -57,21 +57,17 @@ class SnowflakeVarcharType(SnowflakeDataTypeMixin, VarCharType):
 
     name = "snowflake_varchar"
 
-    def __init__(self, dialect=None, *, length: Optional[int] = None):
-        super().__init__(length=length, dialect=dialect)
+    def __init__(self, dialect=None, *, length: Optional[int] = None,
+                 dialect_options: Optional[Dict[str, Any]] = None):
+        super().__init__(dialect, length=length, dialect_options=dialect_options)
+
+    def _type_params(self) -> tuple:
+        return (self.length,)
 
     def format_type(self, dialect=None) -> str:
         if self.length is not None:
             return f"VARCHAR({self.length})"
         return "VARCHAR"
-
-    def __eq__(self, other: Any) -> bool:
-        if type(self) is not type(other):
-            return False
-        return self.length == other.length
-
-    def __hash__(self) -> int:
-        return hash((type(self), self.length))
 
 
 # ========== Numeric Types ==========
@@ -84,8 +80,14 @@ class SnowflakeNumberType(SnowflakeDataTypeMixin, DecimalType):
 
     name = "snowflake_number"
 
-    def __init__(self, dialect=None, *, precision: Optional[int] = None, scale: Optional[int] = None):
-        super().__init__(precision=precision, scale=scale, dialect=dialect)
+    def __init__(self, dialect=None, *, precision: Optional[int] = None,
+                 scale: Optional[int] = None,
+                 dialect_options: Optional[Dict[str, Any]] = None):
+        super().__init__(dialect, precision=precision, scale=scale,
+                         dialect_options=dialect_options)
+
+    def _type_params(self) -> tuple:
+        return (self.precision, self.scale)
 
     def format_type(self, dialect=None) -> str:
         if self.precision is not None:
@@ -94,13 +96,26 @@ class SnowflakeNumberType(SnowflakeDataTypeMixin, DecimalType):
             return f"NUMBER({self.precision})"
         return "NUMBER"
 
-    def __eq__(self, other: Any) -> bool:
-        if type(self) is not type(other):
-            return False
-        return self.precision == other.precision and self.scale == other.scale
 
-    def __hash__(self) -> int:
-        return hash((type(self), self.precision, self.scale))
+class SnowflakeFloatType(SnowflakeDataTypeMixin, FloatType):
+    """Snowflake FLOAT type (IEEE 754 binary64).
+
+    Supports optional precision parameter (1-126 binary, defaults to double).
+    """
+
+    name = "snowflake_float"
+
+    def __init__(self, dialect=None, *, precision: Optional[int] = None,
+                 dialect_options: Optional[Dict[str, Any]] = None):
+        super().__init__(dialect, precision=precision, dialect_options=dialect_options)
+
+    def _type_params(self) -> tuple:
+        return (self.precision,)
+
+    def format_type(self, dialect=None) -> str:
+        if self.precision is not None:
+            return f"FLOAT({self.precision})"
+        return "FLOAT"
 
 
 # ========== Boolean Type ==========
@@ -124,21 +139,17 @@ class SnowflakeTimestampLtzType(SnowflakeDataTypeMixin, TimestampType):
 
     name = "snowflake_timestamp_ltz"
 
-    def __init__(self, dialect=None, *, precision: Optional[int] = None):
-        super().__init__(precision=precision, dialect=dialect)
+    def __init__(self, dialect=None, *, precision: Optional[int] = None,
+                 dialect_options: Optional[Dict[str, Any]] = None):
+        super().__init__(dialect, precision=precision, dialect_options=dialect_options)
+
+    def _type_params(self) -> tuple:
+        return (self.precision,)
 
     def format_type(self, dialect=None) -> str:
         if self.precision is not None:
             return f"TIMESTAMP_LTZ({self.precision})"
         return "TIMESTAMP_LTZ"
-
-    def __eq__(self, other: Any) -> bool:
-        if type(self) is not type(other):
-            return False
-        return self.precision == other.precision
-
-    def __hash__(self) -> int:
-        return hash((type(self), self.precision))
 
 
 class SnowflakeTimestampNtzType(SnowflakeDataTypeMixin, TimestampType):
@@ -149,21 +160,17 @@ class SnowflakeTimestampNtzType(SnowflakeDataTypeMixin, TimestampType):
 
     name = "snowflake_timestamp_ntz"
 
-    def __init__(self, dialect=None, *, precision: Optional[int] = None):
-        super().__init__(precision=precision, dialect=dialect)
+    def __init__(self, dialect=None, *, precision: Optional[int] = None,
+                 dialect_options: Optional[Dict[str, Any]] = None):
+        super().__init__(dialect, precision=precision, dialect_options=dialect_options)
+
+    def _type_params(self) -> tuple:
+        return (self.precision,)
 
     def format_type(self, dialect=None) -> str:
         if self.precision is not None:
             return f"TIMESTAMP_NTZ({self.precision})"
         return "TIMESTAMP_NTZ"
-
-    def __eq__(self, other: Any) -> bool:
-        if type(self) is not type(other):
-            return False
-        return self.precision == other.precision
-
-    def __hash__(self) -> int:
-        return hash((type(self), self.precision))
 
 
 class SnowflakeTimestampTzType(SnowflakeDataTypeMixin, TimestampType):
@@ -174,21 +181,17 @@ class SnowflakeTimestampTzType(SnowflakeDataTypeMixin, TimestampType):
 
     name = "snowflake_timestamp_tz"
 
-    def __init__(self, dialect=None, *, precision: Optional[int] = None):
-        super().__init__(precision=precision, dialect=dialect)
+    def __init__(self, dialect=None, *, precision: Optional[int] = None,
+                 dialect_options: Optional[Dict[str, Any]] = None):
+        super().__init__(dialect, precision=precision, dialect_options=dialect_options)
+
+    def _type_params(self) -> tuple:
+        return (self.precision,)
 
     def format_type(self, dialect=None) -> str:
         if self.precision is not None:
             return f"TIMESTAMP_TZ({self.precision})"
         return "TIMESTAMP_TZ"
-
-    def __eq__(self, other: Any) -> bool:
-        if type(self) is not type(other):
-            return False
-        return self.precision == other.precision
-
-    def __hash__(self) -> int:
-        return hash((type(self), self.precision))
 
 
 # ========== Date & Time ==========
@@ -207,21 +210,17 @@ class SnowflakeTimeType(SnowflakeDataTypeMixin, TimeType):
 
     name = "snowflake_time"
 
-    def __init__(self, dialect=None, *, precision: Optional[int] = None):
-        super().__init__(precision=precision, dialect=dialect)
+    def __init__(self, dialect=None, *, precision: Optional[int] = None,
+                 dialect_options: Optional[Dict[str, Any]] = None):
+        super().__init__(dialect, precision=precision, dialect_options=dialect_options)
+
+    def _type_params(self) -> tuple:
+        return (self.precision,)
 
     def format_type(self, dialect=None) -> str:
         if self.precision is not None:
             return f"TIME({self.precision})"
         return "TIME"
-
-    def __eq__(self, other: Any) -> bool:
-        if type(self) is not type(other):
-            return False
-        return self.precision == other.precision
-
-    def __hash__(self) -> int:
-        return hash((type(self), self.precision))
 
 
 # ========== Binary ==========
@@ -234,22 +233,20 @@ class SnowflakeBinaryType(SnowflakeDataTypeMixin, BlobType):
 
     name = "snowflake_binary"
 
-    def __init__(self, dialect=None, *, length: Optional[int] = None):
-        super().__init__(dialect=dialect)
-        self._length = length
+    length: Optional[int] = None
+
+    def __init__(self, dialect=None, *, length: Optional[int] = None,
+                 dialect_options: Optional[Dict[str, Any]] = None):
+        super().__init__(dialect=dialect, dialect_options=dialect_options)
+        self.length = length
+
+    def _type_params(self) -> tuple:
+        return (self.length,)
 
     def format_type(self, dialect=None) -> str:
-        if self._length is not None:
-            return f"BINARY({self._length})"
+        if self.length is not None:
+            return f"BINARY({self.length})"
         return "BINARY"
-
-    def __eq__(self, other: Any) -> bool:
-        if type(self) is not type(other):
-            return False
-        return self._length == other._length
-
-    def __hash__(self) -> int:
-        return hash((type(self), self._length))
 
 
 # ========== Semi-Structured Types ==========
@@ -280,12 +277,15 @@ class SnowflakeArrayType(SnowflakeDataTypeMixin, ArrayType):
 
     name = "snowflake_array"
 
-    def __init__(self, dialect=None, *, element_type: Optional[DataType] = None):
-        super().__init__(element_type=element_type or IntegerType(), dialect=dialect)
+    def __init__(self, dialect=None, *, element_type: Optional[DataType] = None,
+                 dialect_options: Optional[Dict[str, Any]] = None):
+        super().__init__(dialect, element_type=element_type or IntegerType(),
+                         dialect_options=dialect_options)
+
+    def _type_params(self) -> tuple:
+        return (type(self.element_type),)
 
     def format_type(self, dialect=None) -> str:
-        if self.element_type is not None and not isinstance(self.element_type, IntegerType):
-            return "ARRAY"
         return "ARRAY"
 
     def __eq__(self, other: Any) -> bool:

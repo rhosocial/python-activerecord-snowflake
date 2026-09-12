@@ -348,22 +348,22 @@ class TestSnowflakeDataTypeFormatting:
 
     def test_supports_data_types(self, dialect):
         result = dialect.supports_data_types()
-        assert len(result) == 14
-        names = [name for _, name in result]
-        assert "VARCHAR" in names
-        assert "NUMBER" in names
-        assert "BOOLEAN" in names
-        assert "TIMESTAMP_LTZ" in names
-        assert "TIMESTAMP_NTZ" in names
-        assert "TIMESTAMP_TZ" in names
-        assert "VARIANT" in names
-        assert "ARRAY" in names
-        assert "OBJECT" in names
-        assert "GEOGRAPHY" in names
-        assert "GEOMETRY" in names
-        assert "DATE" in names
-        assert "TIME" in names
-        assert "BINARY" in names
+        assert isinstance(result, dict)
+        assert len(result) >= 14
+        assert "snowflake_varchar" in result
+        assert "snowflake_number" in result
+        assert "snowflake_boolean" in result
+        assert "snowflake_timestamp_ltz" in result
+        assert "snowflake_timestamp_ntz" in result
+        assert "snowflake_timestamp_tz" in result
+        assert "snowflake_variant" in result
+        assert "snowflake_array" in result
+        assert "snowflake_object" in result
+        assert "snowflake_geography" in result
+        assert "snowflake_geometry" in result
+        assert "snowflake_date" in result
+        assert "snowflake_time" in result
+        assert "snowflake_binary" in result
 
 
 class TestSnowflakeDialectVersion:

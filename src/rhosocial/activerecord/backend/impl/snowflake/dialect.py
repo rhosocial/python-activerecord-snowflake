@@ -11,7 +11,7 @@ Snowflake SQL is largely ANSI SQL compliant with extensions for:
 - MERGE with complex conditions
 - Warehouse-based compute management
 """
-from typing import Any, List, Tuple, TYPE_CHECKING
+from typing import Any, Dict, Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
 from rhosocial.activerecord.backend.dialect.protocols import (
@@ -76,6 +76,11 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     WindowFunctionMixin,
 )
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
+from rhosocial.activerecord.backend.expression.types import (
+    BigIntType, BooleanType, CharType, DateTimeType, DateType, DecimalType,
+    DoubleType, FloatType, IntegerType, JsonType, SmallIntType, TextType,
+    TimeType, TimestampType, VarCharType, BlobType,
+)
 from .collation import validate_snowflake_collation_name
 from .protocols import (
     SnowflakeArraySupport,
@@ -420,35 +425,161 @@ class SnowflakeDialect(
         """
         return SnowflakeTypeSupportMixin.parse_type(self, raw)
 
-    def supports_data_types(self) -> List[Tuple["Any", str]]:
-        """List (DataTypeClass, sql_name) pairs supported by this dialect.
+    def supports_data_types(self) -> Dict[str, type]:
+        """Mapping {<name>: concrete type class} of all types this dialect supports.
 
         Returns:
-            List of (DataTypeClass, sql_name) tuples.
+            Dict mapping generic type names to their concrete DataType classes.
         """
         from .expression.types import (
-            SnowflakeVarcharType, SnowflakeNumberType, SnowflakeBooleanType,
-            SnowflakeTimestampLtzType, SnowflakeTimestampNtzType, SnowflakeTimestampTzType,
+            SnowflakeVarcharType, SnowflakeNumberType, SnowflakeFloatType,
+            SnowflakeBooleanType,
+            SnowflakeTimestampLtzType, SnowflakeTimestampNtzType,
+            SnowflakeTimestampTzType,
             SnowflakeVariantType, SnowflakeArrayType, SnowflakeObjectType,
             SnowflakeGeographyType, SnowflakeGeometryType,
             SnowflakeDateType, SnowflakeTimeType, SnowflakeBinaryType,
         )
-        return [
-            (SnowflakeVarcharType, "VARCHAR"),
-            (SnowflakeNumberType, "NUMBER"),
-            (SnowflakeBooleanType, "BOOLEAN"),
-            (SnowflakeTimestampLtzType, "TIMESTAMP_LTZ"),
-            (SnowflakeTimestampNtzType, "TIMESTAMP_NTZ"),
-            (SnowflakeTimestampTzType, "TIMESTAMP_TZ"),
-            (SnowflakeVariantType, "VARIANT"),
-            (SnowflakeArrayType, "ARRAY"),
-            (SnowflakeObjectType, "OBJECT"),
-            (SnowflakeGeographyType, "GEOGRAPHY"),
-            (SnowflakeGeometryType, "GEOMETRY"),
-            (SnowflakeDateType, "DATE"),
-            (SnowflakeTimeType, "TIME"),
-            (SnowflakeBinaryType, "BINARY"),
-        ]
+        result: Dict[str, type] = {}
+        # Core types rendered by SnowflakeTypeSupportMixin
+        result["integer"] = IntegerType
+        result["bigint"] = BigIntType
+        result["smallint"] = SmallIntType
+        result["float"] = FloatType
+        result["double"] = DoubleType
+        result["decimal"] = DecimalType
+        result["boolean"] = BooleanType
+        result["varchar"] = VarCharType
+        result["char"] = CharType
+        result["text"] = TextType
+        result["blob"] = BlobType
+        result["datetime"] = DateTimeType
+        result["date"] = DateType
+        result["time"] = TimeType
+        result["timestamp"] = TimestampType
+        result["json"] = JsonType
+        # Snowflake-specific types
+        result["snowflake_varchar"] = SnowflakeVarcharType
+        result["snowflake_number"] = SnowflakeNumberType
+        result["snowflake_float"] = SnowflakeFloatType
+        result["snowflake_boolean"] = SnowflakeBooleanType
+        result["snowflake_timestamp_ltz"] = SnowflakeTimestampLtzType
+        result["snowflake_timestamp_ntz"] = SnowflakeTimestampNtzType
+        result["snowflake_timestamp_tz"] = SnowflakeTimestampTzType
+        result["snowflake_date"] = SnowflakeDateType
+        result["snowflake_time"] = SnowflakeTimeType
+        result["snowflake_binary"] = SnowflakeBinaryType
+        result["snowflake_variant"] = SnowflakeVariantType
+        result["snowflake_object"] = SnowflakeObjectType
+        result["snowflake_array"] = SnowflakeArrayType
+        result["snowflake_geography"] = SnowflakeGeographyType
+        result["snowflake_geometry"] = SnowflakeGeometryType
+        return result
+
+    # ========== supports_data_type_<name> (1:1 with format_data_type_<name>) ==========
+
+    def supports_data_type_integer(self) -> bool:
+        return True
+
+    def supports_data_type_bigint(self) -> bool:
+        return True
+
+    def supports_data_type_smallint(self) -> bool:
+        return True
+
+    def supports_data_type_float(self) -> bool:
+        return True
+
+    def supports_data_type_double(self) -> bool:
+        return True
+
+    def supports_data_type_decimal(self) -> bool:
+        return True
+
+    def supports_data_type_boolean(self) -> bool:
+        return True
+
+    def supports_data_type_varchar(self) -> bool:
+        return True
+
+    def supports_data_type_char(self) -> bool:
+        return True
+
+    def supports_data_type_text(self) -> bool:
+        return True
+
+    def supports_data_type_blob(self) -> bool:
+        return True
+
+    def supports_data_type_datetime(self) -> bool:
+        return True
+
+    def supports_data_type_date(self) -> bool:
+        return True
+
+    def supports_data_type_time(self) -> bool:
+        return True
+
+    def supports_data_type_timestamp(self) -> bool:
+        return True
+
+    def supports_data_type_json(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_varchar(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_number(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_float(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_boolean(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_timestamp_ltz(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_timestamp_ntz(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_timestamp_tz(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_date(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_time(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_binary(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_variant(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_object(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_array(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_geography(self) -> bool:
+        return True
+
+    def supports_data_type_snowflake_geometry(self) -> bool:
+        return True
+
+    # ========== suggested_data_types ==========
+
+    def suggested_data_types(self) -> Dict[str, type]:
+        """Snowflake maps most ANSI SQL types directly.
+
+        Snowflake follows ANSI SQL closely, so most core types have
+        direct Snowflake equivalents. No cross-backend suggestions needed.
+        """
+        return {}
 
     # ========== SetOperation Support ==========
 

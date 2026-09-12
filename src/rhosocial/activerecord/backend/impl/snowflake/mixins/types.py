@@ -36,6 +36,7 @@ from ..expression.types import (
     SnowflakeBinaryType,
     SnowflakeBooleanType,
     SnowflakeDateType,
+    SnowflakeFloatType,
     SnowflakeGeographyType,
     SnowflakeGeometryType,
     SnowflakeNumberType,
@@ -62,6 +63,46 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
     names; core types render their real Snowflake SQL.
     """
 
+    # Snowflake precision limits
+    _SNOW_NUMBER_PRECISION_MAX = 38
+    _SNOW_NUMBER_SCALE_MAX = 38
+    _SNOW_FLOAT_PRECISION_MAX = 126  # binary precision
+    _SNOW_TIMESTAMP_PRECISION_MAX = 9  # fractional seconds
+    _SNOW_TIME_PRECISION_MAX = 9  # fractional seconds
+
+    def _validate_number_precision(self, precision: int, scale: int = 0) -> None:
+        if not 1 <= precision <= self._SNOW_NUMBER_PRECISION_MAX:
+            raise ValueError(
+                f"Snowflake NUMBER precision must be 1-{self._SNOW_NUMBER_PRECISION_MAX}, "
+                f"got {precision}"
+            )
+        if not 0 <= scale <= self._SNOW_NUMBER_SCALE_MAX:
+            raise ValueError(
+                f"Snowflake NUMBER scale must be 0-{self._SNOW_NUMBER_SCALE_MAX}, "
+                f"got {scale}"
+            )
+
+    def _validate_float_precision(self, precision: int) -> None:
+        if not 1 <= precision <= self._SNOW_FLOAT_PRECISION_MAX:
+            raise ValueError(
+                f"Snowflake FLOAT precision (binary) must be 1-{self._SNOW_FLOAT_PRECISION_MAX}, "
+                f"got {precision}"
+            )
+
+    def _validate_timestamp_precision(self, precision: int) -> None:
+        if not 0 <= precision <= self._SNOW_TIMESTAMP_PRECISION_MAX:
+            raise ValueError(
+                f"Snowflake TIMESTAMP fractional seconds precision must be "
+                f"0-{self._SNOW_TIMESTAMP_PRECISION_MAX}, got {precision}"
+            )
+
+    def _validate_time_precision(self, precision: int) -> None:
+        if not 0 <= precision <= self._SNOW_TIME_PRECISION_MAX:
+            raise ValueError(
+                f"Snowflake TIME fractional seconds precision must be "
+                f"0-{self._SNOW_TIME_PRECISION_MAX}, got {precision}"
+            )
+
     # ------------------------------------------------------------------
     # DDLTypeSupport — formatting (core types)
     # ------------------------------------------------------------------
@@ -82,6 +123,8 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         return "DOUBLE", ()
 
     def format_data_type_decimal(self, expr: DecimalType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_number_precision(expr.precision, expr.scale or 0)
         if expr.precision is not None and expr.scale is not None:
             return f"NUMBER({expr.precision}, {expr.scale})", ()
         if expr.precision is not None:
@@ -112,9 +155,14 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         return "DATE", ()
 
     def format_data_type_time(self, expr: TimeType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_time_precision(expr.precision)
+            return f"TIME({expr.precision})", ()
         return "TIME", ()
 
     def format_data_type_timestamp(self, expr: TimestampType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_timestamp_precision(expr.precision)
         return "TIMESTAMP_NTZ", ()
 
     def format_data_type_json(self, expr: JsonType) -> Tuple[str, tuple]:
@@ -128,27 +176,38 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         return "VARCHAR", ()
 
     def format_data_type_snowflake_number(self, expr: SnowflakeNumberType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_number_precision(expr.precision, expr.scale or 0)
         if expr.precision is not None and expr.scale is not None:
             return f"NUMBER({expr.precision}, {expr.scale})", ()
         if expr.precision is not None:
             return f"NUMBER({expr.precision})", ()
         return "NUMBER", ()
 
+    def format_data_type_snowflake_float(self, expr: SnowflakeFloatType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_float_precision(expr.precision)
+            return f"FLOAT({expr.precision})", ()
+        return "FLOAT", ()
+
     def format_data_type_snowflake_boolean(self, expr: SnowflakeBooleanType) -> Tuple[str, tuple]:
         return "BOOLEAN", ()
 
     def format_data_type_snowflake_timestamp_ltz(self, expr: SnowflakeTimestampLtzType) -> Tuple[str, tuple]:
         if expr.precision is not None:
+            self._validate_timestamp_precision(expr.precision)
             return f"TIMESTAMP_LTZ({expr.precision})", ()
         return "TIMESTAMP_LTZ", ()
 
     def format_data_type_snowflake_timestamp_ntz(self, expr: SnowflakeTimestampNtzType) -> Tuple[str, tuple]:
         if expr.precision is not None:
+            self._validate_timestamp_precision(expr.precision)
             return f"TIMESTAMP_NTZ({expr.precision})", ()
         return "TIMESTAMP_NTZ", ()
 
     def format_data_type_snowflake_timestamp_tz(self, expr: SnowflakeTimestampTzType) -> Tuple[str, tuple]:
         if expr.precision is not None:
+            self._validate_timestamp_precision(expr.precision)
             return f"TIMESTAMP_TZ({expr.precision})", ()
         return "TIMESTAMP_TZ", ()
 
@@ -157,12 +216,13 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
 
     def format_data_type_snowflake_time(self, expr: SnowflakeTimeType) -> Tuple[str, tuple]:
         if expr.precision is not None:
+            self._validate_time_precision(expr.precision)
             return f"TIME({expr.precision})", ()
         return "TIME", ()
 
     def format_data_type_snowflake_binary(self, expr: SnowflakeBinaryType) -> Tuple[str, tuple]:
-        if expr._length is not None:
-            return f"BINARY({expr._length})", ()
+        if expr.length is not None:
+            return f"BINARY({expr.length})", ()
         return "BINARY", ()
 
     def format_data_type_snowflake_variant(self, expr: SnowflakeVariantType) -> Tuple[str, tuple]:
