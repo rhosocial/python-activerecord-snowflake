@@ -36,6 +36,16 @@ from .variant import SnowflakeVariantMixin
 from .types import SnowflakeTypeSupportMixin
 from .warehouse import SnowflakeWarehouseMixin
 from .ddl.alter_table_modifier import SnowflakeAlterColumnModifierMixin
+# New mixins from dialect.py split
+from .datetime import SnowflakeDateTimeMixin
+from .collation import SnowflakeCollationMixin
+from .set_operation import SnowflakeSetOperationMixin
+from .dql import SnowflakeDQLMixin
+from .capabilities import SnowflakeCapabilityMixin
+from .ilike import SnowflakeILIKEMixin
+from .generated_column import SnowflakeGeneratedColumnMixin
+from .ordered_set_aggregation import SnowflakeOrderedSetAggregationMixin
+from .truncate import SnowflakeTruncateMixin
 
 __all__ = [
     "SnowflakeArrayMixin",
@@ -64,4 +74,13 @@ __all__ = [
     "SnowflakeTypeSupportMixin",
     "SnowflakeWarehouseMixin",
     "SnowflakeAlterColumnModifierMixin",
+    "SnowflakeDateTimeMixin",
+    "SnowflakeCollationMixin",
+    "SnowflakeSetOperationMixin",
+    "SnowflakeDQLMixin",
+    "SnowflakeCapabilityMixin",
+    "SnowflakeILIKEMixin",
+    "SnowflakeGeneratedColumnMixin",
+    "SnowflakeOrderedSetAggregationMixin",
+    "SnowflakeTruncateMixin",
 ]
