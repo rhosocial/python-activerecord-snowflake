@@ -43,7 +43,7 @@ class TestSnowflakeAddColumnIfNotExists:
             if_not_exists=True,
         )
         sql, params = action.to_sql()
-        assert 'ADD COLUMN IF NOT EXISTS "content" TEXT' == sql
+        assert 'ADD COLUMN IF NOT EXISTS "content" VARCHAR(16777216)' == sql
         assert params == ()
 
     def test_if_not_exists_with_not_null_allowed(self, dialect):
@@ -53,12 +53,12 @@ class TestSnowflakeAddColumnIfNotExists:
                 dialect,
                 "content",
                 TextType(dialect),
-                constraints=[ColumnConstraint(ColumnConstraintType.NOT_NULL)],
+                constraints=[ColumnConstraint(dialect, ColumnConstraintType.NOT_NULL)],
             ),
             if_not_exists=True,
         )
         sql, params = action.to_sql()
-        assert 'ADD COLUMN IF NOT EXISTS "content" TEXT NOT NULL' == sql
+        assert 'ADD COLUMN IF NOT EXISTS "content" VARCHAR(16777216) NOT NULL' == sql
         assert params == ()
 
     def test_if_not_exists_with_default_raises(self, dialect):
@@ -69,7 +69,7 @@ class TestSnowflakeAddColumnIfNotExists:
                 "content",
                 VarCharType(dialect, length=50),
                 constraints=[
-                    ColumnConstraint(ColumnConstraintType.DEFAULT, default_value="x")
+                    ColumnConstraint(dialect, ColumnConstraintType.DEFAULT, default_value="x")
                 ],
             ),
             if_not_exists=True,
@@ -80,7 +80,7 @@ class TestSnowflakeAddColumnIfNotExists:
     def test_none_renders_plain_form(self, dialect):
         action = AddColumn(dialect, ColumnDefinition(dialect, "content", TextType(dialect)))
         sql, params = action.to_sql()
-        assert 'ADD COLUMN "content" TEXT' == sql
+        assert 'ADD COLUMN "content" VARCHAR(16777216)' == sql
         assert "IF NOT EXISTS" not in sql
         assert params == ()
 
