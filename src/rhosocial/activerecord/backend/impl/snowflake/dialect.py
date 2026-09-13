@@ -91,6 +91,7 @@ from rhosocial.activerecord.backend.expression.types import (
     TimeType, TimestampType, VarCharType, BlobType,
 )
 from .collation import validate_snowflake_collation_name
+from .reserved_words import SNOWFLAKE_RESERVED_WORDS
 from .protocols import (
     SnowflakeArraySupport,
     SnowflakeCloneSupport,
@@ -288,22 +289,31 @@ class SnowflakeDialect(
             version: Snowflake server version as (major, minor, patch) tuple.
         """
         super().__init__(**kwargs)
+        self._reserved_words = SNOWFLAKE_RESERVED_WORDS
         self.version = version
 
     # ========== Identifier & Parameter Formatting ==========
 
-    def format_identifier(self, identifier: str) -> str:
-        """Format an identifier (table name, column name, etc.) with double quotes.
+    def format_identifier(self, identifier: str, need_quote: bool = True) -> str:
+        """Format an identifier with double quotes.
 
-        Snowflake uses double quotes for identifier quoting, which is the SQL standard.
-
-        Args:
-            identifier: The identifier to format.
-
-        Returns:
-            The quoted identifier string.
+        Snowflake uses double quotes for identifier quoting, which is the
+        SQL standard. When need_quote=False, the identifier is returned
+        as-is without quoting or escaping.
         """
-        return f'"{identifier}"'
+        if not need_quote:
+            if self.is_reserved_word(identifier):
+                import warnings
+                from rhosocial.activerecord.backend.warnings import IdentifierQuotingWarning
+                warnings.warn(
+                    f"Identifier '{identifier}' is a reserved word in {self.name} "
+                    f"and may cause SQL errors without quoting.",
+                    IdentifierQuotingWarning,
+                    stacklevel=2,
+                )
+            return identifier
+        escaped = identifier.replace('"', '""')
+        return f'"{escaped}"'
 
     def get_parameter_placeholder(self, index: int = 0) -> str:
         """Get the parameter placeholder for Snowflake.
