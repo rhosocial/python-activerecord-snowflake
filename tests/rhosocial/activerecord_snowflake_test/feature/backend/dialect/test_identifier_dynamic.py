@@ -8,9 +8,6 @@ The placeholder for snowflake-connector-python is ``%s`` (pyformat).
 import pytest
 
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
-from rhosocial.activerecord.backend.impl.snowflake.protocols import (
-    SnowflakeDynamicIdentifierSupport,
-)
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
     SnowflakeIdentifierExpression,
 )
@@ -21,11 +18,8 @@ def dialect():
     return SnowflakeDialect(version=(8, 0, 0))
 
 
-class TestSnowflakeDynamicIdentifierProtocol:
-    """Dialect satisfies isinstance checks for the dynamic identifier protocol."""
-
-    def test_dialect_is_dynamic_identifier_support(self, dialect):
-        assert isinstance(dialect, SnowflakeDynamicIdentifierSupport)
+class TestSnowflakeDynamicIdentifierSupport:
+    """Dialect exposes the dynamic identifier (IDENTIFIER()) surface."""
 
     def test_supports_dynamic_identifier(self, dialect):
         assert dialect.supports_dynamic_identifier() is True

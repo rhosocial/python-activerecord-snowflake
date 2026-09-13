@@ -94,7 +94,6 @@ from .protocols import (
     SnowflakeArraySupport,
     SnowflakeCloneSupport,
     SnowflakeDMLSupport,
-    SnowflakeDynamicIdentifierSupport,
     SnowflakeFileFormatSupport,
     SnowflakeMaterializedViewSupport,
     SnowflakePartitionSupport,
@@ -116,7 +115,6 @@ from .mixins import (
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
     SnowflakeDMLMixin,
-    SnowflakeDynamicIdentifierMixin,
     SnowflakeFileFormatMixin,
     SnowflakeIntrospectionMixin,
     SnowflakeMaterializedViewMixin,
@@ -198,7 +196,6 @@ class SnowflakeDialect(
     SnowflakeRoutineMixin,
     SnowflakeUndropMixin,
     SnowflakeTableModifierMixin,
-    SnowflakeDynamicIdentifierMixin,
     SnowflakePartitionMixin,
     SnowflakeSampleMixin,
     SnowflakePivotMixin,
@@ -252,7 +249,6 @@ class SnowflakeDialect(
     SnowflakeRoutineSupport,
     SnowflakeUndropSupport,
     SnowflakeMaterializedViewSupport,
-    SnowflakeDynamicIdentifierSupport,
     SnowflakeTableModifierSupport,
     SnowflakeSampleSupport,
     SnowflakePivotSupport,
@@ -319,6 +315,28 @@ class SnowflakeDialect(
             The parameter placeholder string.
         """
         return "%s"
+
+    def supports_dynamic_identifier(self) -> bool:
+        """Snowflake supports IDENTIFIER() dynamic binding."""
+        return True
+
+    def format_identifier_dynamic(self, identifier: str) -> str:
+        """Format an ``IDENTIFIER(placeholder)`` dynamic object reference.
+
+        Object names supplied at runtime must be wrapped in ``IDENTIFIER()``
+        so Snowflake treats the bound parameter value as an identifier instead
+        of a string literal. The placeholder is produced by the dialect and the
+        actual value is bound as a parameter, preventing SQL injection.
+
+        Args:
+            identifier: The object name to bind dynamically (used only for
+                the parameter value by the caller).
+
+        Returns:
+            The ``IDENTIFIER(%s)`` SQL fragment using the dialect placeholder.
+        """
+        placeholder = self.get_parameter_placeholder()
+        return f"IDENTIFIER({placeholder})"
 
     # ========== DateTime Formatting (Snowflake-specific override) ==========
 

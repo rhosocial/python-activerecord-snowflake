@@ -5,14 +5,13 @@ This package provides shared non-I/O mixin classes for the Snowflake backend,
 including backend mixin, transaction mixin, concurrency mixins, and
 Snowflake-specific feature mixins for time travel, VARIANT, ARRAY,
 CLONE, stage, warehouse, stream, task, pipe, file format, routine,
-undrop, materialized view, table modifiers and dynamic identifier support.
+undrop, materialized view, table modifiers support.
 """
 
 from .array import SnowflakeArrayMixin
 from .backend import SnowflakeBackendMixin
 from .clone import SnowflakeCloneMixin
 from .dml import SnowflakeDMLMixin
-from .dynamic_identifier import SnowflakeDynamicIdentifierMixin
 from .file_format import SnowflakeFileFormatMixin
 from .introspection import SnowflakeIntrospectionMixin
 from .materialized_view import SnowflakeMaterializedViewMixin
@@ -43,7 +42,6 @@ __all__ = [
     "SnowflakeBackendMixin",
     "SnowflakeCloneMixin",
     "SnowflakeDMLMixin",
-    "SnowflakeDynamicIdentifierMixin",
     "SnowflakeFileFormatMixin",
     "SnowflakeIntrospectionMixin",
     "SnowflakeMaterializedViewMixin",
