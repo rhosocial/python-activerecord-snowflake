@@ -55,14 +55,12 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     ConstraintMixin,
     CTEMixin,
     DDLColumnMixin,
-    DDLTypeMixin,
     DateTimeMixin,
     DMLMixin,
     DQLMixin,
     ExplainMixin,
     ExpressionMixin,
     FilterClauseMixin,
-    IdentifierMixin,
     ILIKEMixin,
     IndexMixin,
     IntrospectionMixin,
@@ -143,17 +141,11 @@ from .mixins import (
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.collation import CollateExpression
-    from rhosocial.activerecord.backend.expression.statements import (
-        CreateTableExpression, CreateViewExpression, DropViewExpression,
-        ColumnDefinition, TableConstraint, IndexDefinition,
-        ExplainExpression, InsertExpression,
-    )
 
 
 class SnowflakeDialect(
     SQLDialectBase,
     # New Mixins (shared by all modern backends)
-    IdentifierMixin,
     PredicateMixin,
     ILIKEMixin,
     ExpressionMixin,
