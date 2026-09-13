@@ -282,26 +282,6 @@ class SnowflakeDialect(
 
     # ========== Identifier & Parameter Formatting ==========
 
-    def format_identifier(self, identifier: str, need_quote: bool = True) -> str:
-        """Format an identifier with double quotes.
-
-        Snowflake uses double quotes for identifier quoting, which is the
-        SQL standard. When need_quote=False, the identifier is returned
-        as-is without quoting or escaping.
-        """
-        if not need_quote:
-            if self.is_reserved_word(identifier):
-                import warnings
-                from rhosocial.activerecord.backend.warnings import IdentifierQuotingWarning
-                warnings.warn(
-                    f"Identifier '{identifier}' is a reserved word in {self.name} "
-                    f"and may cause SQL errors without quoting.",
-                    IdentifierQuotingWarning,
-                    stacklevel=2,
-                )
-            return identifier
-        escaped = identifier.replace('"', '""')
-        return f'"{escaped}"'
 
     def get_parameter_placeholder(self, index: int = 0) -> str:
         """Get the parameter placeholder for Snowflake.
@@ -340,20 +320,6 @@ class SnowflakeDialect(
 
     # ========== DateTime Formatting (Snowflake-specific override) ==========
 
-    def format_interval_expression(self, expr: "Any") -> Tuple[str, Tuple]:
-        """Format an INTERVAL expression for Snowflake.
-
-        Snowflake uses INTERVAL 'value' unit syntax.
-
-        Args:
-            expr: The interval expression.
-
-        Returns:
-            Tuple of (SQL string, parameters).
-        """
-        value = self._escape_sql_string(str(expr.value))
-        sql = f"INTERVAL '{value}' {expr.unit.value.upper()}"
-        return self.apply_alias(sql, (), expr)
 
     def format_datetime_add_expression(self, expr: "Any") -> Tuple[str, Tuple]:
         """Format a date/time addition expression using Snowflake DATEADD.
@@ -432,87 +398,8 @@ class SnowflakeDialect(
 
     # ========== DDLType Support ==========
 
-    def format_data_type(self, data_type: "Any") -> "Tuple[str, tuple]":
-        """Render a DataType into a Snowflake SQL type string.
 
-        Delegates to DDLTypeMixin naming-convention dispatch which routes
-        to ``format_data_type_<name>`` methods on the dialect.
 
-        Args:
-            data_type: The DataType instance to format.
-
-        Returns:
-            Tuple of (SQL type string, params).
-        """
-        from rhosocial.activerecord.backend.expression.types._base import DataType
-        if isinstance(data_type, DataType):
-            return super().format_data_type(data_type)
-        return str(data_type), ()
-
-    def parse_type(self, raw: str) -> "Any":
-        """Parse a raw Snowflake type string into a DataType.
-
-        Delegates to SnowflakeTypeSupportMixin.parse_type for
-        structured type parsing.
-
-        Args:
-            raw: Raw SQL type string.
-
-        Returns:
-            A DataType instance.
-        """
-        return SnowflakeTypeSupportMixin.parse_type(self, raw)
-
-    def supports_data_types(self) -> Dict[str, type]:
-        """Mapping {<name>: concrete type class} of all types this dialect supports.
-
-        Returns:
-            Dict mapping generic type names to their concrete DataType classes.
-        """
-        from .expression.types import (
-            SnowflakeVarcharType, SnowflakeNumberType, SnowflakeFloatType,
-            SnowflakeBooleanType,
-            SnowflakeTimestampLtzType, SnowflakeTimestampNtzType,
-            SnowflakeTimestampTzType,
-            SnowflakeVariantType, SnowflakeArrayType, SnowflakeObjectType,
-            SnowflakeGeographyType, SnowflakeGeometryType,
-            SnowflakeDateType, SnowflakeTimeType, SnowflakeBinaryType,
-        )
-        result: Dict[str, type] = {}
-        # Core types rendered by SnowflakeTypeSupportMixin
-        result["integer"] = IntegerType
-        result["bigint"] = BigIntType
-        result["smallint"] = SmallIntType
-        result["float"] = FloatType
-        result["double"] = DoubleType
-        result["decimal"] = DecimalType
-        result["boolean"] = BooleanType
-        result["varchar"] = VarCharType
-        result["char"] = CharType
-        result["text"] = TextType
-        result["blob"] = BlobType
-        result["datetime"] = DateTimeType
-        result["date"] = DateType
-        result["time"] = TimeType
-        result["timestamp"] = TimestampType
-        result["json"] = JsonType
-        # Snowflake-specific types
-        result["snowflake_varchar"] = SnowflakeVarcharType
-        result["snowflake_number"] = SnowflakeNumberType
-        result["snowflake_float"] = SnowflakeFloatType
-        result["snowflake_boolean"] = SnowflakeBooleanType
-        result["snowflake_timestamp_ltz"] = SnowflakeTimestampLtzType
-        result["snowflake_timestamp_ntz"] = SnowflakeTimestampNtzType
-        result["snowflake_timestamp_tz"] = SnowflakeTimestampTzType
-        result["snowflake_date"] = SnowflakeDateType
-        result["snowflake_time"] = SnowflakeTimeType
-        result["snowflake_binary"] = SnowflakeBinaryType
-        result["snowflake_variant"] = SnowflakeVariantType
-        result["snowflake_object"] = SnowflakeObjectType
-        result["snowflake_array"] = SnowflakeArrayType
-        result["snowflake_geography"] = SnowflakeGeographyType
-        result["snowflake_geometry"] = SnowflakeGeometryType
-        return result
 
     # ========== supports_data_type_<name> (1:1 with format_data_type_<name>) ==========
 
@@ -611,13 +498,6 @@ class SnowflakeDialect(
 
     # ========== suggested_data_types ==========
 
-    def suggested_data_types(self) -> Dict[str, type]:
-        """Snowflake maps most ANSI SQL types directly.
-
-        Snowflake follows ANSI SQL closely, so most core types have
-        direct Snowflake equivalents. No cross-backend suggestions needed.
-        """
-        return {}
 
     # ========== SetOperation Support ==========
 
@@ -645,9 +525,6 @@ class SnowflakeDialect(
         """Snowflake supports LIMIT/OFFSET in set operations."""
         return True
 
-    def supports_set_operation_for_update(self) -> bool:
-        """Snowflake does not support FOR UPDATE in set operations."""
-        return False
 
     # ========== DQL Support ==========
 
@@ -655,9 +532,6 @@ class SnowflakeDialect(
         """Snowflake supports OFFSET without LIMIT."""
         return True
 
-    def supports_for_update(self) -> bool:
-        """Snowflake does not support FOR UPDATE clause."""
-        return False
 
     # ========== Capability Detection ==========
 
@@ -713,9 +587,6 @@ class SnowflakeDialect(
         """Snowflake supports views."""
         return True
 
-    def supports_introspection(self) -> bool:
-        """Snowflake supports introspection via INFORMATION_SCHEMA."""
-        return True
 
     def supports_returning_insert(self) -> bool:
         """Snowflake supports RETURNING for INSERT from version 7.32.0+."""
@@ -749,13 +620,7 @@ class SnowflakeDialect(
         """Snowflake supports explicit INNER JOIN syntax."""
         return True
 
-    def supports_add_constraint(self) -> bool:
-        """Snowflake supports ALTER TABLE ADD CONSTRAINT."""
-        return True
 
-    def supports_drop_constraint(self) -> bool:
-        """Snowflake supports ALTER TABLE DROP CONSTRAINT."""
-        return True
 
     def supports_modify_column(self) -> bool:
         """Snowflake supports ALTER TABLE MODIFY COLUMN."""
