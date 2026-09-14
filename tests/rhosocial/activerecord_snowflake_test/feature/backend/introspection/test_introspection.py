@@ -78,7 +78,7 @@ class TestSnowflakeIntrospectionSQLGeneration:
     def test_format_database_info_query(self, dialect):
         from rhosocial.activerecord.backend.expression.introspection import DatabaseInfoExpression
         expr = DatabaseInfoExpression(dialect)
-        sql, params = dialect.format_database_info_query(expr)
+        sql, params = expr.to_sql()
         assert "CURRENT_DATABASE()" in sql
         assert "CURRENT_VERSION()" in sql
         assert params == ()
@@ -87,7 +87,7 @@ class TestSnowflakeIntrospectionSQLGeneration:
         from rhosocial.activerecord.backend.expression.introspection import TableListExpression
         expr = TableListExpression(dialect)
         expr.schema("MY_SCHEMA")
-        sql, params = dialect.format_table_list_query(expr)
+        sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.TABLES" in sql
         assert "TABLE_SCHEMA = %s" in sql
         assert params == ("MY_SCHEMA",)
@@ -97,7 +97,7 @@ class TestSnowflakeIntrospectionSQLGeneration:
         expr = TableListExpression(dialect)
         expr.schema("MY_SCHEMA")
         # include_views defaults to True
-        sql, params = dialect.format_table_list_query(expr)
+        sql, params = expr.to_sql()
         # When include_views=True, no TABLE_TYPE filter should be present
         assert "TABLE_TYPE = 'BASE TABLE'" not in sql
 
@@ -105,7 +105,7 @@ class TestSnowflakeIntrospectionSQLGeneration:
         from rhosocial.activerecord.backend.expression.introspection import ColumnInfoExpression
         expr = ColumnInfoExpression(dialect, table_name="users")
         expr.schema("MY_SCHEMA")
-        sql, params = dialect.format_column_info_query(expr)
+        sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.COLUMNS" in sql
         assert params == ("MY_SCHEMA", "users")
 
@@ -113,7 +113,7 @@ class TestSnowflakeIntrospectionSQLGeneration:
         from rhosocial.activerecord.backend.expression.introspection import IndexInfoExpression
         expr = IndexInfoExpression(dialect, table_name="users")
         expr.schema("MY_SCHEMA")
-        sql, params = dialect.format_index_info_query(expr)
+        sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.TABLE_CONSTRAINTS" in sql
         assert "INFORMATION_SCHEMA.KEY_COLUMN_USAGE" in sql
         assert "CONSTRAINT_TYPE IN ('PRIMARY KEY', 'UNIQUE')" in sql
@@ -123,7 +123,7 @@ class TestSnowflakeIntrospectionSQLGeneration:
         from rhosocial.activerecord.backend.expression.introspection import ForeignKeyExpression
         expr = ForeignKeyExpression(dialect, table_name="orders")
         expr.schema("MY_SCHEMA")
-        sql, params = dialect.format_foreign_key_query(expr)
+        sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS" in sql
         assert "INFORMATION_SCHEMA.KEY_COLUMN_USAGE" in sql
         assert "REFERENCED_TABLE_NAME" in sql
@@ -134,7 +134,7 @@ class TestSnowflakeIntrospectionSQLGeneration:
         from rhosocial.activerecord.backend.expression.introspection import ViewListExpression
         expr = ViewListExpression(dialect)
         expr.schema("MY_SCHEMA")
-        sql, params = dialect.format_view_list_query(expr)
+        sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.VIEWS" in sql
         assert params == ("MY_SCHEMA",)
 
@@ -142,7 +142,7 @@ class TestSnowflakeIntrospectionSQLGeneration:
         from rhosocial.activerecord.backend.expression.introspection import ViewInfoExpression
         expr = ViewInfoExpression(dialect, view_name="my_view")
         expr.schema("MY_SCHEMA")
-        sql, params = dialect.format_view_info_query(expr)
+        sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.VIEWS" in sql
         assert "TABLE_NAME = %s" in sql
         assert params == ("MY_SCHEMA", "my_view")
@@ -151,7 +151,7 @@ class TestSnowflakeIntrospectionSQLGeneration:
         from rhosocial.activerecord.backend.expression.introspection import TriggerListExpression
         expr = TriggerListExpression(dialect)
         expr.schema("MY_SCHEMA")
-        sql, params = dialect.format_trigger_list_query(expr)
+        sql, params = expr.to_sql()
         assert "1 = 0" in sql
 
 

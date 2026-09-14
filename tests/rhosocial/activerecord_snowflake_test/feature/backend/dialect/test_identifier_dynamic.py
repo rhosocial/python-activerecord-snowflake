@@ -44,8 +44,10 @@ class TestSnowflakeIdentifierExpression:
         assert params == ("my_schema.my_table",)
 
     def test_format_identifier_dynamic_uses_placeholder(self, dialect):
-        sql = dialect.format_identifier_dynamic("whatever")
+        expr = SnowflakeIdentifierExpression(dialect, "whatever")
+        sql, params = expr.to_sql()
         assert sql == "IDENTIFIER(%s)"
+        assert params == ("whatever",)
 
     def test_identifier_can_be_composed_into_ddl(self, dialect):
         expr = SnowflakeIdentifierExpression(dialect, "my_table")

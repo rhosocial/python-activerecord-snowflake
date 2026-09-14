@@ -217,7 +217,7 @@ class TestSnowflakeSpecificFormatting:
             SnowflakeVariantPathAccessExpression,
         )
         expr = SnowflakeVariantPathAccessExpression(dialect, "data", "key.nested")
-        result = dialect.format_variant_path_access(expr)
+        result, _ = expr.to_sql()
         assert result == "data:key.nested"
 
     def test_format_variant_cast(self, dialect):
@@ -225,7 +225,7 @@ class TestSnowflakeSpecificFormatting:
             SnowflakeVariantCastExpression,
         )
         expr = SnowflakeVariantCastExpression(dialect, "data", "count", "NUMBER")
-        result = dialect.format_variant_cast(expr)
+        result, _ = expr.to_sql()
         assert result == "data:count::NUMBER"
 
     def test_format_array_construct(self, dialect):
@@ -253,105 +253,105 @@ class TestSnowflakeDataTypeFormatting:
     """Test Snowflake-specific DataType subclass formatting."""
 
     def test_varchar_type(self, dialect):
-        t = SnowflakeVarcharType(length=256)
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeVarcharType(dialect, length=256)
+        sql, params = t.to_sql()
         assert sql == "VARCHAR(256)"
         assert params == ()
 
     def test_varchar_type_default(self, dialect):
-        t = SnowflakeVarcharType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeVarcharType(dialect)
+        sql, params = t.to_sql()
         assert sql == "VARCHAR"
         assert params == ()
 
     def test_number_type(self, dialect):
-        t = SnowflakeNumberType(precision=38, scale=2)
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeNumberType(dialect, precision=38, scale=2)
+        sql, params = t.to_sql()
         assert sql == "NUMBER(38, 2)"
 
     def test_number_type_precision_only(self, dialect):
-        t = SnowflakeNumberType(precision=10)
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeNumberType(dialect, precision=10)
+        sql, params = t.to_sql()
         assert sql == "NUMBER(10)"
 
     def test_number_type_default(self, dialect):
-        t = SnowflakeNumberType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeNumberType(dialect)
+        sql, params = t.to_sql()
         assert sql == "NUMBER"
 
     def test_boolean_type(self, dialect):
-        t = SnowflakeBooleanType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeBooleanType(dialect)
+        sql, params = t.to_sql()
         assert sql == "BOOLEAN"
 
     def test_timestamp_ltz(self, dialect):
-        t = SnowflakeTimestampLtzType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeTimestampLtzType(dialect)
+        sql, params = t.to_sql()
         assert sql == "TIMESTAMP_LTZ"
 
     def test_timestamp_ltz_with_precision(self, dialect):
-        t = SnowflakeTimestampLtzType(precision=3)
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeTimestampLtzType(dialect, precision=3)
+        sql, params = t.to_sql()
         assert sql == "TIMESTAMP_LTZ(3)"
 
     def test_timestamp_ntz(self, dialect):
-        t = SnowflakeTimestampNtzType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeTimestampNtzType(dialect)
+        sql, params = t.to_sql()
         assert sql == "TIMESTAMP_NTZ"
 
     def test_timestamp_tz(self, dialect):
-        t = SnowflakeTimestampTzType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeTimestampTzType(dialect)
+        sql, params = t.to_sql()
         assert sql == "TIMESTAMP_TZ"
 
     def test_date_type(self, dialect):
-        t = SnowflakeDateType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeDateType(dialect)
+        sql, params = t.to_sql()
         assert sql == "DATE"
 
     def test_time_type(self, dialect):
-        t = SnowflakeTimeType(precision=6)
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeTimeType(dialect, precision=6)
+        sql, params = t.to_sql()
         assert sql == "TIME(6)"
 
     def test_time_type_default(self, dialect):
-        t = SnowflakeTimeType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeTimeType(dialect)
+        sql, params = t.to_sql()
         assert sql == "TIME"
 
     def test_binary_type(self, dialect):
-        t = SnowflakeBinaryType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeBinaryType(dialect)
+        sql, params = t.to_sql()
         assert sql == "BINARY"
 
     def test_binary_type_with_length(self, dialect):
-        t = SnowflakeBinaryType(length=1024)
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeBinaryType(dialect, length=1024)
+        sql, params = t.to_sql()
         assert sql == "BINARY(1024)"
 
     def test_variant_type(self, dialect):
-        t = SnowflakeVariantType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeVariantType(dialect)
+        sql, params = t.to_sql()
         assert sql == "VARIANT"
 
     def test_array_type(self, dialect):
-        t = SnowflakeArrayType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeArrayType(dialect)
+        sql, params = t.to_sql()
         assert sql == "ARRAY"
 
     def test_object_type(self, dialect):
-        t = SnowflakeObjectType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeObjectType(dialect)
+        sql, params = t.to_sql()
         assert sql == "OBJECT"
 
     def test_geography_type(self, dialect):
-        t = SnowflakeGeographyType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeGeographyType(dialect)
+        sql, params = t.to_sql()
         assert sql == "GEOGRAPHY"
 
     def test_geometry_type(self, dialect):
-        t = SnowflakeGeometryType()
-        sql, params = dialect.format_data_type(t)
+        t = SnowflakeGeometryType(dialect)
+        sql, params = t.to_sql()
         assert sql == "GEOMETRY"
 
     def test_supports_data_types(self, dialect):

@@ -245,71 +245,69 @@ class TestSuggestedDataTypes:
 class TestPrecisionValidation:
     def test_number_precision_valid(self):
         dialect = SnowflakeDialect()
-        sql, _ = dialect.format_data_type(
-            SnowflakeNumberType(precision=38, scale=0))
+        sql, _ = SnowflakeNumberType(
+            dialect, precision=38, scale=0
+        ).to_sql()
         assert sql == "NUMBER(38, 0)"
 
     def test_number_precision_too_high(self):
         dialect = SnowflakeDialect()
         with pytest.raises(ValueError, match="precision must be"):
-            dialect.format_data_type(SnowflakeNumberType(precision=39))
+            SnowflakeNumberType(dialect, precision=39).to_sql()
 
     def test_number_precision_zero(self):
         dialect = SnowflakeDialect()
         with pytest.raises(ValueError, match="precision must be"):
-            dialect.format_data_type(SnowflakeNumberType(precision=0))
+            SnowflakeNumberType(dialect, precision=0).to_sql()
 
     def test_number_scale_too_high(self):
         dialect = SnowflakeDialect()
         with pytest.raises(ValueError, match="scale must be"):
-            dialect.format_data_type(
-                SnowflakeNumberType(precision=10, scale=39))
+            SnowflakeNumberType(dialect, precision=10, scale=39).to_sql()
 
     def test_float_precision_valid(self):
         dialect = SnowflakeDialect()
-        sql, _ = dialect.format_data_type(SnowflakeFloatType(precision=126))
+        sql, _ = SnowflakeFloatType(dialect, precision=126).to_sql()
         assert sql == "FLOAT(126)"
 
     def test_float_precision_too_high(self):
         dialect = SnowflakeDialect()
         with pytest.raises(ValueError, match="precision"):
-            dialect.format_data_type(SnowflakeFloatType(precision=127))
+            SnowflakeFloatType(dialect, precision=127).to_sql()
 
     def test_float_precision_zero(self):
         dialect = SnowflakeDialect()
         with pytest.raises(ValueError, match="precision"):
-            dialect.format_data_type(SnowflakeFloatType(precision=0))
+            SnowflakeFloatType(dialect, precision=0).to_sql()
 
     def test_timestamp_precision_valid(self):
         dialect = SnowflakeDialect()
-        sql, _ = dialect.format_data_type(
-            SnowflakeTimestampLtzType(precision=9))
+        sql, _ = SnowflakeTimestampLtzType(dialect, precision=9).to_sql()
         assert sql == "TIMESTAMP_LTZ(9)"
 
     def test_timestamp_precision_too_high(self):
         dialect = SnowflakeDialect()
         with pytest.raises(ValueError, match="precision"):
-            dialect.format_data_type(SnowflakeTimestampNtzType(precision=10))
+            SnowflakeTimestampNtzType(dialect, precision=10).to_sql()
 
     def test_timestamp_precision_zero(self):
         dialect = SnowflakeDialect()
-        sql, _ = dialect.format_data_type(
-            SnowflakeTimestampTzType(precision=0))
+        sql, _ = SnowflakeTimestampTzType(dialect, precision=0).to_sql()
         assert sql == "TIMESTAMP_TZ(0)"
 
     def test_time_precision_valid(self):
         dialect = SnowflakeDialect()
-        sql, _ = dialect.format_data_type(SnowflakeTimeType(precision=9))
+        sql, _ = SnowflakeTimeType(dialect, precision=9).to_sql()
         assert sql == "TIME(9)"
 
     def test_time_precision_too_high(self):
         dialect = SnowflakeDialect()
         with pytest.raises(ValueError, match="precision"):
-            dialect.format_data_type(SnowflakeTimeType(precision=10))
+            SnowflakeTimeType(dialect, precision=10).to_sql()
 
     def test_time_precision_zero(self):
         dialect = SnowflakeDialect()
-        sql, _ = dialect.format_data_type(SnowflakeTimeType(precision=0))
+        sql, _ = SnowflakeTimeType(dialect, precision=0).to_sql()
         assert sql == "TIME(0)"
 
 
@@ -318,96 +316,93 @@ class TestFormatting:
         self.dialect = SnowflakeDialect()
 
     def test_varchar_no_length(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeVarcharType())
+        sql, _ = SnowflakeVarcharType(self.dialect).to_sql()
         assert sql == "VARCHAR"
 
     def test_varchar_with_length(self):
-        sql, _ = self.dialect.format_data_type(
-            SnowflakeVarcharType(length=255))
+        sql, _ = SnowflakeVarcharType(self.dialect, length=255).to_sql()
         assert sql == "VARCHAR(255)"
 
     def test_number_no_params(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeNumberType())
+        sql, _ = SnowflakeNumberType(self.dialect).to_sql()
         assert sql == "NUMBER"
 
     def test_number_precision_only(self):
-        sql, _ = self.dialect.format_data_type(
-            SnowflakeNumberType(precision=10))
+        sql, _ = SnowflakeNumberType(self.dialect, precision=10).to_sql()
         assert sql == "NUMBER(10)"
 
     def test_number_precision_scale(self):
-        sql, _ = self.dialect.format_data_type(
-            SnowflakeNumberType(precision=10, scale=2))
+        sql, _ = SnowflakeNumberType(
+            self.dialect, precision=10, scale=2
+        ).to_sql()
         assert sql == "NUMBER(10, 2)"
 
     def test_float_no_precision(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeFloatType())
+        sql, _ = SnowflakeFloatType(self.dialect).to_sql()
         assert sql == "FLOAT"
 
     def test_float_with_precision(self):
-        sql, _ = self.dialect.format_data_type(
-            SnowflakeFloatType(precision=53))
+        sql, _ = SnowflakeFloatType(self.dialect, precision=53).to_sql()
         assert sql == "FLOAT(53)"
 
     def test_boolean(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeBooleanType())
+        sql, _ = SnowflakeBooleanType(self.dialect).to_sql()
         assert sql == "BOOLEAN"
 
     def test_timestamp_ltz(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeTimestampLtzType())
+        sql, _ = SnowflakeTimestampLtzType(self.dialect).to_sql()
         assert sql == "TIMESTAMP_LTZ"
 
     def test_timestamp_ltz_precision(self):
-        sql, _ = self.dialect.format_data_type(
-            SnowflakeTimestampLtzType(precision=3))
+        sql, _ = SnowflakeTimestampLtzType(
+            self.dialect, precision=3
+        ).to_sql()
         assert sql == "TIMESTAMP_LTZ(3)"
 
     def test_timestamp_ntz(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeTimestampNtzType())
+        sql, _ = SnowflakeTimestampNtzType(self.dialect).to_sql()
         assert sql == "TIMESTAMP_NTZ"
 
     def test_timestamp_tz(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeTimestampTzType())
+        sql, _ = SnowflakeTimestampTzType(self.dialect).to_sql()
         assert sql == "TIMESTAMP_TZ"
 
     def test_date(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeDateType())
+        sql, _ = SnowflakeDateType(self.dialect).to_sql()
         assert sql == "DATE"
 
     def test_time(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeTimeType())
+        sql, _ = SnowflakeTimeType(self.dialect).to_sql()
         assert sql == "TIME"
 
     def test_time_precision(self):
-        sql, _ = self.dialect.format_data_type(
-            SnowflakeTimeType(precision=6))
+        sql, _ = SnowflakeTimeType(self.dialect, precision=6).to_sql()
         assert sql == "TIME(6)"
 
     def test_binary(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeBinaryType())
+        sql, _ = SnowflakeBinaryType(self.dialect).to_sql()
         assert sql == "BINARY"
 
     def test_binary_length(self):
-        sql, _ = self.dialect.format_data_type(
-            SnowflakeBinaryType(length=1024))
+        sql, _ = SnowflakeBinaryType(self.dialect, length=1024).to_sql()
         assert sql == "BINARY(1024)"
 
     def test_variant(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeVariantType())
+        sql, _ = SnowflakeVariantType(self.dialect).to_sql()
         assert sql == "VARIANT"
 
     def test_object(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeObjectType())
+        sql, _ = SnowflakeObjectType(self.dialect).to_sql()
         assert sql == "OBJECT"
 
     def test_array(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeArrayType())
+        sql, _ = SnowflakeArrayType(self.dialect).to_sql()
         assert sql == "ARRAY"
 
     def test_geography(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeGeographyType())
+        sql, _ = SnowflakeGeographyType(self.dialect).to_sql()
         assert sql == "GEOGRAPHY"
 
     def test_geometry(self):
-        sql, _ = self.dialect.format_data_type(SnowflakeGeometryType())
+        sql, _ = SnowflakeGeometryType(self.dialect).to_sql()
         assert sql == "GEOMETRY"

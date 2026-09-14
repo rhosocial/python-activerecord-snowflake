@@ -21,6 +21,26 @@ class SnowflakeTransactionMixin:
         IsolationLevel.READ_COMMITTED: 'READ COMMITTED',
     }
 
+    def supports_transaction_mode(self) -> bool:
+        """Snowflake does not support READ ONLY / READ WRITE modes."""
+        return False
+
+    def supports_isolation_level_in_begin(self) -> bool:
+        """Snowflake only supports READ COMMITTED and not in BEGIN."""
+        return False
+
+    def supports_read_only_transaction(self) -> bool:
+        """Snowflake does not support READ ONLY transactions."""
+        return False
+
+    def supports_deferrable_transaction(self) -> bool:
+        """Snowflake does not support DEFERRABLE transactions."""
+        return False
+
+    def supports_savepoint(self) -> bool:
+        """Snowflake supports savepoints."""
+        return True
+
     def _build_set_isolation_sql(self, level: IsolationLevel) -> Tuple[str, tuple]:
         """Build SQL to set transaction isolation level.
 

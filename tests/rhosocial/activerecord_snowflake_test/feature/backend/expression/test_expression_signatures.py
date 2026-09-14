@@ -36,7 +36,7 @@ class TestCreateWarehouseExpression:
 
     def test_create_warehouse_basic(self, dialect):
         expr = SnowflakeCreateWarehouseExpression(dialect, "my_wh")
-        sql = dialect.format_create_warehouse_statement(expr)
+        sql, _ = expr.to_sql()
         assert sql == 'CREATE WAREHOUSE "my_wh"'
 
     def test_create_warehouse_with_options(self, dialect):
@@ -49,7 +49,7 @@ class TestCreateWarehouseExpression:
             auto_resume=True,
             comment="Test warehouse",
         )
-        sql = dialect.format_create_warehouse_statement(expr)
+        sql, _ = expr.to_sql()
         assert "CREATE OR REPLACE WAREHOUSE" in sql
         assert '"my_wh"' in sql
         assert "WAREHOUSE_SIZE = 'X-SMALL'" in sql
@@ -65,7 +65,7 @@ class TestAlterWarehouseExpression:
         expr = SnowflakeAlterWarehouseExpression(
             dialect, "my_wh", mode=SnowflakeAlterWarehouseMode.SUSPEND
         )
-        sql = dialect.format_alter_warehouse_statement(expr)
+        sql, _ = expr.to_sql()
         assert sql == 'ALTER WAREHOUSE "my_wh" SUSPEND'
 
     def test_alter_warehouse_set(self, dialect):
@@ -75,7 +75,7 @@ class TestAlterWarehouseExpression:
             mode=SnowflakeAlterWarehouseMode.SET,
             warehouse_size="LARGE",
         )
-        sql = dialect.format_alter_warehouse_statement(expr)
+        sql, _ = expr.to_sql()
         assert sql == 'ALTER WAREHOUSE "my_wh" SET WAREHOUSE_SIZE = \'LARGE\''
 
 
@@ -84,14 +84,14 @@ class TestDropWarehouseExpression:
 
     def test_drop_warehouse_basic(self, dialect):
         expr = SnowflakeDropWarehouseExpression(dialect, "my_wh")
-        sql = dialect.format_drop_warehouse_statement(expr)
+        sql, _ = expr.to_sql()
         assert sql == 'DROP WAREHOUSE "my_wh"'
 
     def test_drop_warehouse_if_exists(self, dialect):
         expr = SnowflakeDropWarehouseExpression(
             dialect, "my_wh", if_exists=True
         )
-        sql = dialect.format_drop_warehouse_statement(expr)
+        sql, _ = expr.to_sql()
         assert sql == 'DROP WAREHOUSE IF EXISTS "my_wh"'
 
 
@@ -110,8 +110,7 @@ class TestWarehouseOptionsExpression:
             initially_suspended=True,
             comment="Options test",
         )
-        parts = dialect.format_warehouse_options(expr)
-        joined = " ".join(parts)
+        joined, _ = expr.to_sql()
         assert "WAREHOUSE_SIZE = 'MEDIUM'" in joined
         assert "MAX_CLUSTER_COUNT = 4" in joined
         assert "MIN_CLUSTER_COUNT = 2" in joined
@@ -123,8 +122,8 @@ class TestWarehouseOptionsExpression:
 
     def test_warehouse_options_empty(self, dialect):
         expr = SnowflakeWarehouseOptionsExpression(dialect)
-        parts = dialect.format_warehouse_options(expr)
-        assert parts == []
+        sql, _ = expr.to_sql()
+        assert sql == ""
 
 
 class TestVariantPathAccessExpression:
@@ -134,14 +133,14 @@ class TestVariantPathAccessExpression:
         expr = SnowflakeVariantPathAccessExpression(
             dialect, "data", "key"
         )
-        sql = dialect.format_variant_path_access(expr)
+        sql, _ = expr.to_sql()
         assert sql == "data:key"
 
     def test_variant_path_nested(self, dialect):
         expr = SnowflakeVariantPathAccessExpression(
             dialect, "data", "key.nested.deep"
         )
-        sql = dialect.format_variant_path_access(expr)
+        sql, _ = expr.to_sql()
         assert sql == "data:key.nested.deep"
 
 
@@ -152,14 +151,14 @@ class TestVariantCastExpression:
         expr = SnowflakeVariantCastExpression(
             dialect, "data", "count", "NUMBER"
         )
-        sql = dialect.format_variant_cast(expr)
+        sql, _ = expr.to_sql()
         assert sql == "data:count::NUMBER"
 
     def test_variant_cast_string(self, dialect):
         expr = SnowflakeVariantCastExpression(
             dialect, "data", "name", "VARCHAR"
         )
-        sql = dialect.format_variant_cast(expr)
+        sql, _ = expr.to_sql()
         assert sql == "data:name::VARCHAR"
 
 
@@ -168,12 +167,12 @@ class TestUndropExpression:
 
     def test_undrop_table(self, dialect):
         expr = SnowflakeUndropExpression(dialect, "my_table")
-        sql = dialect.format_undrop_statement(expr)
+        sql, _ = expr.to_sql()
         assert sql == 'UNDROP TABLE "my_table"'
 
     def test_undrop_schema(self, dialect):
         expr = SnowflakeUndropExpression(
             dialect, "my_schema", object_type=SnowflakeUndropObjectType.SCHEMA
         )
-        sql = dialect.format_undrop_statement(expr)
+        sql, _ = expr.to_sql()
         assert sql == 'UNDROP SCHEMA "my_schema"'

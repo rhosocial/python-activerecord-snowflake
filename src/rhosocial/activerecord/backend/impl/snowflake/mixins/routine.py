@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/routine.py
 """SnowflakeRoutineMixin — procedure / function DDL support."""
 
-from typing import Any, TYPE_CHECKING
+from typing import Any, Dict, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.routine import (
@@ -17,6 +17,15 @@ class SnowflakeRoutineMixin:
     def supports_routines(self) -> bool:
         """Snowflake supports procedures and functions."""
         return True
+
+    def supports_functions(self) -> Dict[str, bool]:
+        """Return the SQL functions available in this dialect.
+
+        Snowflake ships a large built-in function library; this mapping is
+        intentionally empty so function-gated tests skip rather than assume
+        availability.
+        """
+        return {}
 
     def format_create_procedure_statement(
         self, expr: "SnowflakeCreateProcedureExpression"
