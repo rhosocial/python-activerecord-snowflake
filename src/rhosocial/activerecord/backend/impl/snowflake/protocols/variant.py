@@ -12,7 +12,13 @@ Key operations:
 Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/data-types-semistructured
 """
-from typing import Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..expression.variant import (
+        SnowflakeVariantPathAccessExpression,
+        SnowflakeVariantCastExpression,
+    )
 
 
 @runtime_checkable
@@ -23,10 +29,14 @@ class SnowflakeVariantSupport(Protocol):
         """Whether VARIANT type is supported."""
         ...
 
-    def format_variant_path_access(self, column: str, path: str) -> str:
+    def format_variant_path_access(
+        self, expr: "SnowflakeVariantPathAccessExpression"
+    ) -> str:
         """Format VARIANT path access expression."""
         ...
 
-    def format_variant_cast(self, column: str, path: str, target_type: str) -> str:
+    def format_variant_cast(
+        self, expr: "SnowflakeVariantCastExpression"
+    ) -> str:
         """Format VARIANT path access with explicit cast."""
         ...

@@ -11,6 +11,9 @@ if TYPE_CHECKING:
         SnowflakeCreateWarehouseExpression,
         SnowflakeDropWarehouseExpression,
     )
+    from ..expression.ddl.warehouse_options import (
+        SnowflakeWarehouseOptionsExpression,
+    )
 
 
 class SnowflakeWarehouseMixin:
@@ -109,9 +112,9 @@ class SnowflakeWarehouseMixin:
 
     def format_warehouse_options(
         self,
-        expr: Any,
+        expr: "SnowflakeWarehouseOptionsExpression",
         *,
-        include_initially_suspended: bool,
+        include_initially_suspended: bool = True,
     ) -> List[str]:
         """Render warehouse property tokens shared by CREATE and ALTER SET."""
         options = []

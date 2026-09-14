@@ -213,11 +213,19 @@ class TestSnowflakeSpecificFormatting:
         assert result == "BEFORE(TIMESTAMP => '2024-01-01 00:00:00')"
 
     def test_format_variant_path_access(self, dialect):
-        result = dialect.format_variant_path_access("data", "key.nested")
+        from rhosocial.activerecord.backend.impl.snowflake.expression.variant import (
+            SnowflakeVariantPathAccessExpression,
+        )
+        expr = SnowflakeVariantPathAccessExpression(dialect, "data", "key.nested")
+        result = dialect.format_variant_path_access(expr)
         assert result == "data:key.nested"
 
     def test_format_variant_cast(self, dialect):
-        result = dialect.format_variant_cast("data", "count", "NUMBER")
+        from rhosocial.activerecord.backend.impl.snowflake.expression.variant import (
+            SnowflakeVariantCastExpression,
+        )
+        expr = SnowflakeVariantCastExpression(dialect, "data", "count", "NUMBER")
+        result = dialect.format_variant_cast(expr)
         assert result == "data:count::NUMBER"
 
     def test_format_array_construct(self, dialect):
