@@ -18,7 +18,7 @@ class SnowflakeILIKEMixin:
         else:
             col_sql = str(column)
         operator = "NOT ILIKE" if negate else "ILIKE"
-        return f"{col_sql} {operator} %s", (pattern,)
+        return f"{col_sql} {operator} {self.p()}", (pattern,)
 
 
 __all__ = ['SnowflakeILIKEMixin']
