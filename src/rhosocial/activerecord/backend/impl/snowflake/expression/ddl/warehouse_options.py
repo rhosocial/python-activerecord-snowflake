@@ -71,5 +71,37 @@ class SnowflakeWarehouseOptionsExpression(BaseExpression):
             Tuple of (options SQL string, empty params tuple).
 
         """
-        parts = self.dialect._render_warehouse_options(self)
+        parts: list[str] = []
+        if self.warehouse_size is not None:
+            parts.append(
+                f"WAREHOUSE_SIZE = "
+                f"'{self.dialect._escape_sql_string(self.warehouse_size)}'"
+            )
+        if self.max_cluster_count is not None:
+            parts.append(f"MAX_CLUSTER_COUNT = {int(self.max_cluster_count)}")
+        if self.min_cluster_count is not None:
+            parts.append(f"MIN_CLUSTER_COUNT = {int(self.min_cluster_count)}")
+        if self.scaling_policy is not None:
+            parts.append(
+                f"SCALING_POLICY = "
+                f"'{self.dialect._escape_sql_string(self.scaling_policy)}'"
+            )
+        if self.auto_suspend is not None:
+            if isinstance(self.auto_suspend, bool):
+                parts.append(f"AUTO_SUSPEND = {str(self.auto_suspend).upper()}")
+            else:
+                parts.append(f"AUTO_SUSPEND = {int(self.auto_suspend)}")
+        if self.auto_resume is not None:
+            parts.append(
+                f"AUTO_RESUME = {str(bool(self.auto_resume)).upper()}"
+            )
+        if self.initially_suspended is not None:
+            parts.append(
+                f"INITIALLY_SUSPENDED = "
+                f"{str(bool(self.initially_suspended)).upper()}"
+            )
+        if self.comment is not None:
+            parts.append(
+                f"COMMENT = '{self.dialect._escape_sql_string(self.comment)}'"
+            )
         return " ".join(parts), ()

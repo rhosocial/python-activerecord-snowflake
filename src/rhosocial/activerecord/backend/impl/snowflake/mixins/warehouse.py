@@ -11,9 +11,6 @@ if TYPE_CHECKING:
         SnowflakeCreateWarehouseExpression,
         SnowflakeDropWarehouseExpression,
     )
-    from ..expression.ddl.warehouse_options import (
-        SnowflakeWarehouseOptionsExpression,
-    )
 
 
 class SnowflakeWarehouseMixin:
@@ -40,9 +37,39 @@ class SnowflakeWarehouseMixin:
             parts.append("OR REPLACE")
         parts.append("WAREHOUSE")
         parts.append(self.format_identifier(expr.name))
-        options = self._render_warehouse_options(
-            expr, include_initially_suspended=True
-        )
+        options: list[str] = []
+        if expr.warehouse_size is not None:
+            options.append(
+                f"WAREHOUSE_SIZE = "
+                f"'{self._escape_sql_string(expr.warehouse_size)}'"
+            )
+        if expr.max_cluster_count is not None:
+            options.append(f"MAX_CLUSTER_COUNT = {int(expr.max_cluster_count)}")
+        if expr.min_cluster_count is not None:
+            options.append(f"MIN_CLUSTER_COUNT = {int(expr.min_cluster_count)}")
+        if expr.scaling_policy is not None:
+            options.append(
+                f"SCALING_POLICY = "
+                f"'{self._escape_sql_string(expr.scaling_policy)}'"
+            )
+        if expr.auto_suspend is not None:
+            if isinstance(expr.auto_suspend, bool):
+                options.append(f"AUTO_SUSPEND = {str(expr.auto_suspend).upper()}")
+            else:
+                options.append(f"AUTO_SUSPEND = {int(expr.auto_suspend)}")
+        if expr.auto_resume is not None:
+            options.append(
+                f"AUTO_RESUME = {str(bool(expr.auto_resume)).upper()}"
+            )
+        if expr.initially_suspended is not None:
+            options.append(
+                f"INITIALLY_SUSPENDED = "
+                f"{str(bool(expr.initially_suspended)).upper()}"
+            )
+        if expr.comment is not None:
+            options.append(
+                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+            )
         if options:
             parts.append("WITH")
             parts.extend(options)
@@ -81,9 +108,34 @@ class SnowflakeWarehouseMixin:
                 )
             parts.extend(["RENAME TO", self.format_identifier(expr.new_name)])
             return " ".join(parts), ()
-        options = self._render_warehouse_options(
-            expr, include_initially_suspended=False
-        )
+        options: list[str] = []
+        if expr.warehouse_size is not None:
+            options.append(
+                f"WAREHOUSE_SIZE = "
+                f"'{self._escape_sql_string(expr.warehouse_size)}'"
+            )
+        if expr.max_cluster_count is not None:
+            options.append(f"MAX_CLUSTER_COUNT = {int(expr.max_cluster_count)}")
+        if expr.min_cluster_count is not None:
+            options.append(f"MIN_CLUSTER_COUNT = {int(expr.min_cluster_count)}")
+        if expr.scaling_policy is not None:
+            options.append(
+                f"SCALING_POLICY = "
+                f"'{self._escape_sql_string(expr.scaling_policy)}'"
+            )
+        if expr.auto_suspend is not None:
+            if isinstance(expr.auto_suspend, bool):
+                options.append(f"AUTO_SUSPEND = {str(expr.auto_suspend).upper()}")
+            else:
+                options.append(f"AUTO_SUSPEND = {int(expr.auto_suspend)}")
+        if expr.auto_resume is not None:
+            options.append(
+                f"AUTO_RESUME = {str(bool(expr.auto_resume)).upper()}"
+            )
+        if expr.comment is not None:
+            options.append(
+                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+            )
         if not options:
             raise ValueError(
                 "ALTER WAREHOUSE SET requires at least one property"
@@ -109,45 +161,3 @@ class SnowflakeWarehouseMixin:
             parts.append("IF EXISTS")
         parts.append(self.format_identifier(expr.name))
         return " ".join(parts), ()
-
-    def _render_warehouse_options(
-        self,
-        expr: "SnowflakeWarehouseOptionsExpression",
-        *,
-        include_initially_suspended: bool = True,
-    ) -> list[str]:
-        """Render warehouse property tokens shared by CREATE and ALTER SET."""
-        options: list[str] = []
-        if expr.warehouse_size is not None:
-            options.append(
-                f"WAREHOUSE_SIZE = "
-                f"'{self._escape_sql_string(expr.warehouse_size)}'"
-            )
-        if expr.max_cluster_count is not None:
-            options.append(f"MAX_CLUSTER_COUNT = {int(expr.max_cluster_count)}")
-        if expr.min_cluster_count is not None:
-            options.append(f"MIN_CLUSTER_COUNT = {int(expr.min_cluster_count)}")
-        if expr.scaling_policy is not None:
-            options.append(
-                f"SCALING_POLICY = "
-                f"'{self._escape_sql_string(expr.scaling_policy)}'"
-            )
-        if expr.auto_suspend is not None:
-            if isinstance(expr.auto_suspend, bool):
-                options.append(f"AUTO_SUSPEND = {str(expr.auto_suspend).upper()}")
-            else:
-                options.append(f"AUTO_SUSPEND = {int(expr.auto_suspend)}")
-        if expr.auto_resume is not None:
-            options.append(
-                f"AUTO_RESUME = {str(bool(expr.auto_resume)).upper()}"
-            )
-        if include_initially_suspended and expr.initially_suspended is not None:
-            options.append(
-                f"INITIALLY_SUSPENDED = "
-                f"{str(bool(expr.initially_suspended)).upper()}"
-            )
-        if expr.comment is not None:
-            options.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
-            )
-        return options

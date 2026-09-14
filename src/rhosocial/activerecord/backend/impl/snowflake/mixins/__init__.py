@@ -35,7 +35,7 @@ from .undrop import SnowflakeUndropMixin
 from .variant import SnowflakeVariantMixin
 from .types import SnowflakeTypeSupportMixin
 from .warehouse import SnowflakeWarehouseMixin
-from .ddl.alter_table_modifier import SnowflakeAlterColumnModifierMixin
+from .ddl import SnowflakeAlterColumnModifierMixin
 # New mixins from dialect.py split
 from .datetime import SnowflakeDateTimeMixin
 from .collation import SnowflakeCollationMixin

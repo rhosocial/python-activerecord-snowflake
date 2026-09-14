@@ -13,6 +13,11 @@ Snowflake SQL is largely ANSI SQL compliant with extensions for:
 """
 from typing import Any, Dict, Tuple, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from rhosocial.activerecord.backend.expression.transaction import (
+        SetTransactionExpression,
+    )
+
 from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
 from rhosocial.activerecord.backend.dialect.protocols import (
     AdvancedGroupingSupport,
@@ -308,7 +313,7 @@ class SnowflakeDialect(
         placeholder = self.get_parameter_placeholder()
         return f"IDENTIFIER({placeholder})"
 
-    def format_set_transaction(self, expr: Any) -> Tuple[str, tuple]:
+    def format_set_transaction(self, expr: "SetTransactionExpression") -> Tuple[str, tuple]:
         """Format SET TRANSACTION statement for Snowflake.
 
         Snowflake only supports READ COMMITTED isolation level, so

@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/file_format.py
 """SnowflakeFileFormatMixin — file format DDL support."""
 
-from typing import Any, Dict, List, Tuple, TYPE_CHECKING
+from typing import Any, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.file_format import (
@@ -9,6 +9,22 @@ if TYPE_CHECKING:
         SnowflakeCreateFileFormatExpression,
         SnowflakeDropFileFormatExpression,
     )
+
+
+def _format_ff_value(value: Any, escape: callable) -> str:
+    """Render a single format option value.
+
+    Strings are quoted, booleans uppercased, lists/tuples rendered as
+    parenthesized lists and numbers left verbatim.
+    """
+    if isinstance(value, bool):
+        return str(value).upper()
+    if isinstance(value, (list, tuple)):
+        inner = ", ".join(_format_ff_value(v, escape) for v in value)
+        return f"({inner})"
+    if isinstance(value, str):
+        return f"'{escape(value)}'"
+    return str(value)
 
 
 class SnowflakeFileFormatMixin:
@@ -40,7 +56,10 @@ class SnowflakeFileFormatMixin:
         if expr.type_ is not None:
             type_value = getattr(expr.type_, "value", expr.type_)
             parts.append(f"TYPE = {str(type_value).upper()}")
-        parts.extend(self._render_file_format_options(expr.options))
+        for key, value in expr.options.items():
+            parts.append(
+                f"{key} = {_format_ff_value(value, self._escape_sql_string)}"
+            )
         if expr.comment is not None:
             parts.append(
                 f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
@@ -61,7 +80,11 @@ class SnowflakeFileFormatMixin:
         Raises:
             ValueError: when no ``SET`` property is specified.
         """
-        options = self._render_file_format_options(expr.options)
+        options: list[str] = []
+        for key, value in expr.options.items():
+            options.append(
+                f"{key} = {_format_ff_value(value, self._escape_sql_string)}"
+            )
         if expr.comment is not None:
             options.append(
                 f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
@@ -93,25 +116,3 @@ class SnowflakeFileFormatMixin:
             parts.append("IF EXISTS")
         parts.append(self.format_identifier(expr.name))
         return " ".join(parts), ()
-
-    def _render_file_format_options(self, options: Dict[str, Any]) -> List[str]:
-        """Render pass-through format options as ``KEY = value`` tokens."""
-        rendered = []
-        for key, value in options.items():
-            rendered.append(f"{key} = {self._render_file_format_value(value)}")
-        return rendered
-
-    def _render_file_format_value(self, value: Any) -> str:
-        """Render a single format option value.
-
-        Strings are quoted, booleans uppercased, lists/tuples rendered as
-        parenthesized lists and numbers left verbatim.
-        """
-        if isinstance(value, bool):
-            return str(value).upper()
-        if isinstance(value, (list, tuple)):
-            inner = ", ".join(self._render_file_format_value(v) for v in value)
-            return f"({inner})"
-        if isinstance(value, str):
-            return f"'{self._escape_sql_string(value)}'"
-        return str(value)

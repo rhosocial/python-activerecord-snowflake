@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/task.py
 """SnowflakeTaskMixin — task (scheduled SQL) DDL support."""
 
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING
 
 from ..expression.ddl.task import SnowflakeAlterTaskMode
 
@@ -49,7 +49,15 @@ class SnowflakeTaskMixin:
                 "USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE = "
                 f"{self.format_identifier(expr.user_task_managed_initial_warehouse_size)}"
             )
-        schedule = self._render_task_schedule(expr)
+        schedule = None
+        if expr.using_cron is not None:
+            cron = f"USING CRON {expr.using_cron}"
+            if expr.timezone is not None:
+                cron += f" {self._escape_sql_string(str(expr.timezone))}"
+            schedule = f"SCHEDULE = '{cron}'"
+        elif expr.schedule is not None:
+            value = self._escape_sql_string(str(expr.schedule))
+            schedule = f"SCHEDULE = '{value}'"
         if schedule:
             parts.append(schedule)
         if expr.allow_overlapping_execution is not None:
@@ -116,7 +124,15 @@ class SnowflakeTaskMixin:
             options.append(
                 f"WAREHOUSE = {self.format_identifier(expr.warehouse)}"
             )
-        schedule = self._render_task_schedule(expr)
+        schedule = None
+        if expr.using_cron is not None:
+            cron = f"USING CRON {expr.using_cron}"
+            if expr.timezone is not None:
+                cron += f" {self._escape_sql_string(str(expr.timezone))}"
+            schedule = f"SCHEDULE = '{cron}'"
+        elif expr.schedule is not None:
+            value = self._escape_sql_string(str(expr.schedule))
+            schedule = f"SCHEDULE = '{value}'"
         if schedule:
             options.append(schedule)
         if not options:
@@ -159,15 +175,3 @@ class SnowflakeTaskMixin:
             parts.append("IF EXISTS")
         parts.append(self.format_identifier(expr.name))
         return " ".join(parts), ()
-
-    def _render_task_schedule(self, expr: object) -> Optional[str]:
-        """Render a SCHEDULE clause from interval or cron spec."""
-        if expr.using_cron is not None:
-            cron = f"USING CRON {expr.using_cron}"
-            if expr.timezone is not None:
-                cron += f" {self._escape_sql_string(str(expr.timezone))}"
-            return f"SCHEDULE = '{cron}'"
-        if expr.schedule is not None:
-            value = self._escape_sql_string(str(expr.schedule))
-            return f"SCHEDULE = '{value}'"
-        return None

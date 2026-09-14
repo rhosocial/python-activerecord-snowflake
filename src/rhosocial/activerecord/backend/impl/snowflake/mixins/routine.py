@@ -44,12 +44,25 @@ class SnowflakeRoutineMixin:
             parts.append("OR REPLACE")
         parts.append("PROCEDURE")
         parts.append(self.format_identifier(expr.name))
-        parts.append(self._render_routine_args(expr.args))
+        if not expr.args:
+            parts.append("()")
+        else:
+            rendered = []
+            for arg in expr.args:
+                arg_name, arg_type = arg
+                if arg_name:
+                    rendered.append(
+                        f"{self.format_identifier(arg_name)} {arg_type}"
+                    )
+                else:
+                    rendered.append(str(arg_type))
+            parts.append("(" + ", ".join(rendered) + ")")
         parts.append(f"RETURNS {expr.returns}")
         parts.append(f"LANGUAGE {expr.language.value}")
         if expr.execute_as is not None:
             parts.append(f"EXECUTE AS {expr.execute_as.value}")
-        parts.append(self._render_routine_body(expr.body))
+        if expr.body is not None:
+            parts.append(f"AS $$ {expr.body} $$")
         if expr.comment is not None:
             parts.append(
                 f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
@@ -73,14 +86,27 @@ class SnowflakeRoutineMixin:
             parts.append("OR REPLACE")
         parts.append("FUNCTION")
         parts.append(self.format_identifier(expr.name))
-        parts.append(self._render_routine_args(expr.args))
+        if not expr.args:
+            parts.append("()")
+        else:
+            rendered = []
+            for arg in expr.args:
+                arg_name, arg_type = arg
+                if arg_name:
+                    rendered.append(
+                        f"{self.format_identifier(arg_name)} {arg_type}"
+                    )
+                else:
+                    rendered.append(str(arg_type))
+            parts.append("(" + ", ".join(rendered) + ")")
         parts.append(f"RETURNS {expr.returns}")
         parts.append(f"LANGUAGE {expr.language.value}")
         if expr.immutable is not None:
             parts.append("IMMUTABLE" if expr.immutable else "VOLATILE")
         if expr.execute_as is not None:
             parts.append(f"EXECUTE AS {expr.execute_as.value}")
-        parts.append(self._render_routine_body(expr.body))
+        if expr.body is not None:
+            parts.append(f"AS $$ {expr.body} $$")
         if expr.comment is not None:
             parts.append(
                 f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
@@ -104,24 +130,3 @@ class SnowflakeRoutineMixin:
             parts.append("IF EXISTS")
         parts.append(self.format_identifier(expr.name))
         return " ".join(parts), ()
-
-    def _render_routine_args(self, args: object) -> str:
-        """Render a routine argument list as ``(name TYPE, ...)``."""
-        if not args:
-            return "()"
-        rendered = []
-        for arg in args:
-            arg_name, arg_type = arg
-            if arg_name:
-                rendered.append(
-                    f"{self.format_identifier(arg_name)} {arg_type}"
-                )
-            else:
-                rendered.append(str(arg_type))
-        return "(" + ", ".join(rendered) + ")"
-
-    def _render_routine_body(self, body: object) -> str:
-        """Render a routine body as a dollar-quoted ``AS $$ ... $$`` clause."""
-        if body is None:
-            return ""
-        return f"AS $$ {body} $$"
