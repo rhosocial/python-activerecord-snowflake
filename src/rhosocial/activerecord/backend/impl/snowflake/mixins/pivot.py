@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/pivot.py
 """SnowflakePivotMixin — PIVOT / UNPIVOT clause support."""
 
-from typing import Any, Tuple, TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.pivot import (
@@ -34,7 +34,7 @@ class SnowflakePivotMixin:
 
         """
         value_sql = ", ".join(
-            self.format_pivot_value(value) for value in expr.values
+            self.inline_sql_literal(value) for value in expr.values
         )
         sql = (
             f"PIVOT ({expr.aggregate_function}("
@@ -71,7 +71,3 @@ class SnowflakePivotMixin:
         if expr.alias:
             sql += f" {self.format_identifier(expr.alias)}"
         return sql, ()
-
-    def format_pivot_value(self, value: Any) -> str:
-        """Render a single PIVOT ``IN`` value as a SQL literal."""
-        return self.inline_sql_literal(value)

@@ -241,19 +241,6 @@ class TestSnowflakeAlterDropStage:
         assert sql == 'DROP STAGE IF EXISTS "my_stage"'
 
 
-class TestSnowflakeStageListRemove:
-    """LIST / REMOVE stage file operations."""
-
-    def test_list_stage(self, dialect):
-        assert dialect.format_list_stage("my_stage") == ("LIST @my_stage", ())
-
-    def test_remove_stage(self, dialect):
-        assert (
-            dialect.format_remove_stage("my_stage", "file.csv")
-            == ("REMOVE @my_stage/file.csv", ())
-        )
-
-
 class TestSnowflakeCopyIntoLoad:
     """COPY INTO <table> FROM @<stage> (load direction)."""
 
@@ -340,22 +327,4 @@ class TestSnowflakeCopyIntoUnload:
             "HEADER = TRUE "
             "OVERWRITE = TRUE "
             "SINGLE = TRUE"
-        )
-
-
-class TestSnowflakeCopyIntoBackwardCompat:
-    """The legacy format_copy_into_table signature is preserved."""
-
-    def test_format_copy_into_table(self, dialect):
-        assert (
-            dialect.format_copy_into_table("my_table", "my_stage")
-            == ("COPY INTO my_table FROM @my_stage", ())
-        )
-
-    def test_format_copy_into_table_with_format(self, dialect):
-        assert (
-            dialect.format_copy_into_table(
-                "my_table", "my_stage", "TYPE = 'CSV'"
-            )
-            == ("COPY INTO my_table FROM @my_stage FILE_FORMAT = (TYPE = 'CSV')", ())
         )

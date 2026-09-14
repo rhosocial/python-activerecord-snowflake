@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/warehouse.py
 """SnowflakeWarehouseMixin — virtual warehouse DDL support."""
 
-from typing import Any, List, Tuple, TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING
 
 from ..expression.ddl.warehouse import SnowflakeAlterWarehouseMode
 
@@ -40,7 +40,7 @@ class SnowflakeWarehouseMixin:
             parts.append("OR REPLACE")
         parts.append("WAREHOUSE")
         parts.append(self.format_identifier(expr.name))
-        options = self.format_warehouse_options(
+        options = self._render_warehouse_options(
             expr, include_initially_suspended=True
         )
         if options:
@@ -81,7 +81,7 @@ class SnowflakeWarehouseMixin:
                 )
             parts.extend(["RENAME TO", self.format_identifier(expr.new_name)])
             return " ".join(parts), ()
-        options = self.format_warehouse_options(
+        options = self._render_warehouse_options(
             expr, include_initially_suspended=False
         )
         if not options:
@@ -110,14 +110,14 @@ class SnowflakeWarehouseMixin:
         parts.append(self.format_identifier(expr.name))
         return " ".join(parts), ()
 
-    def format_warehouse_options(
+    def _render_warehouse_options(
         self,
         expr: "SnowflakeWarehouseOptionsExpression",
         *,
         include_initially_suspended: bool = True,
-    ) -> List[str]:
+    ) -> list[str]:
         """Render warehouse property tokens shared by CREATE and ALTER SET."""
-        options = []
+        options: list[str] = []
         if expr.warehouse_size is not None:
             options.append(
                 f"WAREHOUSE_SIZE = "

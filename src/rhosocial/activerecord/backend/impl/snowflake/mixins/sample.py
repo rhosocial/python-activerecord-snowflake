@@ -30,7 +30,7 @@ class SnowflakeSampleMixin:
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.format_sampling_clause(expr, "SAMPLE")
+        return self.format_sampling_clause(expr)
 
     def format_tablesample_clause(
         self, expr: "SnowflakeSampleExpression"
@@ -44,16 +44,17 @@ class SnowflakeSampleMixin:
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.format_sampling_clause(expr, "TABLESAMPLE")
+        return self.format_sampling_clause(expr)
 
     def format_sampling_clause(
-        self, expr: "SnowflakeSampleExpression", keyword: str
+        self, expr: "SnowflakeSampleExpression"
     ) -> Tuple[str, tuple]:
-        """Render a sampling clause under a given keyword.
+        """Render a sampling clause.
 
         Emits ``{keyword} [method] ({count} ROWS | {percentage})
         [REPEATABLE ({seed})]``.
         """
+        keyword = expr.form.value
         parts = [keyword]
         if expr.sampling_method is not None:
             parts.append(expr.sampling_method.value)

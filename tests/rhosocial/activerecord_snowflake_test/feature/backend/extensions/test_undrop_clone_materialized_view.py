@@ -75,28 +75,6 @@ class TestSnowflakeCloneProtocol:
         assert dialect.supports_clone() is True
 
 
-class TestSnowflakeClone:
-    """CREATE TABLE / SCHEMA / DATABASE ... CLONE generation."""
-
-    def test_clone_table_backward_compatible(self, dialect):
-        assert (
-            dialect.format_clone_table("new_table", "source_table")
-            == ("CREATE TABLE new_table CLONE source_table", ())
-        )
-
-    def test_clone_schema(self, dialect):
-        assert (
-            dialect.format_clone_schema("s2", "s1")
-            == ("CREATE SCHEMA s2 CLONE s1", ())
-        )
-
-    def test_clone_database(self, dialect):
-        assert (
-            dialect.format_clone_database("d2", "d1")
-            == ("CREATE DATABASE d2 CLONE d1", ())
-        )
-
-
 class TestSnowflakeMaterializedViewProtocol:
     """Dialect satisfies isinstance checks for the materialized view protocol."""
 

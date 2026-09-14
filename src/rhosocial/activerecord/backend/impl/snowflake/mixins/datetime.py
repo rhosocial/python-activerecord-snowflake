@@ -13,7 +13,7 @@ class SnowflakeDateTimeMixin:
     expressions using DATEADD and DATEDIFF.
     """
 
-    def format_datetime_add_expression(self, expr: "Any") -> Tuple[str, Tuple]:
+    def format_datetime_add_expression(self, expr: "Any") -> Tuple[str, tuple]:
         source_sql, source_params = expr.source.to_sql()
         unit = expr.interval.unit.value.upper()
         sql = f"DATEADD({unit}, {self.p()}, {source_sql})"
@@ -21,7 +21,7 @@ class SnowflakeDateTimeMixin:
             sql, (expr.interval.value,) + source_params, expr
         )
 
-    def format_datetime_subtract_expression(self, expr: "Any") -> Tuple[str, Tuple]:
+    def format_datetime_subtract_expression(self, expr: "Any") -> Tuple[str, tuple]:
         source_sql, source_params = expr.source.to_sql()
         unit = expr.interval.unit.value.upper()
         sql = f"DATEADD({unit}, {self.p()}, {source_sql})"
@@ -29,7 +29,7 @@ class SnowflakeDateTimeMixin:
             sql, (-expr.interval.value,) + source_params, expr
         )
 
-    def format_datetime_diff_expression(self, expr: "Any") -> Tuple[str, Tuple]:
+    def format_datetime_diff_expression(self, expr: "Any") -> Tuple[str, tuple]:
         start_sql, start_params = expr.start.to_sql()
         end_sql, end_params = expr.end.to_sql()
         sql = f"DATEDIFF({expr.unit.value.upper()}, {start_sql}, {end_sql})"

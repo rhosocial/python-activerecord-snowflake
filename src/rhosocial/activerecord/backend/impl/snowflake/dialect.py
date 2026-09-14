@@ -308,7 +308,7 @@ class SnowflakeDialect(
         placeholder = self.get_parameter_placeholder()
         return f"IDENTIFIER({placeholder})"
 
-    def format_set_transaction(self, expr) -> Tuple[str, tuple]:
+    def format_set_transaction(self, expr: Any) -> Tuple[str, tuple]:
         """Format SET TRANSACTION statement for Snowflake.
 
         Snowflake only supports READ COMMITTED isolation level, so

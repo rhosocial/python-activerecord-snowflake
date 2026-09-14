@@ -14,7 +14,7 @@ using AT/BEFORE clauses:
 Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/constructs/at-before
 """
-from typing import Protocol, Tuple, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -23,16 +23,4 @@ class SnowflakeTimeTravelSupport(Protocol):
 
     def supports_time_travel(self) -> bool:
         """Whether time travel queries are supported."""
-        ...
-
-    def format_time_travel_at_timestamp(self, timestamp: str) -> Tuple[str, tuple]:
-        """Format AT(TIMESTAMP => ...) clause."""
-        ...
-
-    def format_time_travel_at_offset(self, seconds: int) -> Tuple[str, tuple]:
-        """Format AT(OFFSET => ...) clause."""
-        ...
-
-    def format_time_travel_before_timestamp(self, timestamp: str) -> Tuple[str, tuple]:
-        """Format BEFORE(TIMESTAMP => ...) clause."""
         ...

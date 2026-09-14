@@ -10,7 +10,7 @@ Official Documentation:
 - CREATE WAREHOUSE: https://docs.snowflake.com/en/sql-reference/sql/create-warehouse
 - ALTER WAREHOUSE:  https://docs.snowflake.com/en/sql-reference/sql/alter-warehouse
 """
-from typing import Any, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Optional, Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
@@ -71,5 +71,5 @@ class SnowflakeWarehouseOptionsExpression(BaseExpression):
             Tuple of (options SQL string, empty params tuple).
 
         """
-        parts = self.dialect.format_warehouse_options(self)
+        parts = self.dialect._render_warehouse_options(self)
         return " ".join(parts), ()

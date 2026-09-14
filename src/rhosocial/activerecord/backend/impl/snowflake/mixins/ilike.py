@@ -1,6 +1,9 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/ilike.py
 """Snowflake ILIKE support mixin."""
-from typing import Any, Tuple
+from typing import Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
 
 class SnowflakeILIKEMixin:
@@ -11,17 +14,12 @@ class SnowflakeILIKEMixin:
         return True
 
     def format_ilike_expression(
-        self, column: Any, pattern: str, negate: bool = False
+        self, column: "BaseExpression", pattern: str, negate: bool = False
     ) -> Tuple[str, tuple]:
         """Format a native Snowflake [NOT] ILIKE expression."""
-        if isinstance(column, str):
-            col_sql = self.format_identifier(column)
-        elif hasattr(column, "to_sql"):
-            col_sql, _ = column.to_sql()
-        else:
-            col_sql = str(column)
+        col_sql, col_params = column.to_sql()
         operator = "NOT ILIKE" if negate else "ILIKE"
-        return f"{col_sql} {operator} {self.p()}", (pattern,)
+        return f"{col_sql} {operator} {self.p()}", col_params + (pattern,)
 
 
 __all__ = ['SnowflakeILIKEMixin']
