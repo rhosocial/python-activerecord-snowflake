@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/stage.py
 """SnowflakeStageMixin — stage (data staging area) support."""
 
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Optional, Tuple, TYPE_CHECKING
 
 from ..expression.ddl.stage import SnowflakeCopyIntoMode
 
@@ -23,7 +23,7 @@ class SnowflakeStageMixin:
 
     def format_copy_into_table(
         self, table: str, stage: str, file_format: Optional[str] = None
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format COPY INTO table FROM stage statement.
 
         Backwards-compatible convenience wrapper kept for existing callers;
@@ -32,25 +32,25 @@ class SnowflakeStageMixin:
         sql = f"COPY INTO {table} FROM @{stage}"
         if file_format:
             sql += f" FILE_FORMAT = ({file_format})"
-        return sql
+        return sql, ()
 
     def format_copy_into_statement(
         self, expr: "SnowflakeCopyIntoExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format a full COPY INTO statement (load or unload).
 
         Args:
             expr: :class:`SnowflakeCopyIntoExpression`.
 
         Returns:
-            The formatted COPY INTO SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
         if expr.mode is SnowflakeCopyIntoMode.UNLOAD:
             return self.format_copy_into_unload(expr)
         return self.format_copy_into_load(expr)
 
-    def format_copy_into_load(self, expr: Any) -> str:
+    def format_copy_into_load(self, expr: Any) -> Tuple[str, tuple]:
         """Format COPY INTO <table> FROM @<stage> (load direction)."""
         parts = [f"COPY INTO {expr.table} FROM @{expr.stage}"]
         if expr.files:
@@ -78,9 +78,9 @@ class SnowflakeStageMixin:
                 f"VALIDATION_MODE = "
                 f"'{self._escape_sql_string(expr.validation_mode)}'"
             )
-        return " ".join(parts)
+        return " ".join(parts), ()
 
-    def format_copy_into_unload(self, expr: Any) -> str:
+    def format_copy_into_unload(self, expr: Any) -> Tuple[str, tuple]:
         """Format COPY INTO @<stage> FROM <table> (unload direction)."""
         parts = [f"COPY INTO @{expr.stage} FROM {expr.table}"]
         if expr.partition_by:
@@ -95,7 +95,7 @@ class SnowflakeStageMixin:
             parts.append(f"OVERWRITE = {str(bool(expr.overwrite)).upper()}")
         if expr.single is not None:
             parts.append(f"SINGLE = {str(bool(expr.single)).upper()}")
-        return " ".join(parts)
+        return " ".join(parts), ()
 
     def format_file_format(self, file_format: Optional[Any]) -> Optional[str]:
         """Render a FILE_FORMAT clause from a string fragment or dict.
@@ -119,14 +119,14 @@ class SnowflakeStageMixin:
 
     def format_create_stage_statement(
         self, expr: "SnowflakeCreateStageExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE STAGE statement.
 
         Args:
             expr: :class:`SnowflakeCreateStageExpression`.
 
         Returns:
-            The formatted CREATE STAGE SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
         parts = ["CREATE"]
@@ -156,18 +156,18 @@ class SnowflakeStageMixin:
             options.append("DIRECTORY = (ENABLE = TRUE)")
         if options:
             parts.extend(options)
-        return " ".join(parts)
+        return " ".join(parts), ()
 
     def format_alter_stage_statement(
         self, expr: "SnowflakeAlterStageExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format ALTER STAGE ... SET statement.
 
         Args:
             expr: :class:`SnowflakeAlterStageExpression`.
 
         Returns:
-            The formatted ALTER STAGE SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         Raises:
             ValueError: when no ``SET`` property is specified.
@@ -193,39 +193,39 @@ class SnowflakeStageMixin:
             raise ValueError("ALTER STAGE SET requires at least one property")
         parts = ["ALTER STAGE", self.format_identifier(expr.name), "SET"]
         parts.extend(options)
-        return " ".join(parts)
+        return " ".join(parts), ()
 
     def format_drop_stage_statement(
         self, expr: "SnowflakeDropStageExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format DROP STAGE statement.
 
         Args:
             expr: :class:`SnowflakeDropStageExpression`.
 
         Returns:
-            The formatted DROP STAGE SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
         parts = ["DROP STAGE"]
         if expr.if_exists:
             parts.append("IF EXISTS")
         parts.append(self.format_identifier(expr.name))
-        return " ".join(parts)
+        return " ".join(parts), ()
 
-    def format_list_stage(self, stage: str) -> str:
+    def format_list_stage(self, stage: str) -> Tuple[str, tuple]:
         """Format LIST @stage statement.
 
         Args:
             stage: Stage name (without ``@`` prefix).
 
         Returns:
-            The formatted LIST statement string.
+            Tuple of (SQL string, empty params tuple).
 
         """
-        return f"LIST @{stage}"
+        return f"LIST @{stage}", ()
 
-    def format_remove_stage(self, stage: str, path: str) -> str:
+    def format_remove_stage(self, stage: str, path: str) -> Tuple[str, tuple]:
         """Format REMOVE @stage/path statement.
 
         Args:
@@ -233,17 +233,19 @@ class SnowflakeStageMixin:
             path: Path of the file to remove inside the stage.
 
         Returns:
-            The formatted REMOVE statement string.
+            Tuple of (SQL string, empty params tuple).
 
         """
-        return f"REMOVE @{stage}/{path}"
+        return f"REMOVE @{stage}/{path}", ()
 
-    def format_encryption(self, encryption: Any) -> str:
+    def format_encryption(self, encryption: Any) -> Optional[str]:
         """Render an ENCRYPTION clause from a string fragment or dict.
 
         A dict is rendered as ``ENCRYPTION = (KEY = 'value' ...)`` with string
         values quoted (e.g. ``TYPE = 'SSE_S3'``).
         """
+        if encryption is None:
+            return None
         if isinstance(encryption, dict):
             items = []
             for key, value in encryption.items():

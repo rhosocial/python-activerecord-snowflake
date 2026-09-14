@@ -84,5 +84,5 @@ class SnowflakeSampleExpression(BaseExpression):
 
         """
         if self.form is SnowflakeSampleForm.TABLESAMPLE:
-            return self.dialect.format_tablesample_clause(self), ()
-        return self.dialect.format_sample_clause(self), ()
+            return self.dialect.format_tablesample_clause(self)
+        return self.dialect.format_sample_clause(self)

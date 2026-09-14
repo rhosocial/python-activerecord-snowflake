@@ -15,7 +15,7 @@ Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/sql/create-stage
 - https://docs.snowflake.com/en/sql-reference/sql/copy-into-table
 """
-from typing import Any, Optional, Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Any, Optional, Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.stage import (
@@ -36,47 +36,47 @@ class SnowflakeStageSupport(Protocol):
 
     def format_copy_into_table(
         self, table: str, stage: str, file_format: Optional[str] = None
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format COPY INTO table FROM stage statement."""
         ...
 
     def format_copy_into_statement(
         self, expr: "SnowflakeCopyIntoExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format a full COPY INTO statement (load or unload)."""
         ...
 
     def format_create_stage_statement(
         self, expr: "SnowflakeCreateStageExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE STAGE statement."""
         ...
 
     def format_alter_stage_statement(
         self, expr: "SnowflakeAlterStageExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format ALTER STAGE ... SET statement."""
         ...
 
     def format_drop_stage_statement(
         self, expr: "SnowflakeDropStageExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format DROP STAGE statement."""
         ...
 
-    def format_list_stage(self, stage: str) -> str:
+    def format_list_stage(self, stage: str) -> Tuple[str, tuple]:
         """Format LIST @stage statement."""
         ...
 
-    def format_remove_stage(self, stage: str, path: str) -> str:
+    def format_remove_stage(self, stage: str, path: str) -> Tuple[str, tuple]:
         """Format REMOVE @stage/path statement."""
         ...
 
-    def format_copy_into_load(self, expr: Any) -> str:
+    def format_copy_into_load(self, expr: Any) -> Tuple[str, tuple]:
         """Format COPY INTO <table> FROM <stage> (load)."""
         ...
 
-    def format_copy_into_unload(self, expr: Any) -> str:
+    def format_copy_into_unload(self, expr: Any) -> Tuple[str, tuple]:
         """Format COPY INTO <stage> FROM <table> (unload)."""
         ...
 
@@ -84,6 +84,6 @@ class SnowflakeStageSupport(Protocol):
         """Format FILE_FORMAT clause."""
         ...
 
-    def format_encryption(self, encryption: Any) -> str:
+    def format_encryption(self, encryption: Any) -> Optional[str]:
         """Format ENCRYPTION option."""
         ...

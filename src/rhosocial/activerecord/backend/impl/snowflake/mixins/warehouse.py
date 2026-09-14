@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/warehouse.py
 """SnowflakeWarehouseMixin — virtual warehouse DDL support."""
 
-from typing import Any, List, TYPE_CHECKING
+from typing import Any, List, Tuple, TYPE_CHECKING
 
 from ..expression.ddl.warehouse import SnowflakeAlterWarehouseMode
 
@@ -25,14 +25,14 @@ class SnowflakeWarehouseMixin:
 
     def format_create_warehouse_statement(
         self, expr: "SnowflakeCreateWarehouseExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE WAREHOUSE statement.
 
         Args:
             expr: :class:`SnowflakeCreateWarehouseExpression`.
 
         Returns:
-            The formatted CREATE WAREHOUSE SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
         parts = ["CREATE"]
@@ -46,11 +46,11 @@ class SnowflakeWarehouseMixin:
         if options:
             parts.append("WITH")
             parts.extend(options)
-        return " ".join(parts)
+        return " ".join(parts), ()
 
     def format_alter_warehouse_statement(
         self, expr: "SnowflakeAlterWarehouseExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format ALTER WAREHOUSE statement.
 
         Emits one of ``SUSPEND`` / ``RESUME`` / ``SET ...`` / ``RENAME TO ...``
@@ -60,7 +60,7 @@ class SnowflakeWarehouseMixin:
             expr: :class:`SnowflakeAlterWarehouseExpression`.
 
         Returns:
-            The formatted ALTER WAREHOUSE SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         Raises:
             ValueError: RENAME without ``new_name``, or SET with no property.
@@ -70,17 +70,17 @@ class SnowflakeWarehouseMixin:
         parts = ["ALTER WAREHOUSE", self.format_identifier(expr.name)]
         if mode is SnowflakeAlterWarehouseMode.SUSPEND:
             parts.append("SUSPEND")
-            return " ".join(parts)
+            return " ".join(parts), ()
         if mode is SnowflakeAlterWarehouseMode.RESUME:
             parts.append("RESUME")
-            return " ".join(parts)
+            return " ".join(parts), ()
         if mode is SnowflakeAlterWarehouseMode.RENAME:
             if not expr.new_name:
                 raise ValueError(
                     "ALTER WAREHOUSE RENAME requires a new_name"
                 )
             parts.extend(["RENAME TO", self.format_identifier(expr.new_name)])
-            return " ".join(parts)
+            return " ".join(parts), ()
         options = self.format_warehouse_options(
             expr, include_initially_suspended=False
         )
@@ -90,25 +90,25 @@ class SnowflakeWarehouseMixin:
             )
         parts.append("SET")
         parts.extend(options)
-        return " ".join(parts)
+        return " ".join(parts), ()
 
     def format_drop_warehouse_statement(
         self, expr: "SnowflakeDropWarehouseExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format DROP WAREHOUSE statement.
 
         Args:
             expr: :class:`SnowflakeDropWarehouseExpression`.
 
         Returns:
-            The formatted DROP WAREHOUSE SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
         parts = ["DROP WAREHOUSE"]
         if expr.if_exists:
             parts.append("IF EXISTS")
         parts.append(self.format_identifier(expr.name))
-        return " ".join(parts)
+        return " ".join(parts), ()
 
     def format_warehouse_options(
         self,

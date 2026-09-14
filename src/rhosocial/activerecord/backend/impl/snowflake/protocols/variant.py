@@ -12,7 +12,7 @@ Key operations:
 Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/data-types-semistructured
 """
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.variant import (
@@ -31,12 +31,12 @@ class SnowflakeVariantSupport(Protocol):
 
     def format_variant_path_access(
         self, expr: "SnowflakeVariantPathAccessExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format VARIANT path access expression."""
         ...
 
     def format_variant_cast(
         self, expr: "SnowflakeVariantCastExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format VARIANT path access with explicit cast."""
         ...

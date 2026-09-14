@@ -11,7 +11,7 @@ Snowflake ARRAY type supports:
 Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/data-types-semistructured
 """
-from typing import Protocol, runtime_checkable
+from typing import Protocol, Tuple, runtime_checkable
 
 
 @runtime_checkable
@@ -22,10 +22,10 @@ class SnowflakeArraySupport(Protocol):
         """Whether ARRAY type is supported."""
         ...
 
-    def format_array_construct(self, elements: str) -> str:
+    def format_array_construct(self, elements: str) -> Tuple[str, tuple]:
         """Format array construction expression."""
         ...
 
-    def format_array_access(self, array_expr: str, index: str) -> str:
+    def format_array_access(self, array_expr: str, index: str) -> Tuple[str, tuple]:
         """Format array element access expression."""
         ...

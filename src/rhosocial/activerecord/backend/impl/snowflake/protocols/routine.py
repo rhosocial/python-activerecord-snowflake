@@ -8,10 +8,10 @@ SQL, JavaScript, Java, Python and Scala, typically with Snowflake Scripting
 bodies delimited by ``AS $$ ... $$``.
 
 Official Documentation:
-- https://docs.snowflake.com/en/sql-reference/sql/create-procedure
-- https://docs.snowflake.com/en/sql-reference/sql/create-function
+- CREATE PROCEDURE: https://docs.snowflake.com/en/sql-reference/sql/create-procedure
+- CREATE FUNCTION:  https://docs.snowflake.com/en/sql-reference/sql/create-function
 """
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.routine import (
@@ -31,18 +31,18 @@ class SnowflakeRoutineSupport(Protocol):
 
     def format_create_procedure_statement(
         self, expr: "SnowflakeCreateProcedureExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] PROCEDURE statement."""
         ...
 
     def format_create_function_statement(
         self, expr: "SnowflakeCreateFunctionExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] FUNCTION statement."""
         ...
 
     def format_drop_routine_statement(
         self, expr: "SnowflakeDropRoutineExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format DROP PROCEDURE / DROP FUNCTION statement."""
         ...

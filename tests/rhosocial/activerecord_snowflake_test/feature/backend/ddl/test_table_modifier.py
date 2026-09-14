@@ -44,24 +44,24 @@ class TestSnowflakeCreateTableModifiers:
     """CREATE OR REPLACE / TRANSIENT / TEMPORARY header modifier generation."""
 
     def test_modifier_none(self, dialect):
-        assert dialect.format_create_table_modifier() == ""
+        assert dialect.format_create_table_modifier() == ("", ())
 
     def test_modifier_or_replace(self, dialect):
         assert (
             dialect.format_create_table_modifier(or_replace=True)
-            == "OR REPLACE"
+            == ("OR REPLACE", ())
         )
 
     def test_modifier_transient(self, dialect):
         assert (
             dialect.format_create_table_modifier(transient=True)
-            == "TRANSIENT"
+            == ("TRANSIENT", ())
         )
 
     def test_modifier_temporary(self, dialect):
         assert (
             dialect.format_create_table_modifier(temporary=True)
-            == "TEMPORARY"
+            == ("TEMPORARY", ())
         )
 
     def test_modifier_or_replace_transient(self, dialect):
@@ -69,7 +69,7 @@ class TestSnowflakeCreateTableModifiers:
             dialect.format_create_table_modifier(
                 or_replace=True, transient=True
             )
-            == "OR REPLACE TRANSIENT"
+            == ("OR REPLACE TRANSIENT", ())
         )
 
     def test_modifier_transient_temporary_mutually_exclusive(self, dialect):
@@ -79,10 +79,10 @@ class TestSnowflakeCreateTableModifiers:
             )
 
     def test_compose_create_or_replace_transient_table(self, dialect):
-        modifier = dialect.format_create_table_modifier(
+        modifier, _ = dialect.format_create_table_modifier(
             or_replace=True, transient=True
         )
-        options = dialect.format_create_table_options(
+        options, _ = dialect.format_create_table_options(
             data_retention_time_in_days=1
         )
         sql = " ".join(
@@ -96,7 +96,7 @@ class TestSnowflakeCreateTableModifiers:
         )
 
     def test_compose_create_temporary_table(self, dialect):
-        modifier = dialect.format_create_table_modifier(temporary=True)
+        modifier, _ = dialect.format_create_table_modifier(temporary=True)
         sql = " ".join(
             part
             for part in ["CREATE", modifier, "TABLE t (c1 NUMBER)", ""]
@@ -107,19 +107,19 @@ class TestSnowflakeCreateTableModifiers:
     def test_create_table_options_basic(self, dialect):
         assert (
             dialect.format_create_table_options(data_retention_time_in_days=1)
-            == "DATA_RETENTION_TIME_IN_DAYS = 1"
+            == ("DATA_RETENTION_TIME_IN_DAYS = 1", ())
         )
 
     def test_create_table_options_change_tracking(self, dialect):
         assert (
             dialect.format_create_table_options(change_tracking=True)
-            == "CHANGE_TRACKING = TRUE"
+            == ("CHANGE_TRACKING = TRUE", ())
         )
 
     def test_create_table_options_comment(self, dialect):
         assert (
             dialect.format_create_table_options(comment="hi")
-            == "COMMENT = 'hi'"
+            == ("COMMENT = 'hi'", ())
         )
 
     def test_create_table_options_all(self, dialect):
@@ -129,12 +129,12 @@ class TestSnowflakeCreateTableModifiers:
                 change_tracking=False,
                 comment="c",
             )
-            == "DATA_RETENTION_TIME_IN_DAYS = 5 CHANGE_TRACKING = FALSE "
-            "COMMENT = 'c'"
+            == ("DATA_RETENTION_TIME_IN_DAYS = 5 CHANGE_TRACKING = FALSE "
+                "COMMENT = 'c'", ())
         )
 
     def test_create_table_options_empty(self, dialect):
-        assert dialect.format_create_table_options() == ""
+        assert dialect.format_create_table_options() == ("", ())
 
 
 class TestSnowflakeClusterBy:
@@ -143,19 +143,19 @@ class TestSnowflakeClusterBy:
     def test_alter_table_cluster_by(self, dialect):
         assert (
             dialect.format_alter_table_cluster_by("t", ["c1"])
-            == 'ALTER TABLE "t" CLUSTER BY ("c1")'
+            == ('ALTER TABLE "t" CLUSTER BY ("c1")', ())
         )
 
     def test_alter_table_cluster_by_multiple(self, dialect):
         assert (
             dialect.format_alter_table_cluster_by("t", ["c1", "c2"])
-            == 'ALTER TABLE "t" CLUSTER BY ("c1", "c2")'
+            == ('ALTER TABLE "t" CLUSTER BY ("c1", "c2")', ())
         )
 
     def test_drop_clustering_key(self, dialect):
         assert (
             dialect.format_drop_clustering_key("t")
-            == 'ALTER TABLE "t" DROP CLUSTERING KEY'
+            == ('ALTER TABLE "t" DROP CLUSTERING KEY', ())
         )
 
 
@@ -165,18 +165,18 @@ class TestSnowflakeSearchOptimization:
     def test_add_search_optimization_on_equality(self, dialect):
         assert (
             dialect.format_add_search_optimization("t", on=["c1"])
-            == 'ALTER TABLE "t" ADD SEARCH OPTIMIZATION ON EQUALITY("c1")'
+            == ('ALTER TABLE "t" ADD SEARCH OPTIMIZATION ON EQUALITY("c1")', ())
         )
 
     def test_add_search_optimization_all_columns(self, dialect):
         assert (
             dialect.format_add_search_optimization("t")
-            == 'ALTER TABLE "t" ADD SEARCH OPTIMIZATION'
+            == ('ALTER TABLE "t" ADD SEARCH OPTIMIZATION', ())
         )
 
     def test_add_search_optimization_multiple_columns(self, dialect):
         assert (
             dialect.format_add_search_optimization("t", on=["c1", "c2"])
-            == 'ALTER TABLE "t" ADD SEARCH OPTIMIZATION '
-            'ON EQUALITY("c1", "c2")'
+            == ('ALTER TABLE "t" ADD SEARCH OPTIMIZATION '
+                'ON EQUALITY("c1", "c2")', ())
         )

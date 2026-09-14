@@ -11,7 +11,7 @@ These formatters are independently callable; the generic core
 ``TableMixin`` CREATE TABLE renderer is not modified.
 """
 
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Tuple
 
 
 class SnowflakeTableModifierMixin:
@@ -39,7 +39,7 @@ class SnowflakeTableModifierMixin:
         or_replace: bool = False,
         transient: bool = False,
         temporary: bool = False,
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE TABLE header modifier tokens.
 
         Returns a space-joined token string (e.g. ``"OR REPLACE TRANSIENT"``)
@@ -51,7 +51,7 @@ class SnowflakeTableModifierMixin:
             temporary: Emit ``TEMPORARY``.
 
         Returns:
-            The modifier token string, empty when none requested.
+            Tuple of (modifier token string, empty params tuple).
 
         Raises:
             ValueError: when both ``transient`` and ``temporary`` are set.
@@ -65,7 +65,7 @@ class SnowflakeTableModifierMixin:
             tokens.append("TRANSIENT")
         if temporary:
             tokens.append("TEMPORARY")
-        return " ".join(tokens)
+        return " ".join(tokens), ()
 
     def format_create_table_options(
         self,
@@ -73,7 +73,7 @@ class SnowflakeTableModifierMixin:
         data_retention_time_in_days: Optional[int] = None,
         change_tracking: Optional[bool] = None,
         comment: Optional[str] = None,
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format trailing CREATE TABLE options.
 
         Returns a space-joined token string suitable for appending after the
@@ -85,7 +85,7 @@ class SnowflakeTableModifierMixin:
             comment: ``COMMENT`` string literal.
 
         Returns:
-            The options token string, empty when none requested.
+            Tuple of (options token string, empty params tuple).
         """
         options = []
         if data_retention_time_in_days is not None:
@@ -100,30 +100,30 @@ class SnowflakeTableModifierMixin:
             options.append(
                 f"COMMENT = '{self._escape_sql_string(comment)}'"
             )
-        return " ".join(options)
+        return " ".join(options), ()
 
     def format_alter_table_cluster_by(
         self, table: str, columns: Iterable[str]
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format ALTER TABLE ... CLUSTER BY statement."""
         cols = ", ".join(self.format_identifier(c) for c in columns)
         return (
             f"ALTER TABLE {self.format_identifier(table)} CLUSTER BY ({cols})"
-        )
+        ), ()
 
-    def format_drop_clustering_key(self, table: str) -> str:
+    def format_drop_clustering_key(self, table: str) -> Tuple[str, tuple]:
         """Format ALTER TABLE ... DROP CLUSTERING KEY statement."""
         return (
             f"ALTER TABLE {self.format_identifier(table)} "
             "DROP CLUSTERING KEY"
-        )
+        ), ()
 
     def format_add_search_optimization(
         self,
         table: str,
         on: Optional[Iterable[str]] = None,
         method: str = "EQUALITY",
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format ALTER TABLE ... ADD SEARCH OPTIMIZATION statement.
 
         Args:
@@ -132,7 +132,7 @@ class SnowflakeTableModifierMixin:
             method: Search optimization method (default ``EQUALITY``).
 
         Returns:
-            The formatted ALTER TABLE SQL string.
+            Tuple of (SQL string, empty params tuple).
         """
         parts = [
             f"ALTER TABLE {self.format_identifier(table)} ADD SEARCH OPTIMIZATION"
@@ -141,4 +141,4 @@ class SnowflakeTableModifierMixin:
         if columns:
             cols = ", ".join(self.format_identifier(c) for c in columns)
             parts.append(f"ON {method}({cols})")
-        return " ".join(parts)
+        return " ".join(parts), ()

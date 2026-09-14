@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/pivot.py
 """SnowflakePivotMixin — PIVOT / UNPIVOT clause support."""
 
-from typing import Any, TYPE_CHECKING
+from typing import Any, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.pivot import (
@@ -23,14 +23,14 @@ class SnowflakePivotMixin:
 
     def format_pivot_clause(
         self, expr: "SnowflakePivotExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format a PIVOT clause.
 
         Args:
             expr: :class:`SnowflakePivotExpression`.
 
         Returns:
-            The formatted PIVOT clause SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
         value_sql = ", ".join(
@@ -44,18 +44,18 @@ class SnowflakePivotMixin:
         )
         if expr.alias:
             sql += f" {self.format_identifier(expr.alias)}"
-        return sql
+        return sql, ()
 
     def format_unpivot_clause(
         self, expr: "SnowflakeUnpivotExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format an UNPIVOT clause.
 
         Args:
             expr: :class:`SnowflakeUnpivotExpression`.
 
         Returns:
-            The formatted UNPIVOT clause SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
         nulls = "INCLUDE NULLS" if expr.include_nulls else "EXCLUDE NULLS"
@@ -70,10 +70,8 @@ class SnowflakePivotMixin:
         )
         if expr.alias:
             sql += f" {self.format_identifier(expr.alias)}"
-        return sql
+        return sql, ()
 
     def format_pivot_value(self, value: Any) -> str:
         """Render a single PIVOT ``IN`` value as a SQL literal."""
-        if isinstance(value, str):
-            return f"'{self._escape_sql_string(value)}'"
-        return str(value)
+        return self.inline_sql_literal(value)

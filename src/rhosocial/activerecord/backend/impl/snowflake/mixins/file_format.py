@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/file_format.py
 """SnowflakeFileFormatMixin — file format DDL support."""
 
-from typing import Any, Dict, List, TYPE_CHECKING
+from typing import Any, Dict, List, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.file_format import (
@@ -20,14 +20,14 @@ class SnowflakeFileFormatMixin:
 
     def format_create_file_format_statement(
         self, expr: "SnowflakeCreateFileFormatExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] FILE FORMAT statement.
 
         Args:
             expr: :class:`SnowflakeCreateFileFormatExpression`.
 
         Returns:
-            The formatted CREATE FILE FORMAT SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
         parts = ["CREATE"]
@@ -45,18 +45,18 @@ class SnowflakeFileFormatMixin:
             parts.append(
                 f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
             )
-        return " ".join(parts)
+        return " ".join(parts), ()
 
     def format_alter_file_format_statement(
         self, expr: "SnowflakeAlterFileFormatExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format ALTER FILE FORMAT SET statement.
 
         Args:
             expr: :class:`SnowflakeAlterFileFormatExpression`.
 
         Returns:
-            The formatted ALTER FILE FORMAT SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         Raises:
             ValueError: when no ``SET`` property is specified.
@@ -74,25 +74,25 @@ class SnowflakeFileFormatMixin:
         parts.append(self.format_identifier(expr.name))
         parts.append("SET")
         parts.extend(options)
-        return " ".join(parts)
+        return " ".join(parts), ()
 
     def format_drop_file_format_statement(
         self, expr: "SnowflakeDropFileFormatExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format DROP FILE FORMAT statement.
 
         Args:
             expr: :class:`SnowflakeDropFileFormatExpression`.
 
         Returns:
-            The formatted DROP FILE FORMAT SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
         parts = ["DROP FILE FORMAT"]
         if expr.if_exists:
             parts.append("IF EXISTS")
         parts.append(self.format_identifier(expr.name))
-        return " ".join(parts)
+        return " ".join(parts), ()
 
     def _render_file_format_options(self, options: Dict[str, Any]) -> List[str]:
         """Render pass-through format options as ``KEY = value`` tokens."""

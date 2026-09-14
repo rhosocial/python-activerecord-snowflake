@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/show.py
 """SnowflakeShowMixin — SHOW statement support."""
 
-from typing import TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.show import SnowflakeShowExpression
@@ -16,7 +16,7 @@ class SnowflakeShowMixin:
 
     def format_show_statement(
         self, expr: "SnowflakeShowExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format a SHOW statement.
 
         Emits ``SHOW {type} [LIKE 'pattern'] [IN {ACCOUNT|DATABASE|SCHEMA}
@@ -26,7 +26,7 @@ class SnowflakeShowMixin:
             expr: :class:`SnowflakeShowExpression`.
 
         Returns:
-            The formatted SHOW statement SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
         parts = ["SHOW", expr.object_type.value]
@@ -39,4 +39,4 @@ class SnowflakeShowMixin:
             parts.append(clause)
         if expr.limit is not None:
             parts.append(f"LIMIT {int(expr.limit)}")
-        return " ".join(parts)
+        return " ".join(parts), ()

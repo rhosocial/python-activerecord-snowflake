@@ -13,7 +13,7 @@ Clones are zero-copy operations that share storage with the source.
 Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/sql/create-clone
 """
-from typing import Protocol, runtime_checkable
+from typing import Protocol, Tuple, runtime_checkable
 
 
 @runtime_checkable
@@ -24,14 +24,14 @@ class SnowflakeCloneSupport(Protocol):
         """Whether CLONE operations are supported."""
         ...
 
-    def format_clone_table(self, target: str, source: str) -> str:
+    def format_clone_table(self, target: str, source: str) -> Tuple[str, tuple]:
         """Format CREATE TABLE ... CLONE statement."""
         ...
 
-    def format_clone_schema(self, target: str, source: str) -> str:
+    def format_clone_schema(self, target: str, source: str) -> Tuple[str, tuple]:
         """Format CREATE SCHEMA ... CLONE statement."""
         ...
 
-    def format_clone_database(self, target: str, source: str) -> str:
+    def format_clone_database(self, target: str, source: str) -> Tuple[str, tuple]:
         """Format CREATE DATABASE ... CLONE statement."""
         ...

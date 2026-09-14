@@ -14,5 +14,5 @@ from typing import Protocol
 class SnowflakeSampleSupport(Protocol):
     """Auto-generated capability protocol (P7)."""
 
-    def format_sampling_clause(self, expr: 'SnowflakeSampleExpression', keyword: str) -> str:
+    def format_sampling_clause(self, expr: 'SnowflakeSampleExpression', keyword: str) -> Tuple[str, tuple]:
         ...  # pragma: no cover

@@ -201,16 +201,19 @@ class TestSnowflakeSpecificFormatting:
     """Test Snowflake-specific SQL formatting."""
 
     def test_format_time_travel_at_timestamp(self, dialect):
-        result = dialect.format_time_travel_at_timestamp("2024-01-01 00:00:00")
+        result, params = dialect.format_time_travel_at_timestamp("2024-01-01 00:00:00")
         assert result == "AT(TIMESTAMP => '2024-01-01 00:00:00')"
+        assert params == ()
 
     def test_format_time_travel_at_offset(self, dialect):
-        result = dialect.format_time_travel_at_offset(3600)
+        result, params = dialect.format_time_travel_at_offset(3600)
         assert result == "AT(OFFSET => 3600)"
+        assert params == ()
 
     def test_format_time_travel_before_timestamp(self, dialect):
-        result = dialect.format_time_travel_before_timestamp("2024-01-01 00:00:00")
+        result, params = dialect.format_time_travel_before_timestamp("2024-01-01 00:00:00")
         assert result == "BEFORE(TIMESTAMP => '2024-01-01 00:00:00')"
+        assert params == ()
 
     def test_format_variant_path_access(self, dialect):
         from rhosocial.activerecord.backend.impl.snowflake.expression.variant import (
@@ -229,24 +232,29 @@ class TestSnowflakeSpecificFormatting:
         assert result == "data:count::NUMBER"
 
     def test_format_array_construct(self, dialect):
-        result = dialect.format_array_construct("1, 2, 3")
+        result, params = dialect.format_array_construct("1, 2, 3")
         assert result == "ARRAY_CONSTRUCT(1, 2, 3)"
+        assert params == ()
 
     def test_format_array_access(self, dialect):
-        result = dialect.format_array_access("my_array", "0")
+        result, params = dialect.format_array_access("my_array", "0")
         assert result == "my_array[0]"
+        assert params == ()
 
     def test_format_clone_table(self, dialect):
-        result = dialect.format_clone_table("new_table", "source_table")
+        result, params = dialect.format_clone_table("new_table", "source_table")
         assert result == "CREATE TABLE new_table CLONE source_table"
+        assert params == ()
 
     def test_format_copy_into_table(self, dialect):
-        result = dialect.format_copy_into_table("my_table", "my_stage")
+        result, params = dialect.format_copy_into_table("my_table", "my_stage")
         assert result == "COPY INTO my_table FROM @my_stage"
+        assert params == ()
 
     def test_format_copy_into_table_with_format(self, dialect):
-        result = dialect.format_copy_into_table("my_table", "my_stage", "TYPE = 'CSV'")
+        result, params = dialect.format_copy_into_table("my_table", "my_stage", "TYPE = 'CSV'")
         assert result == "COPY INTO my_table FROM @my_stage FILE_FORMAT = (TYPE = 'CSV')"
+        assert params == ()
 
 
 class TestSnowflakeDataTypeFormatting:

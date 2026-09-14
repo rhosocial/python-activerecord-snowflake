@@ -10,7 +10,7 @@ CREATE / ALTER / DROP FILE FORMAT statements.
 Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/sql/create-file-format
 """
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.file_format import (
@@ -30,18 +30,18 @@ class SnowflakeFileFormatSupport(Protocol):
 
     def format_create_file_format_statement(
         self, expr: "SnowflakeCreateFileFormatExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] FILE FORMAT statement."""
         ...
 
     def format_alter_file_format_statement(
         self, expr: "SnowflakeAlterFileFormatExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format ALTER FILE FORMAT ... SET statement."""
         ...
 
     def format_drop_file_format_statement(
         self, expr: "SnowflakeDropFileFormatExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format DROP FILE FORMAT statement."""
         ...

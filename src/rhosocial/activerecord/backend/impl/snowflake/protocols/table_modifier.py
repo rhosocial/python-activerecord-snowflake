@@ -12,7 +12,7 @@ Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/sql/create-table
 - https://docs.snowflake.com/en/sql-reference/sql/alter-table
 """
-from typing import Iterable, Optional, Protocol, runtime_checkable
+from typing import Iterable, Optional, Protocol, Tuple, runtime_checkable
 
 
 @runtime_checkable
@@ -41,7 +41,7 @@ class SnowflakeTableModifierSupport(Protocol):
         or_replace: bool = False,
         transient: bool = False,
         temporary: bool = False,
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE TABLE header modifier tokens."""
         ...
 
@@ -51,17 +51,17 @@ class SnowflakeTableModifierSupport(Protocol):
         data_retention_time_in_days: Optional[int] = None,
         change_tracking: Optional[bool] = None,
         comment: Optional[str] = None,
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format trailing CREATE TABLE options."""
         ...
 
     def format_alter_table_cluster_by(
         self, table: str, columns: Iterable[str]
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format ALTER TABLE ... CLUSTER BY statement."""
         ...
 
-    def format_drop_clustering_key(self, table: str) -> str:
+    def format_drop_clustering_key(self, table: str) -> Tuple[str, tuple]:
         """Format ALTER TABLE ... DROP CLUSTERING KEY statement."""
         ...
 
@@ -70,6 +70,6 @@ class SnowflakeTableModifierSupport(Protocol):
         table: str,
         on: Optional[Iterable[str]] = None,
         method: str = "EQUALITY",
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format ALTER TABLE ... ADD SEARCH OPTIMIZATION statement."""
         ...

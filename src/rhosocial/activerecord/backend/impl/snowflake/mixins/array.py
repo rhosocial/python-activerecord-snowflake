@@ -1,5 +1,6 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/array.py
 """SnowflakeArrayMixin — ARRAY type formatting."""
+from typing import Tuple
 
 
 class SnowflakeArrayMixin:
@@ -9,10 +10,10 @@ class SnowflakeArrayMixin:
         """Snowflake supports ARRAY type."""
         return True
 
-    def format_array_construct(self, elements: str) -> str:
+    def format_array_construct(self, elements: str) -> Tuple[str, tuple]:
         """Format array construction expression."""
-        return f'ARRAY_CONSTRUCT({elements})'
+        return f'ARRAY_CONSTRUCT({elements})', ()
 
-    def format_array_access(self, array_expr: str, index: str) -> str:
+    def format_array_access(self, array_expr: str, index: str) -> Tuple[str, tuple]:
         """Format array element access expression."""
-        return f'{array_expr}[{index}]'
+        return f'{array_expr}[{index}]', ()
