@@ -23,7 +23,7 @@ from .sample import SnowflakeSampleMixin
 from .show import SnowflakeShowMixin
 from .stage import SnowflakeStageMixin
 from .stream import SnowflakeStreamMixin
-from .table_modifier import SnowflakeTableModifierMixin
+from .ddl_table_modifier import SnowflakeTableModifierMixin
 from .task import SnowflakeTaskMixin
 from .time_travel import SnowflakeTimeTravelMixin
 from .transaction import (
