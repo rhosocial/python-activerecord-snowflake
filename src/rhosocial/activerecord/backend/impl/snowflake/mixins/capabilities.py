@@ -69,6 +69,10 @@ class SnowflakeCapabilityMixin:
         """Snowflake supports CREATE VIEW IF NOT EXISTS."""
         return True
 
+    def supports_if_exists_view(self) -> bool:
+        """Snowflake supports DROP VIEW IF EXISTS."""
+        return True
+
     def supports_introspection(self) -> bool:
         """Snowflake supports introspection."""
         return True

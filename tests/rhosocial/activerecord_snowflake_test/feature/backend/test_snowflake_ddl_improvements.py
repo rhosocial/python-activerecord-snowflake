@@ -22,20 +22,20 @@ class TestSnowflakeViewCapabilityGating:
         dialect = SnowflakeDialect()
         assert dialect.supports_create_or_replace_view() is True
 
-    def test_create_view_if_not_exists_not_supported(self):
-        """Snowflake does not support CREATE VIEW IF NOT EXISTS."""
+    def test_create_view_if_not_exists_supported(self):
+        """Snowflake supports CREATE VIEW IF NOT EXISTS."""
         dialect = SnowflakeDialect()
-        assert dialect.supports_if_not_exists_view() is False
+        assert dialect.supports_if_not_exists_view() is True
 
     def test_drop_view_if_exists_supported(self):
         """Snowflake supports DROP VIEW IF EXISTS."""
         dialect = SnowflakeDialect()
         assert dialect.supports_if_exists_view() is True
 
-    def test_materialized_view_not_supported(self):
-        """Snowflake does not support materialized views."""
+    def test_materialized_view_supported(self):
+        """Snowflake supports native materialized views."""
         dialect = SnowflakeDialect()
-        assert dialect.supports_materialized_view() is False
+        assert dialect.supports_materialized_view() is True
 
 
 class TestSnowflakeSchemaCapabilityGating:

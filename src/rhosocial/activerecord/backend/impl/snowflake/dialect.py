@@ -134,6 +134,7 @@ from .mixins import (
     SnowflakeVariantMixin,
     SnowflakeAlterColumnModifierMixin,
     SnowflakeWarehouseMixin,
+    SnowflakeSchemaMixin,
     # New mixins from dialect.py split
     SnowflakeDateTimeMixin,
     SnowflakeCollationMixin,
@@ -193,6 +194,7 @@ class SnowflakeDialect(
     SnowflakeMaterializedViewMixin,  # Before ViewMixin to override materialized view rendering
     ViewMixin,
     TruncateMixin,
+    SnowflakeSchemaMixin,  # Before SchemaMixin to enable Snowflake schema DDL
     SchemaMixin,
     IndexMixin,
     SnowflakeTableModifierMixin,  # Before TableMixin to override create-table capability flags

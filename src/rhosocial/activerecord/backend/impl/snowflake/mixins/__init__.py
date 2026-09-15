@@ -46,6 +46,8 @@ from .ilike import SnowflakeILIKEMixin
 from .generated_column import SnowflakeGeneratedColumnMixin
 from .ordered_set_aggregation import SnowflakeOrderedSetAggregationMixin
 from .truncate import SnowflakeTruncateMixin
+from .schema import SnowflakeSchemaMixin
+from .ddl_database import SnowflakeDatabaseMixin
 
 __all__ = [
     "SnowflakeArrayMixin",
@@ -83,4 +85,6 @@ __all__ = [
     "SnowflakeGeneratedColumnMixin",
     "SnowflakeOrderedSetAggregationMixin",
     "SnowflakeTruncateMixin",
+    "SnowflakeSchemaMixin",
+    "SnowflakeDatabaseMixin",
 ]
