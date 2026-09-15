@@ -196,6 +196,7 @@ class SnowflakeDialect(
     TruncateMixin,
     SchemaMixin,
     IndexMixin,
+    SnowflakeTableModifierMixin,  # Before TableMixin to override create-table capability flags
     TableMixin,
     ConstraintMixin,
     ReturningMixin,
@@ -212,7 +213,6 @@ class SnowflakeDialect(
     SnowflakeFileFormatMixin,
     SnowflakeRoutineMixin,
     SnowflakeUndropMixin,
-    SnowflakeTableModifierMixin,
     SnowflakePartitionMixin,
     SnowflakeSampleMixin,
     SnowflakePivotMixin,

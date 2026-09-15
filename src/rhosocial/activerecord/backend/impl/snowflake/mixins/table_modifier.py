@@ -30,3 +30,15 @@ class SnowflakeTableModifierMixin:
     def supports_search_optimization(self) -> bool:
         """Snowflake supports SEARCH OPTIMIZATION."""
         return True
+
+    def supports_create_table_like(self) -> bool:
+        """Snowflake supports CREATE TABLE ... LIKE (empty copy)."""
+        return True
+
+    def supports_create_table_clone(self) -> bool:
+        """Snowflake supports CREATE TABLE ... CLONE (zero-copy copy)."""
+        return True
+
+    def supports_create_table_using_template(self) -> bool:
+        """Snowflake supports CREATE TABLE ... USING TEMPLATE."""
+        return True
