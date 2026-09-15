@@ -101,6 +101,14 @@ class SnowflakeCapabilityMixin:
         """Snowflake supports ALTER TABLE MODIFY COLUMN."""
         return True
 
+    def supports_if_exists_table(self) -> bool:
+        """Snowflake supports DROP TABLE IF EXISTS."""
+        return True
+
+    def supports_drop_table_cascade(self) -> bool:
+        """Snowflake does not support standard CASCADE for DROP TABLE."""
+        return False
+
     def _supports_alter_column_type(self) -> bool:
         """Snowflake changes a column type in place via MODIFY COLUMN."""
         return True
