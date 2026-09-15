@@ -141,17 +141,19 @@ class TestSnowflakeDialectCapabilities:
 
     def test_returning_clause_version_dependent(self, dialect):
         """RETURNING support depends on Snowflake server version."""
-        assert dialect.supports_returning_clause() is True
         assert dialect.supports_returning_insert() is True
         assert dialect.supports_returning_update() is True
         assert dialect.supports_returning_delete() is True
 
         old_dialect = SnowflakeDialect(version=(7, 31, 0))
-        assert old_dialect.supports_returning_clause() is False
         assert old_dialect.supports_returning_insert() is False
+        assert old_dialect.supports_returning_update() is False
+        assert old_dialect.supports_returning_delete() is False
 
         boundary_dialect = SnowflakeDialect(version=(7, 32, 0))
-        assert boundary_dialect.supports_returning_clause() is True
+        assert boundary_dialect.supports_returning_insert() is True
+        assert boundary_dialect.supports_returning_update() is True
+        assert boundary_dialect.supports_returning_delete() is True
 
     def test_supports_offset_without_limit(self, dialect):
         assert dialect.supports_offset_without_limit() is True

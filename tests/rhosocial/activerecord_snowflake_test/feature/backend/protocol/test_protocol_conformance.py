@@ -171,6 +171,8 @@ class TestSnowflakeDialectProtocolConformance:
 # decision (move to SNOWFLAKE_PROTOCOLS or revert).
 SNOWFLAKE_NOT_IMPLEMENTED = [
     # --- Intentional non-support ---
+    # Snowflake dialect does not compose the generic DatabaseMixin.
+    dialect_protocols.DatabaseSupport,
     # Snowflake has no SQL/XML support.
     dialect_protocols.SQLXMLSupport,
     dialect_protocols.SQLXMLParsingSupport,
