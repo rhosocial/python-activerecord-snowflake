@@ -13,6 +13,8 @@ from rhosocial.activerecord.backend.expression import (
     CreateTableCloneExpression,
     CreateTableCloneMode,
     CreateTableFromTemplateExpression,
+    CreateTableOptions,
+    CreateTableExpression,
     QueryExpression,
     Literal,
 )
@@ -55,3 +57,33 @@ class TestSnowflakeCreateTableFamily:
         sql, params = CreateTableFromTemplateExpression(dialect, "t", template).to_sql()
         assert "USING TEMPLATE" in sql
         assert params == (1,)
+
+    def test_create_or_replace(self, dialect):
+        expr = CreateTableExpression(
+            dialect,
+            table="t",
+            columns=[],
+            table_options=CreateTableOptions(dialect, or_replace=True),
+        )
+        sql, _ = expr.to_sql()
+        assert sql.startswith("CREATE OR REPLACE TABLE")
+
+    def test_create_transient(self, dialect):
+        expr = CreateTableExpression(
+            dialect,
+            table="t",
+            columns=[],
+            table_options=CreateTableOptions(dialect, transient=True),
+        )
+        sql, _ = expr.to_sql()
+        assert sql.startswith("CREATE TRANSIENT TABLE")
+
+    def test_create_or_replace_transient(self, dialect):
+        expr = CreateTableExpression(
+            dialect,
+            table="t",
+            columns=[],
+            table_options=CreateTableOptions(dialect, or_replace=True, transient=True),
+        )
+        sql, _ = expr.to_sql()
+        assert sql.startswith("CREATE OR REPLACE TRANSIENT TABLE")
