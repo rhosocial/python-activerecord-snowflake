@@ -76,7 +76,6 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     OrderedSetAggregationMixin,
     PredicateMixin,
     QualifyClauseMixin,
-    ReturningMixin,
     SchemaMixin,
     SequenceMixin,
     SetOperationMixin,
@@ -199,7 +198,6 @@ class SnowflakeDialect(
     SnowflakeTableModifierMixin,  # Before TableMixin to override create-table capability flags
     TableMixin,
     ConstraintMixin,
-    ReturningMixin,
     # Snowflake-specific mixins (before generic IntrospectionMixin to override methods)
     SnowflakeTransactionMixin,
     SnowflakeTimeTravelMixin,
