@@ -109,7 +109,7 @@ class SnowflakeCapabilityMixin:
         """Snowflake does not support standard CASCADE for DROP TABLE."""
         return False
 
-    def _supports_alter_column_type(self) -> bool:
+    def supports_alter_column_type(self) -> bool:
         """Snowflake changes a column type in place via MODIFY COLUMN."""
         return True
 
@@ -141,11 +141,11 @@ class SnowflakeCapabilityMixin:
         spec = " ".join(parts)
         return f"MODIFY COLUMN {self.format_identifier(col.name)} {spec}", ()
 
-    def _supports_alter_column_properties(self) -> bool:
+    def supports_alter_column_properties(self) -> bool:
         """Snowflake has no independent ALTER COLUMN SET DEFAULT clause."""
         return False
 
-    def _supports_alter_table_index_actions(self) -> bool:
+    def supports_alter_table_index_actions(self) -> bool:
         """Snowflake has no traditional indexes."""
         return False
 
