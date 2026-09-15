@@ -61,6 +61,14 @@ class SnowflakeCapabilityMixin:
         """Snowflake supports views."""
         return True
 
+    def supports_create_or_replace_view(self) -> bool:
+        """Snowflake supports CREATE OR REPLACE VIEW."""
+        return True
+
+    def supports_if_not_exists_view(self) -> bool:
+        """Snowflake supports CREATE VIEW IF NOT EXISTS."""
+        return True
+
     def supports_introspection(self) -> bool:
         """Snowflake supports introspection."""
         return True
