@@ -98,6 +98,7 @@ SNOWFLAKE_PROTOCOLS = [
     ConstraintSupport,
     # Generic protocols Snowflake also satisfies (previously omitted from this list).
     AlterTableModifierSupport,
+    LockingSupport,
     PartitionSupport,
     TableSupport,
     # Snowflake-specific protocols
@@ -184,8 +185,6 @@ SNOWFLAKE_NOT_IMPLEMENTED = [
     dialect_protocols.GraphTableSupport,
     # Snowflake has no Cypher/property-graph query support.
     dialect_protocols.GraphSupport,
-    # Snowflake does not support SELECT ... FOR UPDATE row locking.
-    dialect_protocols.LockingSupport,
     # Snowflake does not support triggers.
     dialect_protocols.TriggerSupport,
     # Snowflake exposes routine DDL through SnowflakeRoutineSupport (SQL,
