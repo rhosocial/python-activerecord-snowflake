@@ -53,7 +53,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     WindowFunctionSupport,
 )
 from rhosocial.activerecord.backend.dialect.mixins import (
-    AdvancedGroupingMixin,
+
     ArrayMixin,
     AutoIncrementMixin,
     CollationMixin,
@@ -65,7 +65,7 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     DQLMixin,
     ExplainMixin,
     ExpressionMixin,
-    FilterClauseMixin,
+
     ILIKEMixin,
     IndexMixin,
     IntrospectionMixin,
@@ -73,9 +73,9 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     JSONMixin,
     LateralJoinMixin,
     MergeMixin,
-    OrderedSetAggregationMixin,
+
     PredicateMixin,
-    QualifyClauseMixin,
+
     SchemaMixin,
     SequenceMixin,
     SetOperationMixin,
@@ -178,16 +178,15 @@ class SnowflakeDialect(
     # Standard SQL mixins
     CollationMixin,
     CTEMixin,
-    FilterClauseMixin,
+
     WindowFunctionMixin,
     JSONMixin,
-    AdvancedGroupingMixin,
-    OrderedSetAggregationMixin,
+
     SnowflakeArrayMixin,  # Before ArrayMixin
     ArrayMixin,
     ExplainMixin,
     MergeMixin,
-    QualifyClauseMixin,
+
     UpsertMixin,
     LateralJoinMixin,
     JoinMixin,
