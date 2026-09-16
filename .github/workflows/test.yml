@@ -33,7 +33,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-          pip install git+https://github.com/rhosocial/python-activerecord.git@feature/parameter-inline#egg=rhosocial-activerecord
+          pip install git+https://github.com/rhosocial/python-activerecord.git@release/v1.0.0.dev30#egg=rhosocial-activerecord
           pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/activerecord-derived-ddl#egg=rhosocial-activerecord-testsuite
 
       - name: Install package
@@ -77,7 +77,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-          pip install git+https://github.com/rhosocial/python-activerecord.git@feature/parameter-inline#egg=rhosocial-activerecord
+          pip install git+https://github.com/rhosocial/python-activerecord.git@release/v1.0.0.dev30#egg=rhosocial-activerecord
           pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/activerecord-derived-ddl#egg=rhosocial-activerecord-testsuite
 
       - name: Install package
@@ -109,7 +109,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-          pip install git+https://github.com/rhosocial/python-activerecord.git@feature/parameter-inline#egg=rhosocial-activerecord
+          pip install git+https://github.com/rhosocial/python-activerecord.git@release/v1.0.0.dev30#egg=rhosocial-activerecord
           pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/activerecord-derived-ddl#egg=rhosocial-activerecord-testsuite
 
       - name: Install package
