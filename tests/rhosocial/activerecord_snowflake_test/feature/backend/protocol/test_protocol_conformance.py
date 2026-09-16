@@ -42,6 +42,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     JSONSupport,
     JoinSupport,
     LateralJoinSupport,
+    LockingSupport,
     MergeSupport,
     OrderedSetAggregationSupport,
     QualifyClauseSupport,
