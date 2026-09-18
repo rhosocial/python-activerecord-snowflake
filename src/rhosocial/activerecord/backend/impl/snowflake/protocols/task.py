@@ -9,11 +9,11 @@ and ``AFTER`` predecessor dependencies. Managed via CREATE / ALTER / EXECUTE /
 DROP TASK statements.
 
 Official Documentation:
-- https://docs.snowflake.com/en/sql-reference/sql/create-task
-- https://docs.snowflake.com/en/sql-reference/sql/alter-task
-- https://docs.snowflake.com/en/sql-reference/sql/execute-task
+- CREATE TASK:   https://docs.snowflake.com/en/sql-reference/sql/create-task
+- ALTER TASK:    https://docs.snowflake.com/en/sql-reference/sql/alter-task
+- EXECUTE TASK:  https://docs.snowflake.com/en/sql-reference/sql/execute-task
 """
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.task import (
@@ -34,24 +34,24 @@ class SnowflakeTaskSupport(Protocol):
 
     def format_create_task_statement(
         self, expr: "SnowflakeCreateTaskExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] TASK statement."""
         ...
 
     def format_alter_task_statement(
         self, expr: "SnowflakeAlterTaskExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format ALTER TASK statement (RESUME / SUSPEND / AFTER / SET)."""
         ...
 
     def format_execute_task_statement(
         self, expr: "SnowflakeExecuteTaskExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format EXECUTE TASK statement."""
         ...
 
     def format_drop_task_statement(
         self, expr: "SnowflakeDropTaskExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format DROP TASK statement."""
         ...

@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/undrop.py
 """SnowflakeUndropMixin — UNDROP support."""
 
-from typing import TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.undrop import SnowflakeUndropExpression
@@ -16,17 +16,17 @@ class SnowflakeUndropMixin:
 
     def format_undrop_statement(
         self, expr: "SnowflakeUndropExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format UNDROP statement.
 
         Args:
             expr: :class:`SnowflakeUndropExpression`.
 
         Returns:
-            The formatted UNDROP SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
         return (
             f"UNDROP {expr.object_type.value} "
             f"{self.format_identifier(expr.name)}"
-        )
+        ), ()

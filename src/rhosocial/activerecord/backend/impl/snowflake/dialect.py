@@ -11,24 +11,33 @@ Snowflake SQL is largely ANSI SQL compliant with extensions for:
 - MERGE with complex conditions
 - Warehouse-based compute management
 """
-from typing import Any, List, Tuple, TYPE_CHECKING
+from typing import Any, Dict, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from rhosocial.activerecord.backend.expression.transaction import (
+        SetTransactionExpression,
+    )
 
 from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
 from rhosocial.activerecord.backend.dialect.protocols import (
     AdvancedGroupingSupport,
     ArraySupport,
+    AutoIncrementSupport,
     CollationSupport,
     ConstraintSupport,
     CTESupport,
     DDLTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
+    GeneratedColumnSupport,
+    ILIKESupport,
     IndexSupport,
     IntrospectionSupport,
     JSONSupport,
     JoinSupport,
     LateralJoinSupport,
     MergeSupport,
+    OrderedSetAggregationSupport,
     PartitionSupport,
     QualifyClauseSupport,
     ReturningSupport,
@@ -37,51 +46,53 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     SetOperationSupport,
     SQLFunctionSupport,
     TransactionControlSupport,
+    TruncateSupport,
     UpsertSupport,
     ViewSupport,
     WildcardSupport,
     WindowFunctionSupport,
 )
 from rhosocial.activerecord.backend.dialect.mixins import (
-    AdvancedGroupingMixin,
+
     ArrayMixin,
+    AutoIncrementMixin,
     CollationMixin,
     ConstraintMixin,
     CTEMixin,
     DDLColumnMixin,
-    DDLTypeMixin,
     DateTimeMixin,
     DMLMixin,
     DQLMixin,
     ExplainMixin,
     ExpressionMixin,
-    FilterClauseMixin,
-    IdentifierMixin,
+
+    ILIKEMixin,
     IndexMixin,
     IntrospectionMixin,
     JoinMixin,
     JSONMixin,
     LateralJoinMixin,
     MergeMixin,
+
     PredicateMixin,
-    QualifyClauseMixin,
-    ReturningMixin,
+
     SchemaMixin,
     SequenceMixin,
     SetOperationMixin,
     TableMixin,
     TransactionControlMixin,
+    TruncateMixin,
     UpsertMixin,
     ViewMixin,
     WindowFunctionMixin,
 )
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from .collation import validate_snowflake_collation_name
+from .reserved_words import SNOWFLAKE_RESERVED_WORDS
 from .protocols import (
     SnowflakeArraySupport,
     SnowflakeCloneSupport,
     SnowflakeDMLSupport,
-    SnowflakeDynamicIdentifierSupport,
     SnowflakeFileFormatSupport,
     SnowflakeMaterializedViewSupport,
     SnowflakePartitionSupport,
@@ -103,7 +114,6 @@ from .mixins import (
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
     SnowflakeDMLMixin,
-    SnowflakeDynamicIdentifierMixin,
     SnowflakeFileFormatMixin,
     SnowflakeIntrospectionMixin,
     SnowflakeMaterializedViewMixin,
@@ -124,22 +134,35 @@ from .mixins import (
     SnowflakeVariantMixin,
     SnowflakeAlterColumnModifierMixin,
     SnowflakeWarehouseMixin,
+    SnowflakeSchemaMixin,
+    # New mixins from dialect.py split
+    SnowflakeDateTimeMixin,
+    SnowflakeCollationMixin,
+    SnowflakeSetOperationMixin,
+    SnowflakeDQLMixin,
+    SnowflakeCapabilityMixin,
+    SnowflakeILIKEMixin,
+    SnowflakeGeneratedColumnMixin,
+    SnowflakeOrderedSetAggregationMixin,
+    SnowflakeTruncateMixin,
 )
-
-if TYPE_CHECKING:
-    from rhosocial.activerecord.backend.expression.collation import CollateExpression
-    from rhosocial.activerecord.backend.expression.statements import (
-        CreateTableExpression, CreateViewExpression, DropViewExpression,
-        ColumnDefinition, TableConstraint, IndexDefinition,
-        ExplainExpression, InsertExpression,
-    )
 
 
 class SnowflakeDialect(
     SQLDialectBase,
+    # New Snowflake-specific mixins (BEFORE generic mixins they override)
+    SnowflakeDateTimeMixin,
+    SnowflakeCollationMixin,
+    SnowflakeSetOperationMixin,
+    SnowflakeDQLMixin,
+    SnowflakeCapabilityMixin,
+    SnowflakeILIKEMixin,
+    SnowflakeGeneratedColumnMixin,
+    SnowflakeOrderedSetAggregationMixin,
+    SnowflakeTruncateMixin,
     # New Mixins (shared by all modern backends)
-    IdentifierMixin,
     PredicateMixin,
+    ILIKEMixin,
     ExpressionMixin,
     DateTimeMixin,
     DQLMixin,
@@ -147,6 +170,7 @@ class SnowflakeDialect(
     DMLMixin,
     SnowflakeAlterColumnModifierMixin,  # Before DDLColumnMixin to override format_*_action
     DDLColumnMixin,
+    AutoIncrementMixin,
     SnowflakeTypeSupportMixin,
     TransactionControlMixin,
     SetOperationMixin,
@@ -154,29 +178,31 @@ class SnowflakeDialect(
     # Standard SQL mixins
     CollationMixin,
     CTEMixin,
-    FilterClauseMixin,
+
     WindowFunctionMixin,
     JSONMixin,
-    AdvancedGroupingMixin,
+
+    SnowflakeArrayMixin,  # Before ArrayMixin
     ArrayMixin,
     ExplainMixin,
     MergeMixin,
-    QualifyClauseMixin,
+
     UpsertMixin,
     LateralJoinMixin,
     JoinMixin,
     SnowflakeMaterializedViewMixin,  # Before ViewMixin to override materialized view rendering
     ViewMixin,
+    TruncateMixin,
+    SnowflakeSchemaMixin,  # Before SchemaMixin to enable Snowflake schema DDL
     SchemaMixin,
     IndexMixin,
+    SnowflakeTableModifierMixin,  # Before TableMixin to override create-table capability flags
     TableMixin,
     ConstraintMixin,
-    ReturningMixin,
     # Snowflake-specific mixins (before generic IntrospectionMixin to override methods)
     SnowflakeTransactionMixin,
     SnowflakeTimeTravelMixin,
     SnowflakeVariantMixin,
-    SnowflakeArrayMixin,
     SnowflakeCloneMixin,
     SnowflakeStageMixin,
     SnowflakeWarehouseMixin,
@@ -186,8 +212,6 @@ class SnowflakeDialect(
     SnowflakeFileFormatMixin,
     SnowflakeRoutineMixin,
     SnowflakeUndropMixin,
-    SnowflakeTableModifierMixin,
-    SnowflakeDynamicIdentifierMixin,
     SnowflakePartitionMixin,
     SnowflakeSampleMixin,
     SnowflakePivotMixin,
@@ -197,18 +221,22 @@ class SnowflakeDialect(
     # Protocol supports (for isinstance checks)
     AdvancedGroupingSupport,
     ArraySupport,
+    AutoIncrementSupport,
     CollationSupport,
     CTESupport,
     ConstraintSupport,
     DDLTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
+    GeneratedColumnSupport,
+    ILIKESupport,
     IndexSupport,
     IntrospectionSupport,
     JSONSupport,
     JoinSupport,
     LateralJoinSupport,
     MergeSupport,
+    OrderedSetAggregationSupport,
     QualifyClauseSupport,
     ReturningSupport,
     SchemaSupport,
@@ -216,6 +244,7 @@ class SnowflakeDialect(
     SetOperationSupport,
     SQLFunctionSupport,
     TransactionControlSupport,
+    TruncateSupport,
     UpsertSupport,
     ViewSupport,
     WildcardSupport,
@@ -236,7 +265,6 @@ class SnowflakeDialect(
     SnowflakeRoutineSupport,
     SnowflakeUndropSupport,
     SnowflakeMaterializedViewSupport,
-    SnowflakeDynamicIdentifierSupport,
     SnowflakeTableModifierSupport,
     SnowflakeSampleSupport,
     SnowflakePivotSupport,
@@ -265,395 +293,126 @@ class SnowflakeDialect(
             version: Snowflake server version as (major, minor, patch) tuple.
         """
         super().__init__(**kwargs)
+        self._reserved_words = SNOWFLAKE_RESERVED_WORDS
         self.version = version
-
-    # ========== Identifier & Parameter Formatting ==========
-
-    def format_identifier(self, identifier: str) -> str:
-        """Format an identifier (table name, column name, etc.) with double quotes.
-
-        Snowflake uses double quotes for identifier quoting, which is the SQL standard.
-
-        Args:
-            identifier: The identifier to format.
-
-        Returns:
-            The quoted identifier string.
-        """
-        return f'"{identifier}"'
 
     def get_parameter_placeholder(self, index: int = 0) -> str:
         """Get the parameter placeholder for Snowflake.
 
         Snowflake uses pyformat style (%s) with snowflake-connector-python.
-
-        Args:
-            index: Parameter index (not used for pyformat style).
-
-        Returns:
-            The parameter placeholder string.
         """
         return "%s"
 
-    # ========== DateTime Formatting (Snowflake-specific override) ==========
+    def supports_dynamic_identifier(self) -> bool:
+        """Snowflake supports IDENTIFIER() dynamic binding."""
+        return True
 
-    def format_interval_expression(self, expr: "Any") -> Tuple[str, Tuple]:
-        """Format an INTERVAL expression for Snowflake.
+    def format_identifier_dynamic(self, identifier: str) -> str:
+        """Format an IDENTIFIER(placeholder) dynamic object reference."""
+        placeholder = self.get_parameter_placeholder()
+        return f"IDENTIFIER({placeholder})"
 
-        Snowflake uses INTERVAL 'value' unit syntax.
-
-        Args:
-            expr: The interval expression.
-
-        Returns:
-            Tuple of (SQL string, parameters).
-        """
-        value = self._escape_sql_string(str(expr.value))
-        sql = f"INTERVAL '{value}' {expr.unit.value.upper()}"
-        return self._apply_value_expression_modifiers(sql, (), expr)
-
-    def format_datetime_add_expression(self, expr: "Any") -> Tuple[str, Tuple]:
-        """Format a date/time addition expression using Snowflake DATEADD.
-
-        Args:
-            expr: The date/time add expression.
-
-        Returns:
-            Tuple of (SQL string, parameters).
-        """
-        source_sql, source_params = expr.source.to_sql()
-        unit = expr.interval.unit.value.upper()
-        sql = f"DATEADD({unit}, %s, {source_sql})"
-        return self._apply_value_expression_modifiers(
-            sql, (expr.interval.value,) + source_params, expr
-        )
-
-    def format_datetime_subtract_expression(self, expr: "Any") -> Tuple[str, Tuple]:
-        """Format a date/time subtraction expression using Snowflake DATEADD.
-
-        Snowflake does not have a native date subtraction operator,
-        so DATEADD with a negative value is used.
-
-        Args:
-            expr: The date/time subtract expression.
-
-        Returns:
-            Tuple of (SQL string, parameters).
-        """
-        source_sql, source_params = expr.source.to_sql()
-        unit = expr.interval.unit.value.upper()
-        sql = f"DATEADD({unit}, %s, {source_sql})"
-        return self._apply_value_expression_modifiers(
-            sql, (-expr.interval.value,) + source_params, expr
-        )
-
-    def format_datetime_diff_expression(self, expr: "Any") -> Tuple[str, Tuple]:
-        """Format a date/time difference expression using Snowflake DATEDIFF.
-
-        Args:
-            expr: The date/time diff expression.
-
-        Returns:
-            Tuple of (SQL string, parameters).
-        """
-        start_sql, start_params = expr.start.to_sql()
-        end_sql, end_params = expr.end.to_sql()
-        sql = f"DATEDIFF({expr.unit.value.upper()}, {start_sql}, {end_sql})"
-        return self._apply_value_expression_modifiers(sql, start_params + end_params, expr)
-
-    def format_set_transaction(self, expr) -> Tuple[str, tuple]:
+    def format_set_transaction(self, expr: "SetTransactionExpression") -> Tuple[str, tuple]:
         """Format SET TRANSACTION statement for Snowflake.
 
         Snowflake only supports READ COMMITTED isolation level, so
         no SET TRANSACTION is needed.
-
-        Args:
-            expr: The set transaction expression.
-
-        Returns:
-            Tuple of (SQL string, parameters) - empty no-op.
         """
         return ("", ())
 
-    def supports_collate_expression(self) -> bool:
-        """Snowflake supports expression-level COLLATE."""
-        return True
-
-    def validate_collation_name(self, expr: "CollateExpression") -> str:
-        """Validate Snowflake collation specs and return their SQL representation."""
-        if expr.collation_options:
-            unsupported = ", ".join(sorted(expr.collation_options))
-            raise UnsupportedFeatureError(self.name, f"COLLATE options: {unsupported}")
-        spec = validate_snowflake_collation_name(expr.collation_name, getattr(self, "version", None))
-        return f"'{self._escape_sql_string(spec)}'"
-
     # ========== DDLType Support ==========
 
-    def format_data_type(self, data_type: "Any") -> "Tuple[str, tuple]":
-        """Render a DataType into a Snowflake SQL type string.
-
-        Args:
-            data_type: The DataType instance to format.
-
-        Returns:
-            Tuple of (SQL type string, params).
-        """
-        from .expression.types import SnowflakeDataTypeMixin
-        if isinstance(data_type, SnowflakeDataTypeMixin):
-            return data_type.format_type(self), ()
-        from rhosocial.activerecord.backend.expression.types._base import DataType
-        if hasattr(data_type, 'ddl') and callable(data_type.ddl):
-            return data_type.ddl, ()
-        if isinstance(data_type, DataType):
-            return data_type.__class__.__name__.replace("Type", "").upper(), ()
-        return str(data_type), ()
-
-    def parse_type(self, raw: str) -> "Any":
-        """Parse a raw Snowflake type string into a DataType.
-
-        Delegates to SnowflakeTypeSupportMixin.parse_type for
-        structured type parsing.
-
-        Args:
-            raw: Raw SQL type string.
-
-        Returns:
-            A DataType instance.
-        """
-        return SnowflakeTypeSupportMixin.parse_type(self, raw)
-
-    def supports_data_types(self) -> List[Tuple["Any", str]]:
-        """List (DataTypeClass, sql_name) pairs supported by this dialect.
-
-        Returns:
-            List of (DataTypeClass, sql_name) tuples.
-        """
-        from .expression.types import (
-            SnowflakeVarcharType, SnowflakeNumberType, SnowflakeBooleanType,
-            SnowflakeTimestampLtzType, SnowflakeTimestampNtzType, SnowflakeTimestampTzType,
-            SnowflakeVariantType, SnowflakeArrayType, SnowflakeObjectType,
-            SnowflakeGeographyType, SnowflakeGeometryType,
-            SnowflakeDateType, SnowflakeTimeType, SnowflakeBinaryType,
-        )
-        return [
-            (SnowflakeVarcharType, "VARCHAR"),
-            (SnowflakeNumberType, "NUMBER"),
-            (SnowflakeBooleanType, "BOOLEAN"),
-            (SnowflakeTimestampLtzType, "TIMESTAMP_LTZ"),
-            (SnowflakeTimestampNtzType, "TIMESTAMP_NTZ"),
-            (SnowflakeTimestampTzType, "TIMESTAMP_TZ"),
-            (SnowflakeVariantType, "VARIANT"),
-            (SnowflakeArrayType, "ARRAY"),
-            (SnowflakeObjectType, "OBJECT"),
-            (SnowflakeGeographyType, "GEOGRAPHY"),
-            (SnowflakeGeometryType, "GEOMETRY"),
-            (SnowflakeDateType, "DATE"),
-            (SnowflakeTimeType, "TIME"),
-            (SnowflakeBinaryType, "BINARY"),
-        ]
-
-    # ========== SetOperation Support ==========
-
-    def supports_union(self) -> bool:
-        """Snowflake supports UNION."""
+    def supports_data_type_integer(self) -> bool:
         return True
 
-    def supports_union_all(self) -> bool:
-        """Snowflake supports UNION ALL."""
+    def supports_data_type_bigint(self) -> bool:
         return True
 
-    def supports_intersect(self) -> bool:
-        """Snowflake supports INTERSECT."""
+    def supports_data_type_smallint(self) -> bool:
         return True
 
-    def supports_except(self) -> bool:
-        """Snowflake supports EXCEPT/MINUS."""
+    def supports_data_type_float(self) -> bool:
         return True
 
-    def supports_set_operation_order_by(self) -> bool:
-        """Snowflake supports ORDER BY in set operations."""
+    def supports_data_type_double(self) -> bool:
         return True
 
-    def supports_set_operation_limit_offset(self) -> bool:
-        """Snowflake supports LIMIT/OFFSET in set operations."""
+    def supports_data_type_decimal(self) -> bool:
         return True
 
-    def supports_set_operation_for_update(self) -> bool:
-        """Snowflake does not support FOR UPDATE in set operations."""
-        return False
-
-    # ========== DQL Support ==========
-
-    def supports_offset_without_limit(self) -> bool:
-        """Snowflake supports OFFSET without LIMIT."""
+    def supports_data_type_boolean(self) -> bool:
         return True
 
-    def supports_for_update(self) -> bool:
-        """Snowflake does not support FOR UPDATE clause."""
-        return False
-
-    # ========== Capability Detection ==========
-
-    def supports_cte(self) -> bool:
-        """Snowflake supports CTEs including recursive CTEs."""
+    def supports_data_type_varchar(self) -> bool:
         return True
 
-    def supports_recursive_cte(self) -> bool:
-        """Snowflake supports recursive CTEs."""
+    def supports_data_type_char(self) -> bool:
         return True
 
-    def supports_window_functions(self) -> bool:
-        """Snowflake supports window functions."""
+    def supports_data_type_text(self) -> bool:
         return True
 
-    def supports_json_operations(self) -> bool:
-        """Snowflake supports JSON via VARIANT type."""
+    def supports_data_type_blob(self) -> bool:
         return True
 
-    def supports_merge(self) -> bool:
-        """Snowflake supports MERGE INTO with complex conditions."""
+    def supports_data_type_datetime(self) -> bool:
         return True
 
-    def supports_qualify_clause(self) -> bool:
-        """Snowflake supports QUALIFY clause for window function filtering."""
+    def supports_data_type_date(self) -> bool:
         return True
 
-    def supports_upsert(self) -> bool:
-        """Snowflake supports upsert via MERGE."""
+    def supports_data_type_time(self) -> bool:
         return True
 
-    def supports_lateral_join(self) -> bool:
-        """Snowflake supports LATERAL joins."""
+    def supports_data_type_timestamp(self) -> bool:
         return True
 
-    def supports_explain(self) -> bool:
-        """Snowflake supports EXPLAIN."""
+    def supports_data_type_json(self) -> bool:
         return True
 
-    def supports_advanced_grouping(self) -> bool:
-        """Snowflake supports GROUPING SETS, ROLLUP, CUBE."""
+    def supports_data_type_snowflake_varchar(self) -> bool:
         return True
 
-    def supports_arrays(self) -> bool:
-        """Snowflake supports ARRAY type natively."""
+    def supports_data_type_snowflake_number(self) -> bool:
         return True
 
-    def supports_schema(self) -> bool:
-        """Snowflake uses a three-level namespace (database.schema.table)."""
+    def supports_data_type_snowflake_float(self) -> bool:
         return True
 
-    def supports_views(self) -> bool:
-        """Snowflake supports views."""
+    def supports_data_type_snowflake_boolean(self) -> bool:
         return True
 
-    def supports_introspection(self) -> bool:
-        """Snowflake supports introspection via INFORMATION_SCHEMA."""
+    def supports_data_type_snowflake_timestamp_ltz(self) -> bool:
         return True
 
-    def supports_returning_insert(self) -> bool:
-        """Snowflake supports RETURNING for INSERT from version 7.32.0+."""
-        return self.version >= (7, 32, 0)
-
-    def supports_returning_update(self) -> bool:
-        """Snowflake supports RETURNING for UPDATE from version 7.32.0+."""
-        return self.version >= (7, 32, 0)
-
-    def supports_returning_delete(self) -> bool:
-        """Snowflake supports RETURNING for DELETE from version 7.32.0+."""
-        return self.version >= (7, 32, 0)
-
-    def supports_filter_clause(self) -> bool:
-        """Snowflake supports FILTER clause."""
+    def supports_data_type_snowflake_timestamp_ntz(self) -> bool:
         return True
 
-    def supports_indexes(self) -> bool:
-        """Snowflake supports indexes (clustering keys and search optimization)."""
+    def supports_data_type_snowflake_timestamp_tz(self) -> bool:
         return True
 
-    def supports_constraints(self) -> bool:
-        """Snowflake supports constraints (PK, FK, UNIQUE, NOT NULL, CHECK)."""
+    def supports_data_type_snowflake_date(self) -> bool:
         return True
 
-    def supports_sequences(self) -> bool:
-        """Snowflake supports sequences."""
+    def supports_data_type_snowflake_time(self) -> bool:
         return True
 
-    def supports_explicit_inner_join(self) -> bool:
-        """Snowflake supports explicit INNER JOIN syntax."""
+    def supports_data_type_snowflake_binary(self) -> bool:
         return True
 
-    def supports_add_constraint(self) -> bool:
-        """Snowflake supports ALTER TABLE ADD CONSTRAINT."""
+    def supports_data_type_snowflake_variant(self) -> bool:
         return True
 
-    def supports_drop_constraint(self) -> bool:
-        """Snowflake supports ALTER TABLE DROP CONSTRAINT."""
+    def supports_data_type_snowflake_object(self) -> bool:
         return True
 
-    def supports_modify_column(self) -> bool:
-        """Snowflake supports ALTER TABLE MODIFY COLUMN."""
+    def supports_data_type_snowflake_array(self) -> bool:
         return True
 
-    # region CreateTableExpressionDiffSupport hooks
-
-    def _supports_alter_column_type(self) -> bool:
-        """Snowflake changes a column type in place via ``MODIFY COLUMN``.
-        The accompanying formatter is overridden below."""
+    def supports_data_type_snowflake_geography(self) -> bool:
         return True
 
-    def alter_column_type_action(self, old_col, new_col):
-        """Build the in-place type-change action (``MODIFY COLUMN``)."""
-        from rhosocial.activerecord.backend.expression.statements.ddl_alter import ModifyColumn
-
-        return ModifyColumn(self, column=new_col)
-
-    def format_modify_column_action(self, action) -> Tuple[str, tuple]:
-        """Render Snowflake ``ALTER TABLE ... MODIFY COLUMN <col> <type>``.
-
-        Snowflake redefines a column wholesale with ``MODIFY COLUMN`` carrying
-        the full new definition (type + constraints). ``DEFAULT``/``NOT NULL``
-        ride along inside the rendered column spec.
-        """
-        from rhosocial.activerecord.backend.expression.statements.ddl_table import (
-            ColumnConstraintType,
-        )
-
-        col = action.column
-        type_sql, _ = self.format_data_type(col.data_type)
-        parts = [type_sql]
-        for c in col.constraints:
-            if c.constraint_type == ColumnConstraintType.NOT_NULL:
-                parts.append("NOT NULL")
-            elif c.constraint_type == ColumnConstraintType.NULL:
-                parts.append("NULL")
-            elif c.constraint_type == ColumnConstraintType.DEFAULT and c.default_value is not None:
-                from rhosocial.activerecord.backend.expression.core import Literal
-
-                lit_sql, lit_params = Literal(self, c.default_value).to_sql()
-                parts.append(f"DEFAULT {lit_sql}")
-        spec = " ".join(parts)
-        return f"MODIFY COLUMN {self.format_identifier(col.name)} {spec}", ()
-
-    def _supports_alter_column_properties(self) -> bool:
-        """Snowflake has no independent ``ALTER COLUMN SET DEFAULT`` clause;
-        property changes ride inside ``MODIFY COLUMN``. The generic diff path
-        emits standalone ``ALTER COLUMN SET/DROP DEFAULT`` actions, which
-        Snowflake rejects — route property-only changes to a rebuild.
-        """
-        return False
-
-    def _supports_alter_table_index_actions(self) -> bool:
-        """Snowflake has no traditional indexes (only SEARCH INDEX via a
-        separate statement) — index changes route to a rebuild plan.
-        """
-        return False
-
-    # endregion
-
-    # ========== Snowflake-Specific Capability Detection ==========
-
-    def supports_array_type(self) -> bool:
-        """Snowflake supports ARRAY type."""
+    def supports_data_type_snowflake_geometry(self) -> bool:
         return True
 
     # ========== Snowflake-Specific SQL Formatting ==========

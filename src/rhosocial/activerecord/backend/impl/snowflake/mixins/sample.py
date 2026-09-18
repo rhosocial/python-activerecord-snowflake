@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/sample.py
 """SnowflakeSampleMixin — SAMPLE / TABLESAMPLE clause support."""
 
-from typing import TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.sample import SnowflakeSampleExpression
@@ -20,40 +20,41 @@ class SnowflakeSampleMixin:
 
     def format_sample_clause(
         self, expr: "SnowflakeSampleExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format a ``SAMPLE`` clause.
 
         Args:
             expr: :class:`SnowflakeSampleExpression`.
 
         Returns:
-            The formatted SAMPLE clause SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
-        return self.format_sampling_clause(expr, "SAMPLE")
+        return self.format_sampling_clause(expr)
 
     def format_tablesample_clause(
         self, expr: "SnowflakeSampleExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format a ``TABLESAMPLE`` clause.
 
         Args:
             expr: :class:`SnowflakeSampleExpression`.
 
         Returns:
-            The formatted TABLESAMPLE clause SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
-        return self.format_sampling_clause(expr, "TABLESAMPLE")
+        return self.format_sampling_clause(expr)
 
     def format_sampling_clause(
-        self, expr: "SnowflakeSampleExpression", keyword: str
-    ) -> str:
-        """Render a sampling clause under a given keyword.
+        self, expr: "SnowflakeSampleExpression"
+    ) -> Tuple[str, tuple]:
+        """Render a sampling clause.
 
         Emits ``{keyword} [method] ({count} ROWS | {percentage})
         [REPEATABLE ({seed})]``.
         """
+        keyword = expr.form.value
         parts = [keyword]
         if expr.sampling_method is not None:
             parts.append(expr.sampling_method.value)
@@ -63,4 +64,4 @@ class SnowflakeSampleMixin:
             parts.append(f"({int(expr.count)} ROWS)")
         if expr.seed is not None:
             parts.append(f"REPEATABLE ({int(expr.seed)})")
-        return " ".join(parts)
+        return " ".join(parts), ()

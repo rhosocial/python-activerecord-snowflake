@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/pipe.py
 """SnowflakePipeMixin — pipe (Snowpipe) DDL support."""
 
-from typing import TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING
 
 from ..expression.ddl.pipe import SnowflakeAlterPipeMode
 
@@ -22,14 +22,14 @@ class SnowflakePipeMixin:
 
     def format_create_pipe_statement(
         self, expr: "SnowflakeCreatePipeExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] PIPE statement.
 
         Args:
             expr: :class:`SnowflakeCreatePipeExpression`.
 
         Returns:
-            The formatted CREATE PIPE SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         Raises:
             ValueError: when ``copy_sql`` is not specified.
@@ -63,11 +63,11 @@ class SnowflakePipeMixin:
                 f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
             )
         parts.extend(["AS", str(expr.copy_sql)])
-        return " ".join(parts)
+        return " ".join(parts), ()
 
     def format_alter_pipe_statement(
         self, expr: "SnowflakeAlterPipeExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format ALTER PIPE statement.
 
         Emits ``REFRESH`` / ``SET ...`` / pause / resume based on
@@ -77,7 +77,7 @@ class SnowflakePipeMixin:
             expr: :class:`SnowflakeAlterPipeExpression`.
 
         Returns:
-            The formatted ALTER PIPE SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         Raises:
             ValueError: SET with no property.
@@ -92,13 +92,13 @@ class SnowflakePipeMixin:
             if expr.modified_after is not None:
                 value = self._escape_sql_string(str(expr.modified_after))
                 parts.append(f"MODIFIED_AFTER => '{value}'")
-            return " ".join(parts)
+            return " ".join(parts), ()
         if mode is SnowflakeAlterPipeMode.PAUSE:
             parts.append("SET PIPE_EXECUTION_PAUSED = TRUE")
-            return " ".join(parts)
+            return " ".join(parts), ()
         if mode is SnowflakeAlterPipeMode.RESUME:
             parts.append("SET PIPE_EXECUTION_PAUSED = FALSE")
-            return " ".join(parts)
+            return " ".join(parts), ()
         options = []
         if expr.pipe_execution_paused is not None:
             options.append(
@@ -113,22 +113,22 @@ class SnowflakePipeMixin:
             raise ValueError("ALTER PIPE SET requires at least one property")
         parts.append("SET")
         parts.extend(options)
-        return " ".join(parts)
+        return " ".join(parts), ()
 
     def format_drop_pipe_statement(
         self, expr: "SnowflakeDropPipeExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format DROP PIPE statement.
 
         Args:
             expr: :class:`SnowflakeDropPipeExpression`.
 
         Returns:
-            The formatted DROP PIPE SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
         parts = ["DROP PIPE"]
         if expr.if_exists:
             parts.append("IF EXISTS")
         parts.append(self.format_identifier(expr.name))
-        return " ".join(parts)
+        return " ".join(parts), ()
