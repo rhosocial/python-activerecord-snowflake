@@ -1,4 +1,4 @@
-# src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl/alter_table_modifier.py
+# src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl.py
 """Snowflake ALTER TABLE column IF [NOT] EXISTS qualifier formatting."""
 
 from typing import Tuple

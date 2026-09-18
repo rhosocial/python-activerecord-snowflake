@@ -91,4 +91,4 @@ class SnowflakeShowExpression(BaseExpression):
             Tuple of (statement SQL string, empty params tuple).
 
         """
-        return self.dialect.format_show_statement(self), ()
+        return self.dialect.format_show_statement(self)

@@ -60,4 +60,4 @@ class SnowflakeUndropExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_undrop_statement(self), ()
+        return self.dialect.format_undrop_statement(self)

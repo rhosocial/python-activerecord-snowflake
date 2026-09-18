@@ -63,7 +63,7 @@ class SnowflakePivotExpression(BaseExpression):
             Tuple of (clause SQL string, empty params tuple).
 
         """
-        return self.dialect.format_pivot_clause(self), ()
+        return self.dialect.format_pivot_clause(self)
 
 
 class SnowflakeUnpivotExpression(BaseExpression):
@@ -105,4 +105,4 @@ class SnowflakeUnpivotExpression(BaseExpression):
             Tuple of (clause SQL string, empty params tuple).
 
         """
-        return self.dialect.format_unpivot_clause(self), ()
+        return self.dialect.format_unpivot_clause(self)

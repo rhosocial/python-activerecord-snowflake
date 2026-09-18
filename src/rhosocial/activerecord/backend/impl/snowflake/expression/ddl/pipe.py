@@ -91,7 +91,7 @@ class SnowflakeCreatePipeExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_create_pipe_statement(self), ()
+        return self.dialect.format_create_pipe_statement(self)
 
 
 class SnowflakeAlterPipeExpression(BaseExpression):
@@ -138,7 +138,7 @@ class SnowflakeAlterPipeExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_alter_pipe_statement(self), ()
+        return self.dialect.format_alter_pipe_statement(self)
 
 
 class SnowflakeDropPipeExpression(BaseExpression):
@@ -167,4 +167,4 @@ class SnowflakeDropPipeExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_drop_pipe_statement(self), ()
+        return self.dialect.format_drop_pipe_statement(self)

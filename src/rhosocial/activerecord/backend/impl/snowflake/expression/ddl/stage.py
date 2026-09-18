@@ -88,7 +88,7 @@ class SnowflakeCreateStageExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_create_stage_statement(self), ()
+        return self.dialect.format_create_stage_statement(self)
 
 
 class SnowflakeAlterStageExpression(BaseExpression):
@@ -132,7 +132,7 @@ class SnowflakeAlterStageExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_alter_stage_statement(self), ()
+        return self.dialect.format_alter_stage_statement(self)
 
 
 class SnowflakeDropStageExpression(BaseExpression):
@@ -161,7 +161,7 @@ class SnowflakeDropStageExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_drop_stage_statement(self), ()
+        return self.dialect.format_drop_stage_statement(self)
 
 
 class SnowflakeCopyIntoExpression(BaseExpression):
@@ -237,4 +237,4 @@ class SnowflakeCopyIntoExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_copy_into_statement(self), ()
+        return self.dialect.format_copy_into_statement(self)

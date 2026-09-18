@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/types.py
 """Snowflake DataType formatting and parsing mixin.
 
-Uses DDLTypeMixin registry-based dispatch for Snowflake-specific type SQL.
+Uses DDLTypeMixin naming-convention dispatch for Snowflake-specific type SQL.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from typing import Tuple
 
-from rhosocial.activerecord.backend.dialect.mixins import DDLTypeMixin
+from rhosocial.activerecord.backend.dialect.mixins.ddl_type import DDLTypeMixin
 from rhosocial.activerecord.backend.dialect.protocols import DDLTypeSupport
 from rhosocial.activerecord.backend.expression.types import (
     BigIntType,
@@ -36,6 +36,7 @@ from ..expression.types import (
     SnowflakeBinaryType,
     SnowflakeBooleanType,
     SnowflakeDateType,
+    SnowflakeFloatType,
     SnowflakeGeographyType,
     SnowflakeGeometryType,
     SnowflakeNumberType,
@@ -50,152 +51,198 @@ from ..expression.types import (
 
 
 class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
+    """Snowflake DataType formatting and parsing.
 
-    @DDLTypeMixin.handles(IntegerType)
-    def format_data_type_integer(self, data_type: IntegerType) -> Tuple[str, tuple]:
+    Implements ``DDLTypeSupport`` so the dialect can render ``DataType``
+    expressions to SQL strings and parse raw SQL type strings back into
+    ``DataType`` instances.
+
+    Formatting dispatches by the type instance's ``name`` through the
+    naming-convention ``format_data_type_<name>`` methods (see
+    ``DDLTypeMixin``). Snowflake-specific types carry ``snowflake_``-prefixed
+    names; core types render their real Snowflake SQL.
+    """
+
+    # Snowflake precision limits
+    _SNOW_NUMBER_PRECISION_MAX = 38
+    _SNOW_NUMBER_SCALE_MAX = 38
+    _SNOW_FLOAT_PRECISION_MAX = 126  # binary precision
+    _SNOW_TIMESTAMP_PRECISION_MAX = 9  # fractional seconds
+    _SNOW_TIME_PRECISION_MAX = 9  # fractional seconds
+
+    def _validate_number_precision(self, precision: int, scale: int = 0) -> None:
+        if not 1 <= precision <= self._SNOW_NUMBER_PRECISION_MAX:
+            raise ValueError(
+                f"Snowflake NUMBER precision must be 1-{self._SNOW_NUMBER_PRECISION_MAX}, "
+                f"got {precision}"
+            )
+        if not 0 <= scale <= self._SNOW_NUMBER_SCALE_MAX:
+            raise ValueError(
+                f"Snowflake NUMBER scale must be 0-{self._SNOW_NUMBER_SCALE_MAX}, "
+                f"got {scale}"
+            )
+
+    def _validate_float_precision(self, precision: int) -> None:
+        if not 1 <= precision <= self._SNOW_FLOAT_PRECISION_MAX:
+            raise ValueError(
+                f"Snowflake FLOAT precision (binary) must be 1-{self._SNOW_FLOAT_PRECISION_MAX}, "
+                f"got {precision}"
+            )
+
+    def _validate_timestamp_precision(self, precision: int) -> None:
+        if not 0 <= precision <= self._SNOW_TIMESTAMP_PRECISION_MAX:
+            raise ValueError(
+                f"Snowflake TIMESTAMP fractional seconds precision must be "
+                f"0-{self._SNOW_TIMESTAMP_PRECISION_MAX}, got {precision}"
+            )
+
+    def _validate_time_precision(self, precision: int) -> None:
+        if not 0 <= precision <= self._SNOW_TIME_PRECISION_MAX:
+            raise ValueError(
+                f"Snowflake TIME fractional seconds precision must be "
+                f"0-{self._SNOW_TIME_PRECISION_MAX}, got {precision}"
+            )
+
+    # ------------------------------------------------------------------
+    # DDLTypeSupport — formatting (core types)
+    # ------------------------------------------------------------------
+
+    def format_data_type_integer(self, expr: IntegerType) -> Tuple[str, tuple]:
         return "INTEGER", ()
 
-    @DDLTypeMixin.handles(BigIntType)
-    def format_data_type_bigint(self, data_type: BigIntType) -> Tuple[str, tuple]:
+    def format_data_type_bigint(self, expr: BigIntType) -> Tuple[str, tuple]:
         return "BIGINT", ()
 
-    @DDLTypeMixin.handles(SmallIntType)
-    def format_data_type_smallint(self, data_type: SmallIntType) -> Tuple[str, tuple]:
+    def format_data_type_smallint(self, expr: SmallIntType) -> Tuple[str, tuple]:
         return "SMALLINT", ()
 
-    @DDLTypeMixin.handles(FloatType)
-    def format_data_type_float(self, data_type: FloatType) -> Tuple[str, tuple]:
+    def format_data_type_float(self, expr: FloatType) -> Tuple[str, tuple]:
         return "FLOAT", ()
 
-    @DDLTypeMixin.handles(DoubleType)
-    def format_data_type_double(self, data_type: DoubleType) -> Tuple[str, tuple]:
+    def format_data_type_double(self, expr: DoubleType) -> Tuple[str, tuple]:
         return "DOUBLE", ()
 
-    @DDLTypeMixin.handles(DecimalType)
-    def format_data_type_decimal(self, data_type: DecimalType) -> Tuple[str, tuple]:
-        if data_type.precision is not None and data_type.scale is not None:
-            return f"NUMBER({data_type.precision}, {data_type.scale})", ()
-        if data_type.precision is not None:
-            return f"NUMBER({data_type.precision})", ()
+    def format_data_type_decimal(self, expr: DecimalType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_number_precision(expr.precision, expr.scale or 0)
+        if expr.precision is not None and expr.scale is not None:
+            return f"NUMBER({expr.precision}, {expr.scale})", ()
+        if expr.precision is not None:
+            return f"NUMBER({expr.precision})", ()
         return "NUMBER", ()
 
-    @DDLTypeMixin.handles(BooleanType)
-    def format_data_type_boolean(self, data_type: BooleanType) -> Tuple[str, tuple]:
+    def format_data_type_boolean(self, expr: BooleanType) -> Tuple[str, tuple]:
         return "BOOLEAN", ()
 
-    @DDLTypeMixin.handles(VarCharType)
-    def format_data_type_varchar(self, data_type: VarCharType) -> Tuple[str, tuple]:
-        if data_type.length is not None:
-            return f"VARCHAR({data_type.length})", ()
+    def format_data_type_varchar(self, expr: VarCharType) -> Tuple[str, tuple]:
+        if expr.length is not None:
+            return f"VARCHAR({expr.length})", ()
         return "VARCHAR", ()
 
-    @DDLTypeMixin.handles(CharType)
-    def format_data_type_char(self, data_type: CharType) -> Tuple[str, tuple]:
-        return (f"CHAR({data_type.length})" if data_type.length is not None else "CHAR(1)"), ()
+    def format_data_type_char(self, expr: CharType) -> Tuple[str, tuple]:
+        return (f"CHAR({expr.length})" if expr.length is not None else "CHAR(1)"), ()
 
-    @DDLTypeMixin.handles(TextType)
-    def format_data_type_text(self, data_type: TextType) -> Tuple[str, tuple]:
+    def format_data_type_text(self, expr: TextType) -> Tuple[str, tuple]:
         return "VARCHAR(16777216)", ()
 
-    @DDLTypeMixin.handles(BlobType)
-    def format_data_type_blob(self, data_type: BlobType) -> Tuple[str, tuple]:
+    def format_data_type_blob(self, expr: BlobType) -> Tuple[str, tuple]:
         return "BINARY", ()
 
-    @DDLTypeMixin.handles(DateTimeType)
-    def format_data_type_datetime(self, data_type: DateTimeType) -> Tuple[str, tuple]:
+    def format_data_type_datetime(self, expr: DateTimeType) -> Tuple[str, tuple]:
         return "TIMESTAMP_NTZ", ()
 
-    @DDLTypeMixin.handles(DateType)
-    def format_data_type_date(self, data_type: DateType) -> Tuple[str, tuple]:
+    def format_data_type_date(self, expr: DateType) -> Tuple[str, tuple]:
         return "DATE", ()
 
-    @DDLTypeMixin.handles(TimeType)
-    def format_data_type_time(self, data_type: TimeType) -> Tuple[str, tuple]:
+    def format_data_type_time(self, expr: TimeType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_time_precision(expr.precision)
+            return f"TIME({expr.precision})", ()
         return "TIME", ()
 
-    @DDLTypeMixin.handles(TimestampType)
-    def format_data_type_timestamp(self, data_type: TimestampType) -> Tuple[str, tuple]:
+    def format_data_type_timestamp(self, expr: TimestampType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_timestamp_precision(expr.precision)
         return "TIMESTAMP_NTZ", ()
 
-    @DDLTypeMixin.handles(JsonType)
-    def format_data_type_json(self, data_type: JsonType) -> Tuple[str, tuple]:
+    def format_data_type_json(self, expr: JsonType) -> Tuple[str, tuple]:
         return "VARIANT", ()
 
-    # --- Snowflake-specific formatters ---
+    # --- Snowflake-specific type formatters (dispatch key = type name) ---
 
-    @DDLTypeMixin.handles(SnowflakeVarcharType)
-    def format_data_type_snowflake_varchar(self, data_type) -> Tuple[str, tuple]:
-        if data_type.length is not None:
-            return f"VARCHAR({data_type.length})", ()
+    def format_data_type_snowflake_varchar(self, expr: SnowflakeVarcharType) -> Tuple[str, tuple]:
+        if expr.length is not None:
+            return f"VARCHAR({expr.length})", ()
         return "VARCHAR", ()
 
-    @DDLTypeMixin.handles(SnowflakeNumberType)
-    def format_data_type_snowflake_number(self, data_type) -> Tuple[str, tuple]:
-        if data_type.precision is not None and data_type.scale is not None:
-            return f"NUMBER({data_type.precision}, {data_type.scale})", ()
-        if data_type.precision is not None:
-            return f"NUMBER({data_type.precision})", ()
+    def format_data_type_snowflake_number(self, expr: SnowflakeNumberType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_number_precision(expr.precision, expr.scale or 0)
+        if expr.precision is not None and expr.scale is not None:
+            return f"NUMBER({expr.precision}, {expr.scale})", ()
+        if expr.precision is not None:
+            return f"NUMBER({expr.precision})", ()
         return "NUMBER", ()
 
-    @DDLTypeMixin.handles(SnowflakeBooleanType)
-    def format_data_type_snowflake_boolean(self, data_type) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_float(self, expr: SnowflakeFloatType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_float_precision(expr.precision)
+            return f"FLOAT({expr.precision})", ()
+        return "FLOAT", ()
+
+    def format_data_type_snowflake_boolean(self, expr: SnowflakeBooleanType) -> Tuple[str, tuple]:
         return "BOOLEAN", ()
 
-    @DDLTypeMixin.handles(SnowflakeTimestampLtzType)
-    def format_data_type_snowflake_timestamp_ltz(self, data_type) -> Tuple[str, tuple]:
-        if data_type.precision is not None:
-            return f"TIMESTAMP_LTZ({data_type.precision})", ()
+    def format_data_type_snowflake_timestamp_ltz(self, expr: SnowflakeTimestampLtzType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_timestamp_precision(expr.precision)
+            return f"TIMESTAMP_LTZ({expr.precision})", ()
         return "TIMESTAMP_LTZ", ()
 
-    @DDLTypeMixin.handles(SnowflakeTimestampNtzType)
-    def format_data_type_snowflake_timestamp_ntz(self, data_type) -> Tuple[str, tuple]:
-        if data_type.precision is not None:
-            return f"TIMESTAMP_NTZ({data_type.precision})", ()
+    def format_data_type_snowflake_timestamp_ntz(self, expr: SnowflakeTimestampNtzType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_timestamp_precision(expr.precision)
+            return f"TIMESTAMP_NTZ({expr.precision})", ()
         return "TIMESTAMP_NTZ", ()
 
-    @DDLTypeMixin.handles(SnowflakeTimestampTzType)
-    def format_data_type_snowflake_timestamp_tz(self, data_type) -> Tuple[str, tuple]:
-        if data_type.precision is not None:
-            return f"TIMESTAMP_TZ({data_type.precision})", ()
+    def format_data_type_snowflake_timestamp_tz(self, expr: SnowflakeTimestampTzType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_timestamp_precision(expr.precision)
+            return f"TIMESTAMP_TZ({expr.precision})", ()
         return "TIMESTAMP_TZ", ()
 
-    @DDLTypeMixin.handles(SnowflakeDateType)
-    def format_data_type_snowflake_date(self, data_type) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_date(self, expr: SnowflakeDateType) -> Tuple[str, tuple]:
         return "DATE", ()
 
-    @DDLTypeMixin.handles(SnowflakeTimeType)
-    def format_data_type_snowflake_time(self, data_type) -> Tuple[str, tuple]:
-        if data_type.precision is not None:
-            return f"TIME({data_type.precision})", ()
+    def format_data_type_snowflake_time(self, expr: SnowflakeTimeType) -> Tuple[str, tuple]:
+        if expr.precision is not None:
+            self._validate_time_precision(expr.precision)
+            return f"TIME({expr.precision})", ()
         return "TIME", ()
 
-    @DDLTypeMixin.handles(SnowflakeBinaryType)
-    def format_data_type_snowflake_binary(self, data_type) -> Tuple[str, tuple]:
-        if data_type._length is not None:
-            return f"BINARY({data_type._length})", ()
+    def format_data_type_snowflake_binary(self, expr: SnowflakeBinaryType) -> Tuple[str, tuple]:
+        if expr.length is not None:
+            return f"BINARY({expr.length})", ()
         return "BINARY", ()
 
-    @DDLTypeMixin.handles(SnowflakeVariantType)
-    def format_data_type_snowflake_variant(self, data_type) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_variant(self, expr: SnowflakeVariantType) -> Tuple[str, tuple]:
         return "VARIANT", ()
 
-    @DDLTypeMixin.handles(SnowflakeObjectType)
-    def format_data_type_snowflake_object(self, data_type) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_object(self, expr: SnowflakeObjectType) -> Tuple[str, tuple]:
         return "OBJECT", ()
 
-    @DDLTypeMixin.handles(SnowflakeArrayType)
-    def format_data_type_snowflake_array(self, data_type) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_array(self, expr: SnowflakeArrayType) -> Tuple[str, tuple]:
         return "ARRAY", ()
 
-    @DDLTypeMixin.handles(SnowflakeGeographyType)
-    def format_data_type_snowflake_geography(self, data_type) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_geography(self, expr: SnowflakeGeographyType) -> Tuple[str, tuple]:
         return "GEOGRAPHY", ()
 
-    @DDLTypeMixin.handles(SnowflakeGeometryType)
-    def format_data_type_snowflake_geometry(self, data_type) -> Tuple[str, tuple]:
+    def format_data_type_snowflake_geometry(self, expr: SnowflakeGeometryType) -> Tuple[str, tuple]:
         return "GEOMETRY", ()
 
-    # --- Parsing ---
+    # ------------------------------------------------------------------
+    # DDLTypeSupport — parsing
+    # ------------------------------------------------------------------
 
     _SNOW_INTEGER_TYPES = re.compile(r"^(?:INT|INTEGER|BIGINT|SMALLINT|TINYINT|BYTEINT)\b", re.IGNORECASE)
     _SNOW_FLOAT_TYPES = re.compile(r"^(?:FLOAT|FLOAT4|FLOAT8|DOUBLE|DOUBLE\s+PRECISION|REAL)\b", re.IGNORECASE)

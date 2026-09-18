@@ -8,9 +8,9 @@ incrementally in the background, managed via
 ``CREATE [OR REPLACE] MATERIALIZED VIEW ... AS <query>``.
 
 Official Documentation:
-- https://docs.snowflake.com/en/sql-reference/sql/create-materialized-view
+- CREATE MATERIALIZED VIEW: https://docs.snowflake.com/en/sql-reference/sql/create-materialized-view
 """
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.materialized_view import (
@@ -28,6 +28,6 @@ class SnowflakeMaterializedViewSupport(Protocol):
 
     def format_create_materialized_view_statement(
         self, expr: "SnowflakeCreateMaterializedViewExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] MATERIALIZED VIEW statement."""
         ...
