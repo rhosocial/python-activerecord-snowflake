@@ -8,9 +8,9 @@ window (tables, schemas, databases, tags, ...). It is the recovery
 companion to time travel.
 
 Official Documentation:
-- https://docs.snowflake.com/en/sql-reference/sql/undrop
+- UNDROP: https://docs.snowflake.com/en/sql-reference/sql/undrop
 """
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.undrop import SnowflakeUndropExpression
@@ -26,6 +26,6 @@ class SnowflakeUndropSupport(Protocol):
 
     def format_undrop_statement(
         self, expr: "SnowflakeUndropExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format UNDROP statement."""
         ...

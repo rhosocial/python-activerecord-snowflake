@@ -11,7 +11,7 @@ synonyms.
 Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/constructs/sample
 """
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.sample import SnowflakeSampleExpression
@@ -31,12 +31,12 @@ class SnowflakeSampleSupport(Protocol):
 
     def format_sample_clause(
         self, expr: "SnowflakeSampleExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format a SAMPLE clause."""
         ...
 
     def format_tablesample_clause(
         self, expr: "SnowflakeSampleExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format a TABLESAMPLE clause."""
         ...

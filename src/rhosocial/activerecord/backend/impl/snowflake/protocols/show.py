@@ -8,9 +8,9 @@ scoping by namespace (``IN {ACCOUNT | DATABASE | SCHEMA}``), name filtering
 (``LIKE 'pattern'``) and result row limits (``LIMIT``).
 
 Official Documentation:
-- https://docs.snowflake.com/en/sql-reference/sql/show
+- SHOW: https://docs.snowflake.com/en/sql-reference/sql/show
 """
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.show import SnowflakeShowExpression
@@ -26,6 +26,6 @@ class SnowflakeShowSupport(Protocol):
 
     def format_show_statement(
         self, expr: "SnowflakeShowExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format a SHOW statement."""
         ...

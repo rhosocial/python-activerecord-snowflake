@@ -14,7 +14,7 @@ Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/sql/alter-warehouse
 - https://docs.snowflake.com/en/sql-reference/sql/drop-warehouse
 """
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.warehouse import (
@@ -34,13 +34,13 @@ class SnowflakeWarehouseSupport(Protocol):
 
     def format_create_warehouse_statement(
         self, expr: "SnowflakeCreateWarehouseExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE WAREHOUSE statement."""
         ...
 
     def format_alter_warehouse_statement(
         self, expr: "SnowflakeAlterWarehouseExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format ALTER WAREHOUSE statement.
 
         Emits ``SUSPEND`` / ``RESUME`` / ``SET`` / ``RENAME TO`` depending
@@ -50,6 +50,6 @@ class SnowflakeWarehouseSupport(Protocol):
 
     def format_drop_warehouse_statement(
         self, expr: "SnowflakeDropWarehouseExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format DROP WAREHOUSE statement."""
         ...

@@ -81,7 +81,7 @@ class SnowflakeCreateFileFormatExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_create_file_format_statement(self), ()
+        return self.dialect.format_create_file_format_statement(self)
 
 
 class SnowflakeAlterFileFormatExpression(BaseExpression):
@@ -119,7 +119,7 @@ class SnowflakeAlterFileFormatExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_alter_file_format_statement(self), ()
+        return self.dialect.format_alter_file_format_statement(self)
 
 
 class SnowflakeDropFileFormatExpression(BaseExpression):
@@ -148,4 +148,4 @@ class SnowflakeDropFileFormatExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_drop_file_format_statement(self), ()
+        return self.dialect.format_drop_file_format_statement(self)

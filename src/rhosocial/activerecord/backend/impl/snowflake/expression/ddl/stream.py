@@ -100,7 +100,7 @@ class SnowflakeCreateStreamExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_create_stream_statement(self), ()
+        return self.dialect.format_create_stream_statement(self)
 
 
 class SnowflakeDropStreamExpression(BaseExpression):
@@ -129,4 +129,4 @@ class SnowflakeDropStreamExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_drop_stream_statement(self), ()
+        return self.dialect.format_drop_stream_statement(self)

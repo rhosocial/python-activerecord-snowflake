@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/stream.py
 """SnowflakeStreamMixin — stream (change data capture) DDL support."""
 
-from typing import Any, TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.stream import (
@@ -19,14 +19,14 @@ class SnowflakeStreamMixin:
 
     def format_create_stream_statement(
         self, expr: "SnowflakeCreateStreamExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] STREAM statement.
 
         Args:
             expr: :class:`SnowflakeCreateStreamExpression`.
 
         Returns:
-            The formatted CREATE STREAM SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         Raises:
             ValueError: when ``object_name`` is not specified.
@@ -56,44 +56,43 @@ class SnowflakeStreamMixin:
                 f"SHOW_INITIAL_ROWS = {str(bool(expr.show_initial_rows)).upper()}"
             )
         if expr.at is not None:
-            parts.append(self.format_stream_time_point("AT", expr.at))
+            kind, value = expr.at
+            kind = str(kind).upper()
+            if kind == "OFFSET":
+                parts.append(f"AT(OFFSET => {int(value)})")
+            else:
+                escaped = self._escape_sql_string(str(value))
+                parts.append(f"AT({kind} => '{escaped}')")
         if expr.before is not None:
-            parts.append(self.format_stream_time_point("BEFORE", expr.before))
+            kind, value = expr.before
+            kind = str(kind).upper()
+            if kind == "OFFSET":
+                parts.append(f"BEFORE(OFFSET => {int(value)})")
+            else:
+                escaped = self._escape_sql_string(str(value))
+                parts.append(f"BEFORE({kind} => '{escaped}')")
         if expr.copy_grants is not None:
             parts.append(f"COPY_GRANTS = {str(bool(expr.copy_grants)).upper()}")
         if expr.comment is not None:
             parts.append(
                 f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
             )
-        return " ".join(parts)
+        return " ".join(parts), ()
 
     def format_drop_stream_statement(
         self, expr: "SnowflakeDropStreamExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format DROP STREAM statement.
 
         Args:
             expr: :class:`SnowflakeDropStreamExpression`.
 
         Returns:
-            The formatted DROP STREAM SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         """
         parts = ["DROP STREAM"]
         if expr.if_exists:
             parts.append("IF EXISTS")
         parts.append(self.format_identifier(expr.name))
-        return " ".join(parts)
-
-    def format_stream_time_point(self, keyword: str, spec: Any) -> str:
-        """Render an AT / BEFORE time-travel point.
-
-        ``spec`` is a ``(kind, value)`` tuple where kind is one of
-        ``TIMESTAMP`` / ``OFFSET`` / ``STATEMENT``.
-        """
-        kind, value = spec
-        kind = str(kind).upper()
-        if kind == "OFFSET":
-            return f"{keyword}(OFFSET => {int(value)})"
-        escaped = self._escape_sql_string(str(value))
-        return f"{keyword}({kind} => '{escaped}')"
+        return " ".join(parts), ()

@@ -9,9 +9,9 @@ with optional ``APPEND_ONLY`` / ``INSERT_ONLY`` controls and ``AT`` /
 ``BEFORE`` time-travel points, and dropped via ``DROP STREAM``.
 
 Official Documentation:
-- https://docs.snowflake.com/en/sql-reference/sql/create-stream
+- CREATE STREAM: https://docs.snowflake.com/en/sql-reference/sql/create-stream
 """
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.stream import (
@@ -30,12 +30,12 @@ class SnowflakeStreamSupport(Protocol):
 
     def format_create_stream_statement(
         self, expr: "SnowflakeCreateStreamExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] STREAM statement."""
         ...
 
     def format_drop_stream_statement(
         self, expr: "SnowflakeDropStreamExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format DROP STREAM statement."""
         ...

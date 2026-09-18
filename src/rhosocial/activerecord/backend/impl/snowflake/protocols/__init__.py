@@ -20,7 +20,6 @@ from .file_format import SnowflakeFileFormatSupport
 from .routine import SnowflakeRoutineSupport
 from .undrop import SnowflakeUndropSupport
 from .materialized_view import SnowflakeMaterializedViewSupport
-from .dynamic_identifier import SnowflakeDynamicIdentifierSupport
 from .table_modifier import SnowflakeTableModifierSupport
 from .sample import SnowflakeSampleSupport
 from .pivot import SnowflakePivotSupport
@@ -42,7 +41,6 @@ __all__ = [
     "SnowflakeRoutineSupport",
     "SnowflakeUndropSupport",
     "SnowflakeMaterializedViewSupport",
-    "SnowflakeDynamicIdentifierSupport",
     "SnowflakeTableModifierSupport",
     "SnowflakeSampleSupport",
     "SnowflakePivotSupport",

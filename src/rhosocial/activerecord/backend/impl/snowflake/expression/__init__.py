@@ -34,11 +34,16 @@ from .show import (
     SnowflakeShowObjectType,
     SnowflakeShowScope,
 )
+from .variant import (
+    SnowflakeVariantPathAccessExpression,
+    SnowflakeVariantCastExpression,
+)
 from .ddl import (
     SnowflakeAlterWarehouseMode,
     SnowflakeCreateWarehouseExpression,
     SnowflakeAlterWarehouseExpression,
     SnowflakeDropWarehouseExpression,
+    SnowflakeWarehouseOptionsExpression,
     SnowflakeCopyIntoMode,
     SnowflakeCreateStageExpression,
     SnowflakeAlterStageExpression,
@@ -97,10 +102,13 @@ __all__ = [
     "SnowflakeShowExpression",
     "SnowflakeShowObjectType",
     "SnowflakeShowScope",
+    "SnowflakeVariantPathAccessExpression",
+    "SnowflakeVariantCastExpression",
     "SnowflakeAlterWarehouseMode",
     "SnowflakeCreateWarehouseExpression",
     "SnowflakeAlterWarehouseExpression",
     "SnowflakeDropWarehouseExpression",
+    "SnowflakeWarehouseOptionsExpression",
     "SnowflakeCopyIntoMode",
     "SnowflakeCreateStageExpression",
     "SnowflakeAlterStageExpression",

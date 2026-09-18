@@ -102,7 +102,7 @@ class SnowflakeCreateProcedureExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_create_procedure_statement(self), ()
+        return self.dialect.format_create_procedure_statement(self)
 
 
 class SnowflakeCreateFunctionExpression(BaseExpression):
@@ -152,7 +152,7 @@ class SnowflakeCreateFunctionExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_create_function_statement(self), ()
+        return self.dialect.format_create_function_statement(self)
 
 
 class SnowflakeDropRoutineExpression(BaseExpression):
@@ -184,4 +184,4 @@ class SnowflakeDropRoutineExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_drop_routine_statement(self), ()
+        return self.dialect.format_drop_routine_statement(self)

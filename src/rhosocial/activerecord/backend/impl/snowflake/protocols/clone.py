@@ -23,15 +23,3 @@ class SnowflakeCloneSupport(Protocol):
     def supports_clone(self) -> bool:
         """Whether CLONE operations are supported."""
         ...
-
-    def format_clone_table(self, target: str, source: str) -> str:
-        """Format CREATE TABLE ... CLONE statement."""
-        ...
-
-    def format_clone_schema(self, target: str, source: str) -> str:
-        """Format CREATE SCHEMA ... CLONE statement."""
-        ...
-
-    def format_clone_database(self, target: str, source: str) -> str:
-        """Format CREATE DATABASE ... CLONE statement."""
-        ...

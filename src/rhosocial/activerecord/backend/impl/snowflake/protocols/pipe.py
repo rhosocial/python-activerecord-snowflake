@@ -8,10 +8,10 @@ via CREATE / ALTER / DROP PIPE statements, with ``AUTO_INGEST`` mode and
 REFRESH / PAUSE / RESUME controls.
 
 Official Documentation:
-- https://docs.snowflake.com/en/sql-reference/sql/create-pipe
-- https://docs.snowflake.com/en/sql-reference/sql/alter-pipe
+- CREATE PIPE: https://docs.snowflake.com/en/sql-reference/sql/create-pipe
+- ALTER PIPE:  https://docs.snowflake.com/en/sql-reference/sql/alter-pipe
 """
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.pipe import (
@@ -31,18 +31,18 @@ class SnowflakePipeSupport(Protocol):
 
     def format_create_pipe_statement(
         self, expr: "SnowflakeCreatePipeExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] PIPE statement."""
         ...
 
     def format_alter_pipe_statement(
         self, expr: "SnowflakeAlterPipeExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format ALTER PIPE statement (REFRESH / SET / PAUSE / RESUME)."""
         ...
 
     def format_drop_pipe_statement(
         self, expr: "SnowflakeDropPipeExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format DROP PIPE statement."""
         ...

@@ -94,7 +94,7 @@ class SnowflakeCreateWarehouseExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_create_warehouse_statement(self), ()
+        return self.dialect.format_create_warehouse_statement(self)
 
 
 class SnowflakeAlterWarehouseExpression(BaseExpression):
@@ -154,7 +154,7 @@ class SnowflakeAlterWarehouseExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_alter_warehouse_statement(self), ()
+        return self.dialect.format_alter_warehouse_statement(self)
 
 
 class SnowflakeDropWarehouseExpression(BaseExpression):
@@ -183,4 +183,4 @@ class SnowflakeDropWarehouseExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_drop_warehouse_statement(self), ()
+        return self.dialect.format_drop_warehouse_statement(self)

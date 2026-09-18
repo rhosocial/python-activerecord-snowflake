@@ -12,7 +12,7 @@ Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/sql/create-table
 - https://docs.snowflake.com/en/sql-reference/sql/alter-table
 """
-from typing import Iterable, Optional, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -33,43 +33,4 @@ class SnowflakeTableModifierSupport(Protocol):
 
     def supports_search_optimization(self) -> bool:
         """Whether SEARCH OPTIMIZATION is supported."""
-        ...
-
-    def format_create_table_modifier(
-        self,
-        *,
-        or_replace: bool = False,
-        transient: bool = False,
-        temporary: bool = False,
-    ) -> str:
-        """Format CREATE TABLE header modifier tokens."""
-        ...
-
-    def format_create_table_options(
-        self,
-        *,
-        data_retention_time_in_days: Optional[int] = None,
-        change_tracking: Optional[bool] = None,
-        comment: Optional[str] = None,
-    ) -> str:
-        """Format trailing CREATE TABLE options."""
-        ...
-
-    def format_alter_table_cluster_by(
-        self, table: str, columns: Iterable[str]
-    ) -> str:
-        """Format ALTER TABLE ... CLUSTER BY statement."""
-        ...
-
-    def format_drop_clustering_key(self, table: str) -> str:
-        """Format ALTER TABLE ... DROP CLUSTERING KEY statement."""
-        ...
-
-    def format_add_search_optimization(
-        self,
-        table: str,
-        on: Optional[Iterable[str]] = None,
-        method: str = "EQUALITY",
-    ) -> str:
-        """Format ALTER TABLE ... ADD SEARCH OPTIMIZATION statement."""
         ...

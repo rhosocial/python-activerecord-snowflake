@@ -21,11 +21,3 @@ class SnowflakeArraySupport(Protocol):
     def supports_array_type(self) -> bool:
         """Whether ARRAY type is supported."""
         ...
-
-    def format_array_construct(self, elements: str) -> str:
-        """Format array construction expression."""
-        ...
-
-    def format_array_access(self, array_expr: str, index: str) -> str:
-        """Format array element access expression."""
-        ...

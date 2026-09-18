@@ -112,7 +112,7 @@ class SnowflakeCreateTaskExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_create_task_statement(self), ()
+        return self.dialect.format_create_task_statement(self)
 
 
 class SnowflakeAlterTaskExpression(BaseExpression):
@@ -165,7 +165,7 @@ class SnowflakeAlterTaskExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_alter_task_statement(self), ()
+        return self.dialect.format_alter_task_statement(self)
 
 
 class SnowflakeExecuteTaskExpression(BaseExpression):
@@ -194,7 +194,7 @@ class SnowflakeExecuteTaskExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_execute_task_statement(self), ()
+        return self.dialect.format_execute_task_statement(self)
 
 
 class SnowflakeDropTaskExpression(BaseExpression):
@@ -223,4 +223,4 @@ class SnowflakeDropTaskExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_drop_task_statement(self), ()
+        return self.dialect.format_drop_task_statement(self)

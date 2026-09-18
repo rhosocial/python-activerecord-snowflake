@@ -18,6 +18,9 @@ from .warehouse import (
     SnowflakeAlterWarehouseExpression,
     SnowflakeDropWarehouseExpression,
 )
+from .warehouse_options import (
+    SnowflakeWarehouseOptionsExpression,
+)
 from .stage import (
     SnowflakeCopyIntoMode,
     SnowflakeCreateStageExpression,
@@ -70,6 +73,7 @@ __all__ = [
     "SnowflakeCreateWarehouseExpression",
     "SnowflakeAlterWarehouseExpression",
     "SnowflakeDropWarehouseExpression",
+    "SnowflakeWarehouseOptionsExpression",
     "SnowflakeCopyIntoMode",
     "SnowflakeCreateStageExpression",
     "SnowflakeAlterStageExpression",

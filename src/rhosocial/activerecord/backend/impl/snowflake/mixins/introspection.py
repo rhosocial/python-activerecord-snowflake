@@ -104,7 +104,7 @@ class SnowflakeIntrospectionMixin:
         include_system = params.get("include_system", False)
         table_type = params.get("table_type")
 
-        conditions = ["TABLE_SCHEMA = %s"]
+        conditions = [f"TABLE_SCHEMA = {self.p()}"]
         sql_params: list = [schema]
 
         if not include_system:
@@ -114,7 +114,7 @@ class SnowflakeIntrospectionMixin:
         if not include_views:
             conditions.append("TABLE_TYPE = 'BASE TABLE'")
         if table_type:
-            conditions.append("TABLE_TYPE = %s")
+            conditions.append(f"TABLE_TYPE = {self.p()}")
             sql_params.append(table_type)
 
         where = " AND ".join(conditions)
@@ -138,7 +138,7 @@ class SnowflakeIntrospectionMixin:
             "DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, NUMERIC_PRECISION, NUMERIC_SCALE, "
             "COLLATION_NAME, COMMENT "
             "FROM INFORMATION_SCHEMA.COLUMNS "
-            "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s "
+            f"WHERE TABLE_SCHEMA = {self.p()} AND TABLE_NAME = {self.p()} "
             "ORDER BY ORDINAL_POSITION"
         )
         return (sql, (schema, table_name))
@@ -163,7 +163,7 @@ class SnowflakeIntrospectionMixin:
             "JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu "
             "  ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME "
             "  AND tc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA "
-            "WHERE tc.TABLE_SCHEMA = %s AND tc.TABLE_NAME = %s "
+            f"WHERE tc.TABLE_SCHEMA = {self.p()} AND tc.TABLE_NAME = {self.p()} "
             "  AND tc.CONSTRAINT_TYPE IN ('PRIMARY KEY', 'UNIQUE') "
             "ORDER BY tc.CONSTRAINT_NAME, kcu.ORDINAL_POSITION"
         )
@@ -197,8 +197,8 @@ class SnowflakeIntrospectionMixin:
             "  ON rc.UNIQUE_CONSTRAINT_NAME = ukcu.CONSTRAINT_NAME "
             "  AND rc.UNIQUE_CONSTRAINT_SCHEMA = ukcu.CONSTRAINT_SCHEMA "
             "  AND kcu.POSITION_IN_UNIQUE_CONSTRAINT = ukcu.ORDINAL_POSITION "
-            "WHERE rc.CONSTRAINT_SCHEMA = %s "
-            "  AND kcu.TABLE_NAME = %s "
+            f"WHERE rc.CONSTRAINT_SCHEMA = {self.p()} "
+            f"  AND kcu.TABLE_NAME = {self.p()} "
             "ORDER BY rc.CONSTRAINT_NAME, kcu.ORDINAL_POSITION"
         )
         return (sql, (schema, table_name))
@@ -211,7 +211,7 @@ class SnowflakeIntrospectionMixin:
         schema = params.get("schema", "")
         include_system = params.get("include_system", False)
 
-        conditions = ["TABLE_SCHEMA = %s"]
+        conditions = [f"TABLE_SCHEMA = {self.p()}"]
         sql_params: list = [schema]
 
         if not include_system:
@@ -238,7 +238,7 @@ class SnowflakeIntrospectionMixin:
         sql = (
             "SELECT TABLE_NAME, VIEW_DEFINITION, CHECK_OPTION, IS_UPDATABLE "
             "FROM INFORMATION_SCHEMA.VIEWS "
-            "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s"
+            f"WHERE TABLE_SCHEMA = {self.p()} AND TABLE_NAME = {self.p()}"
         )
         return (sql, (schema, view_name))
 

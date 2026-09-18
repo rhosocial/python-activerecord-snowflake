@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/materialized_view.py
 """SnowflakeMaterializedViewMixin — materialized view DDL support."""
 
-from typing import TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.materialized_view import (
@@ -18,14 +18,14 @@ class SnowflakeMaterializedViewMixin:
 
     def format_create_materialized_view_statement(
         self, expr: "SnowflakeCreateMaterializedViewExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] MATERIALIZED VIEW statement.
 
         Args:
             expr: :class:`SnowflakeCreateMaterializedViewExpression`.
 
         Returns:
-            The formatted CREATE MATERIALIZED VIEW SQL string.
+            Tuple of (SQL string, empty params tuple).
 
         Raises:
             ValueError: when ``as_query`` is not specified.
@@ -52,4 +52,4 @@ class SnowflakeMaterializedViewMixin:
                 f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
             )
         parts.extend(["AS", str(expr.as_query)])
-        return " ".join(parts)
+        return " ".join(parts), ()

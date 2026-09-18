@@ -65,4 +65,4 @@ class SnowflakeCreateMaterializedViewExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        return self.dialect.format_create_materialized_view_statement(self), ()
+        return self.dialect.format_create_materialized_view_statement(self)

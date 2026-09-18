@@ -10,7 +10,7 @@ rotating columns into rows. Snowflake syntax is compatible with Oracle's
 Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/constructs/pivot
 """
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.pivot import (
@@ -33,12 +33,12 @@ class SnowflakePivotSupport(Protocol):
 
     def format_pivot_clause(
         self, expr: "SnowflakePivotExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format a PIVOT clause."""
         ...
 
     def format_unpivot_clause(
         self, expr: "SnowflakeUnpivotExpression"
-    ) -> str:
+    ) -> Tuple[str, tuple]:
         """Format an UNPIVOT clause."""
         ...

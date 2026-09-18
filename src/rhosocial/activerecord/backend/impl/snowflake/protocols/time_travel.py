@@ -24,15 +24,3 @@ class SnowflakeTimeTravelSupport(Protocol):
     def supports_time_travel(self) -> bool:
         """Whether time travel queries are supported."""
         ...
-
-    def format_time_travel_at_timestamp(self, timestamp: str) -> str:
-        """Format AT(TIMESTAMP => ...) clause."""
-        ...
-
-    def format_time_travel_at_offset(self, seconds: int) -> str:
-        """Format AT(OFFSET => ...) clause."""
-        ...
-
-    def format_time_travel_before_timestamp(self, timestamp: str) -> str:
-        """Format BEFORE(TIMESTAMP => ...) clause."""
-        ...
