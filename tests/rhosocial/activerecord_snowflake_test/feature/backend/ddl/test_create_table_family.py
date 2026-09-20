@@ -8,6 +8,9 @@ flags are advertised. Pure construction tests — no real instance required.
 import pytest
 
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
+from rhosocial.activerecord.backend.impl.snowflake.expression import (
+    SnowflakeCreateTableOptions,
+)
 from rhosocial.activerecord.backend.expression import (
     CreateTableLikeExpression,
     CreateTableCloneExpression,
@@ -73,7 +76,7 @@ class TestSnowflakeCreateTableFamily:
             dialect,
             table="t",
             columns=[],
-            table_options=CreateTableOptions(dialect, transient=True),
+            table_options=SnowflakeCreateTableOptions(dialect, transient=True),
         )
         sql, _ = expr.to_sql()
         assert sql.startswith("CREATE TRANSIENT TABLE")
@@ -83,7 +86,9 @@ class TestSnowflakeCreateTableFamily:
             dialect,
             table="t",
             columns=[],
-            table_options=CreateTableOptions(dialect, or_replace=True, transient=True),
+            table_options=SnowflakeCreateTableOptions(
+                dialect, or_replace=True, transient=True
+            ),
         )
         sql, _ = expr.to_sql()
         assert sql.startswith("CREATE OR REPLACE TRANSIENT TABLE")
