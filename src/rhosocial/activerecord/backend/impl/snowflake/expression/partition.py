@@ -13,7 +13,7 @@ generic RANGE/LIST/HASH ``PartitionClause`` is *not* valid Snowflake syntax
 and is rejected by the Snowflake partition mixin.
 """
 
-from typing import Any, Dict, Optional, Sequence, TYPE_CHECKING
+from typing import Sequence, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
@@ -39,8 +39,6 @@ class SnowflakeClusterByClause(BaseExpression):
         self,
         dialect: "SQLDialectBase",
         keys: Sequence[BaseExpression],
-        *,
-        dialect_options: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(dialect)
         if not keys:
@@ -51,13 +49,7 @@ class SnowflakeClusterByClause(BaseExpression):
                     "clustering keys must be BaseExpression instances, "
                     f"got {type(key).__name__}"
                 )
-        if dialect_options is not None and not isinstance(dialect_options, dict):
-            raise TypeError(
-                "dialect_options must be a dict when provided, "
-                f"got {type(dialect_options).__name__}"
-            )
         self.keys = list(keys)
-        self.dialect_options = dict(dialect_options or {})
 
     @property
     def format_method(self) -> str:
@@ -80,8 +72,6 @@ class SnowflakeExternalPartitionClause(BaseExpression):
         self,
         dialect: "SQLDialectBase",
         columns: Sequence[BaseExpression],
-        *,
-        dialect_options: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(dialect)
         if not columns:
@@ -92,13 +82,7 @@ class SnowflakeExternalPartitionClause(BaseExpression):
                     "partition columns must be BaseExpression instances, "
                     f"got {type(column).__name__}"
                 )
-        if dialect_options is not None and not isinstance(dialect_options, dict):
-            raise TypeError(
-                "dialect_options must be a dict when provided, "
-                f"got {type(dialect_options).__name__}"
-            )
         self.columns = list(columns)
-        self.dialect_options = dict(dialect_options or {})
 
     @property
     def format_method(self) -> str:
