@@ -16,6 +16,9 @@ from rhosocial.activerecord.backend.expression import (
     ValuesSource,
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
+from rhosocial.activerecord.backend.impl.snowflake.expression import (
+    SnowflakeInsertExpression,
+)
 from rhosocial.activerecord.backend.impl.snowflake.protocols import (
     SnowflakeDMLSupport,
 )
@@ -50,12 +53,12 @@ class TestSnowflakeInsertOverwrite:
     """INSERT OVERWRITE statement generation."""
 
     def test_insert_overwrite_via_dialect_option(self, dialect, select_source):
-        expr = InsertExpression(
+        expr = SnowflakeInsertExpression(
             dialect,
             into="t",
             source=select_source,
             columns=["id", "name"],
-            dialect_options={"overwrite": True},
+            overwrite=True,
         )
         sql, params = expr.to_sql()
         assert sql == (
@@ -89,11 +92,11 @@ class TestSnowflakeInsertOverwrite:
                 Literal(dialect, "b"),
             ],
         ]
-        expr = InsertExpression(
+        expr = SnowflakeInsertExpression(
             dialect,
             into="t",
             source=ValuesSource(dialect, values),
-            dialect_options={"overwrite": True},
+            overwrite=True,
         )
         sql, params = expr.to_sql()
         assert sql == (
