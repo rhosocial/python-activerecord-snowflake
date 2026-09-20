@@ -135,6 +135,7 @@ from .mixins import (
     SnowflakeAlterColumnModifierMixin,
     SnowflakeWarehouseMixin,
     SnowflakeSchemaMixin,
+    SnowflakeDatabaseMixin,
     # New mixins from dialect.py split
     SnowflakeDateTimeMixin,
     SnowflakeCollationMixin,
@@ -194,6 +195,7 @@ class SnowflakeDialect(
     ViewMixin,
     TruncateMixin,
     SnowflakeSchemaMixin,  # Before SchemaMixin to enable Snowflake schema DDL
+    SnowflakeDatabaseMixin,
     SchemaMixin,
     IndexMixin,
     SnowflakeTableModifierMixin,  # Before TableMixin to override create-table capability flags
