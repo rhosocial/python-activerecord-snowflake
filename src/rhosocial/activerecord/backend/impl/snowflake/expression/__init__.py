@@ -18,7 +18,10 @@ from .types import (
     SnowflakeVarcharType,
     SnowflakeVariantType,
 )
-from .partition import SnowflakePartitionClause
+from .partition import (
+    SnowflakeClusterByClause,
+    SnowflakeExternalPartitionClause,
+)
 from .identifier import SnowflakeIdentifierExpression
 from .sample import (
     SnowflakeSampleExpression,
@@ -92,7 +95,8 @@ __all__ = [
     "SnowflakeTimestampTzType",
     "SnowflakeVarcharType",
     "SnowflakeVariantType",
-    "SnowflakePartitionClause",
+    "SnowflakeClusterByClause",
+    "SnowflakeExternalPartitionClause",
     "SnowflakeIdentifierExpression",
     "SnowflakeSampleExpression",
     "SnowflakeSampleForm",
