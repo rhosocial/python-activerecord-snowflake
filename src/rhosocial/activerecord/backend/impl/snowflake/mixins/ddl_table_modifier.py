@@ -11,6 +11,11 @@ These formatters are independently callable; the generic core
 ``TableMixin`` CREATE TABLE renderer is not modified.
 """
 
+from typing import Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover
+    from ..expression.partition import SnowflakeClusterByClause
+
 
 class SnowflakeTableModifierMixin:
     """Mixin for Snowflake table DDL modifier support."""
@@ -18,6 +23,23 @@ class SnowflakeTableModifierMixin:
     def supports_create_or_replace_table(self) -> bool:
         """Snowflake supports CREATE OR REPLACE TABLE."""
         return True
+
+    def format_cluster_by_clause(self, expr: "SnowflakeClusterByClause") -> Tuple[str, tuple]:
+        """Format ``CLUSTER BY ( <expr> [, ...] )`` clustering keys.
+
+        Args:
+            expr: SnowflakeClusterByClause carrying the clustering key expressions.
+
+        Returns:
+            Tuple of (SQL string, parameters tuple).
+        """
+        parts = []
+        params = []
+        for key in expr.keys:
+            key_sql, key_params = key.to_sql()
+            parts.append(key_sql)
+            params.extend(key_params)
+        return f" CLUSTER BY ({', '.join(parts)})", tuple(params)
 
     def supports_transient_table(self) -> bool:
         """Snowflake supports TRANSIENT tables."""
