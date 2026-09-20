@@ -49,6 +49,25 @@ class SnowflakeTableModifierMixin:
         """Snowflake supports CLUSTER BY clustering keys."""
         return True
 
+    def format_create_table_options(self, expr) -> Tuple[str, tuple]:
+        """Format the CREATE header modifiers for Snowflake.
+
+        Accepts both the generic ``CreateTableOptions`` (renders ``OR REPLACE``)
+        and the Snowflake ``SnowflakeCreateTableOptions`` (adds ``TRANSIENT``).
+        """
+        from rhosocial.activerecord.backend.dialect.exceptions import (
+            UnsupportedFeatureError,
+        )
+        from ..expression.table_options import SnowflakeCreateTableOptions
+
+        base_sql, params = super().format_create_table_options(expr)
+        parts = [base_sql] if base_sql else []
+        if isinstance(expr, SnowflakeCreateTableOptions) and expr.transient:
+            if not self.supports_transient_table():
+                raise UnsupportedFeatureError(self.name, "CREATE TRANSIENT TABLE")
+            parts.append("TRANSIENT")
+        return " ".join(parts), params
+
     def supports_search_optimization(self) -> bool:
         """Snowflake supports SEARCH OPTIMIZATION."""
         return True

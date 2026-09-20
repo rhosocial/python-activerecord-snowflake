@@ -18,6 +18,7 @@ from .types import (
     SnowflakeVarcharType,
     SnowflakeVariantType,
 )
+from .table_options import SnowflakeCreateTableOptions
 from .partition import (
     SnowflakeClusterByClause,
     SnowflakeExternalPartitionClause,
@@ -95,6 +96,7 @@ __all__ = [
     "SnowflakeTimestampTzType",
     "SnowflakeVarcharType",
     "SnowflakeVariantType",
+    "SnowflakeCreateTableOptions",
     "SnowflakeClusterByClause",
     "SnowflakeExternalPartitionClause",
     "SnowflakeIdentifierExpression",
