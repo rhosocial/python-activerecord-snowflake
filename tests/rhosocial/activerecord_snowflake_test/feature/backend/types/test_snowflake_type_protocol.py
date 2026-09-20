@@ -59,42 +59,17 @@ class TestNamespacePrefix:
             )
 
 
-class TestDialectOptionsForwarding:
-    def test_varchar_forwards_dialect_options(self):
-        opts = {"max_length": 100}
-        t = SnowflakeVarcharType(dialect_options=opts)
-        assert t.dialect_options == opts
+class TestDialectOptionsRemoved:
+    def test_constructor_rejects_dialect_options(self):
+        with pytest.raises(TypeError):
+            SnowflakeVarcharType(length=100, dialect_options={"x": 1})
 
-    def test_number_forwards_dialect_options(self):
-        opts = {"unsigned": True}
-        t = SnowflakeNumberType(precision=10, dialect_options=opts)
-        assert t.dialect_options == opts
 
-    def test_float_forwards_dialect_options(self):
-        opts = {"storage": "8bytes"}
-        t = SnowflakeFloatType(precision=53, dialect_options=opts)
-        assert t.dialect_options == opts
 
-    def test_timestamp_ltz_forwards_dialect_options(self):
-        opts = {"tz": "PST"}
-        t = SnowflakeTimestampLtzType(dialect_options=opts)
-        assert t.dialect_options == opts
 
-    def test_timestamp_ntz_default_dialect_options(self):
-        t = SnowflakeTimestampNtzType()
-        assert t.dialect_options == {}
 
-    def test_time_forwards_dialect_options(self):
-        t = SnowflakeTimeType(precision=3, dialect_options={"utc": True})
-        assert t.dialect_options == {"utc": True}
 
-    def test_binary_forwards_dialect_options(self):
-        t = SnowflakeBinaryType(length=1024, dialect_options={"compress": True})
-        assert t.dialect_options == {"compress": True}
 
-    def test_array_forwards_dialect_options(self):
-        t = SnowflakeArrayType(dialect_options={"max_items": 100})
-        assert t.dialect_options == {"max_items": 100}
 
 
 class TestTypeParams:
@@ -158,15 +133,7 @@ class TestTypeParams:
         b = SnowflakeNumberType(precision=100)
         assert a != b
 
-    def test_dialect_options_participate_in_eq(self):
-        a = SnowflakeVarcharType(length=100, dialect_options={"x": 1})
-        b = SnowflakeVarcharType(length=100, dialect_options={"x": 2})
-        assert a != b
 
-    def test_dialect_options_not_in_hash(self):
-        a = SnowflakeVarcharType(length=100, dialect_options={"x": 1})
-        b = SnowflakeVarcharType(length=100, dialect_options={"x": 2})
-        assert hash(a) == hash(b)
 
 
 class TestNoHandWrittenEqHash:
