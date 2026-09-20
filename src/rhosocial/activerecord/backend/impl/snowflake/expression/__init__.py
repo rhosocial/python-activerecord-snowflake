@@ -19,6 +19,8 @@ from .types import (
     SnowflakeVariantType,
 )
 from .table_options import SnowflakeCreateTableOptions
+from .database import SnowflakeCreateDatabaseExpression
+from .dml import SnowflakeInsertExpression
 from .partition import (
     SnowflakeClusterByClause,
     SnowflakeExternalPartitionClause,
@@ -97,6 +99,8 @@ __all__ = [
     "SnowflakeVarcharType",
     "SnowflakeVariantType",
     "SnowflakeCreateTableOptions",
+    "SnowflakeCreateDatabaseExpression",
+    "SnowflakeInsertExpression",
     "SnowflakeClusterByClause",
     "SnowflakeExternalPartitionClause",
     "SnowflakeIdentifierExpression",

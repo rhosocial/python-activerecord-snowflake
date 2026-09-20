@@ -61,14 +61,13 @@ class SnowflakeDatabaseMixin:
         parts = ["CREATE"]
         if expr.or_replace:
             parts.append("OR REPLACE")
-        transient = expr.dialect_options.get("transient", False)
-        if transient:
+        if getattr(expr, "transient", False):
             parts.append("TRANSIENT")
         parts.append("DATABASE")
         if expr.if_not_exists:
             parts.append("IF NOT EXISTS")
         parts.append(self.format_identifier(expr.database_name))
-        clone_source = expr.dialect_options.get("clone")
+        clone_source = getattr(expr, "clone", None)
         if clone_source:
             parts.append(f"CLONE {self.format_identifier(clone_source)}")
         if expr.comment:

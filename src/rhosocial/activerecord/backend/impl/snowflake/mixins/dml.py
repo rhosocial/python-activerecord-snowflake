@@ -12,9 +12,9 @@ if TYPE_CHECKING:
 class SnowflakeDMLMixin:
     """Mixin for Snowflake DML statement support.
 
-    Adds ``INSERT OVERWRITE`` on top of the core ``DMLMixin``. The core
-    ``InsertExpression`` carries the ``overwrite`` flag through its
-    ``dialect_options`` so no core changes are required.
+    Adds ``INSERT OVERWRITE`` on top of the core ``DMLMixin``. The Snowflake
+    ``SnowflakeInsertExpression`` carries the ``overwrite`` flag as a typed
+    field so no core changes are required.
     """
 
     def supports_insert_overwrite(self) -> bool:
@@ -26,7 +26,7 @@ class SnowflakeDMLMixin:
     ) -> Tuple[str, tuple]:
         """Format an INSERT statement, honouring the ``overwrite`` option.
 
-        When ``expr.dialect_options["overwrite"]`` is truthy the statement is
+        When ``getattr(expr, "overwrite", False)`` is truthy the statement is
         rendered as ``INSERT OVERWRITE INTO ...``.
 
         Args:
@@ -36,7 +36,7 @@ class SnowflakeDMLMixin:
             Tuple of (SQL string, params tuple).
 
         """
-        if expr.dialect_options.get("overwrite"):
+        if getattr(expr, "overwrite", False):
             return self.format_insert_overwrite_statement(expr)
         return super().format_insert_statement(expr)
 
