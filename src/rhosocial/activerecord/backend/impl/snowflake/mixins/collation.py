@@ -1,6 +1,6 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/collation.py
 """Snowflake collation support mixin."""
-from typing import TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 
@@ -23,6 +23,16 @@ class SnowflakeCollationMixin:
         from ..collation import validate_snowflake_collation_name
         spec = validate_snowflake_collation_name(expr.collation_name, getattr(self, "version", None))
         return f"'{self._escape_sql_string(spec)}'"
+
+    def format_column_attribute(self, attr) -> Tuple[str, tuple]:
+        """Snowflake requires a quoted collation specification on a column."""
+        from rhosocial.activerecord.base.ddl.attributes import CollationAttribute
+        from ..collation import validate_snowflake_collation_name
+
+        if isinstance(attr, CollationAttribute):
+            spec = validate_snowflake_collation_name(attr.name, getattr(self, "version", None))
+            return f" COLLATE '{self._escape_sql_string(spec)}'", ()
+        return super().format_column_attribute(attr)
 
 
 __all__ = ['SnowflakeCollationMixin']
