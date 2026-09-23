@@ -81,6 +81,15 @@ class SnowflakeTableModifierMixin:
         """
         return True
 
+    def supports_comment_on(self) -> bool:
+        """Whether standalone ``COMMENT ON`` statements are supported.
+
+        Snowflake natively supports ``COMMENT [IF EXISTS] ON <object> IS
+        'text'`` for tables, columns, views, and other objects; the generic
+        :class:`CommentOnMixin` rendering is used as-is.
+        """
+        return True
+
     def format_table_comment(self, comment: str) -> Tuple[str, tuple]:
         """Render a table-level ``COMMENT = 'text'`` option.
 
