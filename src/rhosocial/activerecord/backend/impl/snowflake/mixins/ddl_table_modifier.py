@@ -72,6 +72,28 @@ class SnowflakeTableModifierMixin:
         """Snowflake supports SEARCH OPTIMIZATION."""
         return True
 
+    def supports_table_comment(self) -> bool:
+        """Whether inline comments on ``CREATE TABLE`` are supported.
+
+        Snowflake natively supports both the inline ``COMMENT = 'text'`` table
+        option and the standalone ``COMMENT ON`` statement; the inline path is
+        the rendering path, so the capability advertises True.
+        """
+        return True
+
+    def format_table_comment(self, comment: str) -> Tuple[str, tuple]:
+        """Render a table-level ``COMMENT = 'text'`` option.
+
+        Snowflake's table-level comment form carries the ``=`` sign (unlike
+        the bare ``COMMENT 'text'`` of MySQL/MariaDB/ClickHouse, which the
+        generic core rendering emits); the column-level form stays bare and
+        is rendered by the generic ``format_column_definition``.
+        """
+        from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
+
+        escaped = SQLDialectBase._escape_sql_string(comment)
+        return f"COMMENT = '{escaped}'", ()
+
     def supports_create_table_like(self) -> bool:
         """Snowflake supports CREATE TABLE ... LIKE (empty copy)."""
         return True

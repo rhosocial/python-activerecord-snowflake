@@ -32,6 +32,17 @@ class SnowflakeAlterColumnModifierMixin:
         """Snowflake does **not** support ``DROP CONSTRAINT IF EXISTS``."""
         return False
 
+    def supports_column_comment(self) -> bool:
+        """Whether inline ``COMMENT 'text'`` in a column definition is
+        supported.
+
+        Snowflake renders column comments natively (the column-level
+        ``COMMENT 'text'`` form), so the capability advertises True and the
+        inline path is the rendering path. Declared on this mixin, which is
+        composed before the generic ``DDLColumnMixin`` in the MRO.
+        """
+        return True
+
     def format_add_column_action(self, action) -> Tuple[str, tuple]:
         if getattr(action, "if_not_exists", None) is True:
             forbidden = {
