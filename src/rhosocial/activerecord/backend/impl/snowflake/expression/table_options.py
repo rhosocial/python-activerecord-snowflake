@@ -9,7 +9,10 @@ has no generic equivalent. It lives on ``SnowflakeCreateTableOptions``
 
 from typing import Optional, TYPE_CHECKING
 
-from rhosocial.activerecord.backend.expression.statements import CreateTableOptions
+from rhosocial.activerecord.backend.expression.statements import (
+    CreateTableOptions,
+    TableCommentClause,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
@@ -31,7 +34,7 @@ class SnowflakeCreateTableOptions(CreateTableOptions):
         dialect: "SQLDialectBase",
         *,
         or_replace: bool = False,
-        comment: Optional[str] = None,
+        comment: Optional[TableCommentClause] = None,
         transient: bool = False,
     ):
         super().__init__(dialect, or_replace=or_replace, comment=comment)
