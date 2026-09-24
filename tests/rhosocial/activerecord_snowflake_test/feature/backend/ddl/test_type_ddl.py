@@ -164,7 +164,10 @@ def test_scalar_create_type_renders_schema_qualification():
     )
 
     assert definition.to_sql() == ("AS NUMBER(3, 0)", ())
-    assert expression.to_sql() == ('CREATE TYPE "app"."age" AS NUMBER(3, 0)')
+    assert expression.to_sql() == (
+        'CREATE TYPE "app"."age" AS NUMBER(3, 0)',
+        (),
+    )
 
 
 def test_create_options_are_rendered_in_snowflake_order():
@@ -187,8 +190,14 @@ def test_create_options_are_rendered_in_snowflake_order():
         if_not_exists=True,
     )
 
-    assert replace.to_sql() == 'CREATE OR REPLACE TYPE "label" AS VARCHAR'
-    assert create_if_missing.to_sql() == 'CREATE TYPE IF NOT EXISTS "label" AS VARCHAR'
+    assert replace.to_sql() == (
+        'CREATE OR REPLACE TYPE "label" AS VARCHAR',
+        (),
+    )
+    assert create_if_missing.to_sql() == (
+        'CREATE TYPE IF NOT EXISTS "label" AS VARCHAR',
+        (),
+    )
     with pytest.raises(ValueError, match="mutually exclusive"):
         SnowflakeCreateTypeExpression(
             dialect,
@@ -215,7 +224,8 @@ def test_create_type_qualification_and_comment_are_safely_quoted():
     )
 
     assert expression.to_sql() == (
-        'CREATE TYPE "DB""name"."S""chema"."age type" AS NUMBER(3, 0) COMMENT = \'owner\'\'s type\''
+        'CREATE TYPE "DB""name"."S""chema"."age type" AS NUMBER(3, 0) COMMENT = \'owner\'\'s type\'',
+        (),
     )
 
 
@@ -241,7 +251,8 @@ def test_object_type_definition_renders_typed_object_fields():
         (),
     )
     assert expression.to_sql() == (
-        'CREATE TYPE "DB"."APP"."address" AS OBJECT("street" VARCHAR(100), "segments" ARRAY)'
+        'CREATE TYPE "DB"."APP"."address" AS OBJECT("street" VARCHAR(100), "segments" ARRAY)',
+        (),
     )
 
 
@@ -274,7 +285,10 @@ def test_scalar_udt_rejects_another_udt_as_base_type():
     )
     definition = SnowflakeScalarTypeDefinition(dialect, reference)
 
-    assert reference.to_sql() == '"DB"."APP"."age"'
+    assert reference.to_sql() == (
+        '"DB"."APP"."age"',
+        (),
+    )
     with pytest.raises(UnsupportedFeatureError, match="another UDT"):
         definition.to_sql()
 
@@ -297,8 +311,14 @@ def test_alter_type_set_and_unset_comment_actions():
         schema_name="APP",
     )
 
-    assert set_expression.to_sql() == ('ALTER TYPE IF EXISTS "DB"."APP"."age" SET COMMENT = \'owner\'\'s type\'')
-    assert unset_expression.to_sql() == ('ALTER TYPE "APP"."age" UNSET COMMENT')
+    assert set_expression.to_sql() == (
+        'ALTER TYPE IF EXISTS "DB"."APP"."age" SET COMMENT = \'owner\'\'s type\'',
+        (),
+    )
+    assert unset_expression.to_sql() == (
+        'ALTER TYPE "APP"."age" UNSET COMMENT',
+        (),
+    )
 
 
 def test_alter_type_rejects_multiple_or_unknown_actions():
@@ -327,7 +347,10 @@ def test_drop_type_has_no_if_exists_cascade_or_restrict():
         schema_name="APP",
     )
 
-    assert expression.to_sql() == 'DROP TYPE "DB"."APP"."age"'
+    assert expression.to_sql() == (
+        'DROP TYPE "DB"."APP"."age"',
+        (),
+    )
 
     with pytest.raises(UnsupportedFeatureError, match="IF EXISTS"):
         DropTypeExpression(dialect, "age", if_exists=True).to_sql()
