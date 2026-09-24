@@ -19,8 +19,9 @@ Key Snowflake types:
 - GEOGRAPHY
 - GEOMETRY
 """
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
+from rhosocial.activerecord.backend.expression.serialization import ExpressionRegistry
 from rhosocial.activerecord.backend.expression.types._base import DataType
 from rhosocial.activerecord.backend.expression.types.integer import IntegerType
 from rhosocial.activerecord.backend.expression.types.string import VarCharType
@@ -30,6 +31,9 @@ from rhosocial.activerecord.backend.expression.types.binary import BlobType
 from rhosocial.activerecord.backend.expression.types.datetime_ import DateType, TimeType, TimestampType
 from rhosocial.activerecord.backend.expression.types.json_ import JsonType
 from rhosocial.activerecord.backend.expression.types.array import ArrayType
+
+if TYPE_CHECKING:
+    from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
 
 class SnowflakeDataTypeMixin:
@@ -310,3 +314,56 @@ class SnowflakeGeometryType(SnowflakeDataTypeMixin, DataType):
 
     def format_type(self, dialect=None) -> str:
         return "GEOMETRY"
+
+
+class SnowflakeUserDefinedType(DataType):
+    """Reference to a Snowflake schema-level user-defined type."""
+
+    name = "snowflake_user_defined"
+
+    def __init__(
+        self,
+        dialect: Optional["SQLDialectBase"] = None,
+        *,
+        type_name: str,
+        schema_name: Optional[str] = None,
+        database_name: Optional[str] = None,
+    ) -> None:
+        super().__init__(dialect)
+        for field_name, value in (
+            ("type_name", type_name),
+            ("schema_name", schema_name),
+            ("database_name", database_name),
+        ):
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ValueError(f"{field_name} must be a non-empty string")
+        if database_name is not None and schema_name is None:
+            raise ValueError("schema_name is required when database_name is provided")
+        self.type_name = type_name
+        self.schema_name = schema_name
+        self.database_name = database_name
+
+    def _type_params(self) -> tuple:
+        return (self.database_name, self.schema_name, self.type_name)
+
+
+_SNOWFLAKE_DATA_TYPES = (
+    SnowflakeVarcharType,
+    SnowflakeNumberType,
+    SnowflakeFloatType,
+    SnowflakeBooleanType,
+    SnowflakeTimestampLtzType,
+    SnowflakeTimestampNtzType,
+    SnowflakeTimestampTzType,
+    SnowflakeDateType,
+    SnowflakeTimeType,
+    SnowflakeBinaryType,
+    SnowflakeVariantType,
+    SnowflakeObjectType,
+    SnowflakeArrayType,
+    SnowflakeGeographyType,
+    SnowflakeGeometryType,
+    SnowflakeUserDefinedType,
+)
+for _data_type in _SNOWFLAKE_DATA_TYPES:
+    ExpressionRegistry.register(_data_type)

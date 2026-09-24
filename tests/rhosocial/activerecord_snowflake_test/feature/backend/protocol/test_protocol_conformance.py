@@ -5,7 +5,6 @@ Per the project's testing rules, every backend must include 5 mandatory
 protocol conformance test classes.
 """
 import inspect
-from typing import get_type_hints
 
 import pytest
 
@@ -23,7 +22,6 @@ from rhosocial.activerecord.backend.impl.snowflake.mixins import (
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
     SnowflakeStageMixin,
-    SnowflakeTransactionMixin,
 )
 from rhosocial.activerecord.backend.dialect import protocols as dialect_protocols
 from rhosocial.activerecord.backend.dialect.protocols import (
@@ -56,10 +54,12 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     TransactionControlSupport,
     TruncateSupport,
     UpsertSupport,
+    UserDefinedTypeSupport,
     ViewSupport,
     WildcardSupport,
     WindowFunctionSupport,
     ArraySupport as GenericArraySupport,
+
     AlterTableModifierSupport,
     PartitionSupport,
     TableSupport,
@@ -76,6 +76,7 @@ SNOWFLAKE_PROTOCOLS = [
     ColumnAttributeSupport,
     CommentSupport,
     DDLTypeSupport,
+    UserDefinedTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
     GeneratedColumnSupport,
