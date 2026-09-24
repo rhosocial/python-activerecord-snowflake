@@ -67,6 +67,16 @@ from .undrop import (
 from .materialized_view import (
     SnowflakeCreateMaterializedViewExpression,
 )
+from .type import (
+    SnowflakeTypeField,
+    SnowflakeScalarTypeDefinition,
+    SnowflakeObjectTypeDefinition,
+    SnowflakeSetTypeCommentAction,
+    SnowflakeUnsetTypeCommentAction,
+    SnowflakeCreateTypeExpression,
+    SnowflakeAlterTypeExpression,
+    SnowflakeDropTypeExpression,
+)
 
 __all__ = [
     "SnowflakeAlterWarehouseMode",
@@ -104,4 +114,12 @@ __all__ = [
     "SnowflakeUndropObjectType",
     "SnowflakeUndropExpression",
     "SnowflakeCreateMaterializedViewExpression",
+    "SnowflakeTypeField",
+    "SnowflakeScalarTypeDefinition",
+    "SnowflakeObjectTypeDefinition",
+    "SnowflakeSetTypeCommentAction",
+    "SnowflakeUnsetTypeCommentAction",
+    "SnowflakeCreateTypeExpression",
+    "SnowflakeAlterTypeExpression",
+    "SnowflakeDropTypeExpression",
 ]

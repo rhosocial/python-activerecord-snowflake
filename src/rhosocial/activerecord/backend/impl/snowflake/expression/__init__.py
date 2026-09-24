@@ -15,6 +15,7 @@ from .types import (
     SnowflakeTimestampLtzType,
     SnowflakeTimestampNtzType,
     SnowflakeTimestampTzType,
+    SnowflakeUserDefinedType,
     SnowflakeVarcharType,
     SnowflakeVariantType,
 )
@@ -80,6 +81,14 @@ from .ddl import (
     SnowflakeUndropObjectType,
     SnowflakeUndropExpression,
     SnowflakeCreateMaterializedViewExpression,
+    SnowflakeTypeField,
+    SnowflakeScalarTypeDefinition,
+    SnowflakeObjectTypeDefinition,
+    SnowflakeSetTypeCommentAction,
+    SnowflakeUnsetTypeCommentAction,
+    SnowflakeCreateTypeExpression,
+    SnowflakeAlterTypeExpression,
+    SnowflakeDropTypeExpression,
 )
 
 __all__ = [
@@ -96,6 +105,7 @@ __all__ = [
     "SnowflakeTimestampLtzType",
     "SnowflakeTimestampNtzType",
     "SnowflakeTimestampTzType",
+    "SnowflakeUserDefinedType",
     "SnowflakeVarcharType",
     "SnowflakeVariantType",
     "SnowflakeCreateTableOptions",
@@ -149,4 +159,12 @@ __all__ = [
     "SnowflakeUndropObjectType",
     "SnowflakeUndropExpression",
     "SnowflakeCreateMaterializedViewExpression",
+    "SnowflakeTypeField",
+    "SnowflakeScalarTypeDefinition",
+    "SnowflakeObjectTypeDefinition",
+    "SnowflakeSetTypeCommentAction",
+    "SnowflakeUnsetTypeCommentAction",
+    "SnowflakeCreateTypeExpression",
+    "SnowflakeAlterTypeExpression",
+    "SnowflakeDropTypeExpression",
 ]

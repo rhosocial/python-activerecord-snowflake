@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from typing import Tuple
 
+from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.dialect.mixins.ddl_type import DDLTypeMixin
 from rhosocial.activerecord.backend.dialect.protocols import DDLTypeSupport
 from rhosocial.activerecord.backend.expression.types import (
@@ -45,9 +46,11 @@ from ..expression.types import (
     SnowflakeTimestampLtzType,
     SnowflakeTimestampNtzType,
     SnowflakeTimestampTzType,
+    SnowflakeUserDefinedType,
     SnowflakeVariantType,
     SnowflakeVarcharType,
 )
+from .ddl_type import SNOWFLAKE_TYPE_DDL_MIN_VERSION
 
 
 class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
@@ -69,6 +72,15 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
     _SNOW_FLOAT_PRECISION_MAX = 126  # binary precision
     _SNOW_TIMESTAMP_PRECISION_MAX = 9  # fractional seconds
     _SNOW_TIME_PRECISION_MAX = 9  # fractional seconds
+
+    def supports_data_type_snowflake_user_defined(self) -> bool:
+        version = getattr(self, "version", None)
+        if version is None:
+            return False
+        try:
+            return tuple(version) >= SNOWFLAKE_TYPE_DDL_MIN_VERSION
+        except TypeError:
+            return False
 
     def _validate_number_precision(self, precision: int, scale: int = 0) -> None:
         if not 1 <= precision <= self._SNOW_NUMBER_PRECISION_MAX:
@@ -233,6 +245,24 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
 
     def format_data_type_snowflake_array(self, expr: SnowflakeArrayType) -> Tuple[str, tuple]:
         return "ARRAY", ()
+
+    def format_data_type_snowflake_user_defined(
+        self,
+        expr: SnowflakeUserDefinedType,
+    ) -> Tuple[str, tuple]:
+        if not self.supports_data_type_snowflake_user_defined():
+            raise UnsupportedFeatureError(
+                self.name,
+                "user-defined type references",
+                suggestion="Snowflake user-defined types require server version 10.8 or newer.",
+            )
+        parts = []
+        if expr.database_name is not None:
+            parts.append(self.format_identifier(expr.database_name))
+        if expr.schema_name is not None:
+            parts.append(self.format_identifier(expr.schema_name))
+        parts.append(self.format_identifier(expr.type_name))
+        return ".".join(parts), ()
 
     def format_data_type_snowflake_geography(self, expr: SnowflakeGeographyType) -> Tuple[str, tuple]:
         return "GEOGRAPHY", ()
