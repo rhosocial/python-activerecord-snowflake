@@ -180,6 +180,7 @@ SNOWFLAKE_NOT_IMPLEMENTED = [
     # --- Intentional non-support ---
     # Snowflake dialect does not compose the generic DatabaseMixin.
     dialect_protocols.DatabaseSupport,
+    dialect_protocols.DomainSupport,
     # Snowflake has no SQL/XML support.
     dialect_protocols.SQLXMLSupport,
     dialect_protocols.SQLXMLParsingSupport,
@@ -233,20 +234,17 @@ class TestSnowflakeDialectNegativeProtocolConformance:
 
     def test_positive_and_negative_lists_partition_all_protocols(self):
         """Every generic protocol must be classified for Snowflake."""
-        all_protos = set(get_all_generic_protocols())
-        positive = {
-            p.__name__
-            for p in SNOWFLAKE_PROTOCOLS
-            if p.__module__ == dialect_protocols.__name__
-        }
-        negative = {p.__name__ for p in SNOWFLAKE_NOT_IMPLEMENTED}
+        all_protos = set(get_all_generic_protocols().values())
+        positive = {p for p in SNOWFLAKE_PROTOCOLS if p in all_protos}
+        negative = set(SNOWFLAKE_NOT_IMPLEMENTED)
 
-        overlap = positive & negative
+        overlap = {p.__name__ for p in positive & negative}
         assert not overlap, f"Protocols in BOTH lists: {sorted(overlap)}"
 
         unclassified = all_protos - positive - negative
+        unclassified_names = sorted(p.__name__ for p in unclassified)
         assert not unclassified, (
-            f"Generic protocols not classified for Snowflake: {sorted(unclassified)}. "
+            f"Generic protocols not classified for Snowflake: {unclassified_names}. "
             f"Add each to SNOWFLAKE_PROTOCOLS or SNOWFLAKE_NOT_IMPLEMENTED."
         )
 
