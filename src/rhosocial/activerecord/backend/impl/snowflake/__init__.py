@@ -49,6 +49,7 @@ from .mixins import (
     SnowflakeStageMixin,
     SnowflakeConcurrencyMixin,
     AsyncSnowflakeConcurrencyMixin,
+    SnowflakeTypeDDLMixin,
     SnowflakeTypeSupportMixin,
     SnowflakeWarehouseMixin,
 )
@@ -71,8 +72,19 @@ from .expression.types import (
     SnowflakeTimestampLtzType,
     SnowflakeTimestampNtzType,
     SnowflakeTimestampTzType,
+    SnowflakeUserDefinedType,
     SnowflakeVarcharType,
     SnowflakeVariantType,
+)
+from .expression.ddl.type import (
+    SnowflakeTypeField,
+    SnowflakeScalarTypeDefinition,
+    SnowflakeObjectTypeDefinition,
+    SnowflakeSetTypeCommentAction,
+    SnowflakeUnsetTypeCommentAction,
+    SnowflakeCreateTypeExpression,
+    SnowflakeAlterTypeExpression,
+    SnowflakeDropTypeExpression,
 )
 from .functions import (
     array_append,
@@ -140,6 +152,7 @@ __all__ = [
     "SnowflakeStageMixin",
     "SnowflakeConcurrencyMixin",
     "AsyncSnowflakeConcurrencyMixin",
+    "SnowflakeTypeDDLMixin",
     "SnowflakeTypeSupportMixin",
     "SnowflakeWarehouseMixin",
     # Field Mixins
@@ -163,6 +176,15 @@ __all__ = [
     "SnowflakeObjectType",
     "SnowflakeGeographyType",
     "SnowflakeGeometryType",
+    "SnowflakeUserDefinedType",
+    "SnowflakeTypeField",
+    "SnowflakeScalarTypeDefinition",
+    "SnowflakeObjectTypeDefinition",
+    "SnowflakeSetTypeCommentAction",
+    "SnowflakeUnsetTypeCommentAction",
+    "SnowflakeCreateTypeExpression",
+    "SnowflakeAlterTypeExpression",
+    "SnowflakeDropTypeExpression",
     # ARRAY functions
     "array_construct",
     "array_append",
