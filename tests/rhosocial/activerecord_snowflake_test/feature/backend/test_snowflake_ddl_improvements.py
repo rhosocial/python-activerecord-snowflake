@@ -3,6 +3,8 @@
 import pytest
 from unittest.mock import patch, PropertyMock
 
+from rhosocial.activerecord.base.ddl import TableDDLDeriver
+from rhosocial.activerecord.model import ActiveRecord
 from rhosocial.activerecord.backend.expression import (
     Column,
     TableExpression,
@@ -60,3 +62,51 @@ class TestSnowflakeSchemaCapabilityGating:
         """Snowflake supports DROP SCHEMA IF EXISTS."""
         dialect = SnowflakeDialect()
         assert dialect.supports_schema_if_exists() is True
+
+
+class InheritedTable(ActiveRecord):
+    __table_name__ = "inherited"
+
+    id: int
+
+    @classmethod
+    def table_inherits(cls):
+        return ["parent_a", "parent_b"]
+
+
+class TablespacedTable(ActiveRecord):
+    __table_name__ = "tablespaced"
+
+    id: int
+
+    @classmethod
+    def table_tablespace(cls):
+        return "ts_data"
+
+
+class TestSnowflakeTableDeclarationGating:
+    def test_table_declaration_defaults_are_absent(self):
+        class Plain(ActiveRecord):
+            __table_name__ = "plain_table_defaults"
+
+            id: int
+
+        expression = TableDDLDeriver(Plain, SnowflakeDialect()).create_table()
+        assert expression.inherits == []
+        assert expression.tablespace is None
+
+    def test_table_inherits_is_propagated_and_rejected(self):
+        dialect = SnowflakeDialect(version=(8, 0, 0))
+        assert dialect.supports_table_inheritance() is False
+        expression = TableDDLDeriver(InheritedTable, dialect).create_table()
+        assert expression.inherits == ["parent_a", "parent_b"]
+        with pytest.raises(UnsupportedFeatureError, match="INHERITS"):
+            expression.to_sql()
+
+    def test_table_tablespace_is_propagated_and_rejected(self):
+        dialect = SnowflakeDialect(version=(8, 0, 0))
+        assert dialect.supports_table_tablespace() is False
+        expression = TableDDLDeriver(TablespacedTable, dialect).create_table()
+        assert expression.tablespace == "ts_data"
+        with pytest.raises(UnsupportedFeatureError, match="TABLESPACE"):
+            expression.to_sql()
