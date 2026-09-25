@@ -26,7 +26,7 @@ class SnowflakeCollationMixin:
 
     def format_column_attribute(self, attr) -> Tuple[str, tuple]:
         """Snowflake requires a quoted collation specification on a column."""
-        from rhosocial.activerecord.base.ddl.attributes import CollationAttribute
+        from rhosocial.activerecord.base import CollationAttribute
         from ..collation import validate_snowflake_collation_name
 
         if isinstance(attr, CollationAttribute):
