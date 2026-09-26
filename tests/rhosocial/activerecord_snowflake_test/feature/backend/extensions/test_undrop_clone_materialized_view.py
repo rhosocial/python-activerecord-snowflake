@@ -6,6 +6,11 @@ Pure construction tests — no real Snowflake instance required.
 
 import pytest
 
+from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
+from rhosocial.activerecord.backend.expression import Column, QueryExpression, TableExpression
+from rhosocial.activerecord.backend.expression.statements.ddl_view import (
+    CreateMaterializedViewExpression,
+)
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.protocols import (
     SnowflakeCloneSupport,
@@ -136,3 +141,105 @@ class TestSnowflakeCreateMaterializedView:
         expr = SnowflakeCreateMaterializedViewExpression(dialect, "mv")
         with pytest.raises(ValueError):
             expr.to_sql()
+
+
+class TestSnowflakeGenericMaterializedViewInterop:
+    """The core MV expression must render on Snowflake.
+
+    ``SnowflakeCreateMaterializedViewExpression`` extends the core expression, so
+    a backend advertising ``supports_materialized_view()`` has to work with the
+    generic API too. Previously the formatter read ``expr.as_query`` only, and
+    the generic expression raised ``AttributeError``.
+    """
+
+    def _query(self, dialect):
+        return QueryExpression(
+            dialect=dialect,
+            select=[Column(dialect, "c1")],
+            from_=TableExpression(dialect, "t"),
+        )
+
+    def test_generic_expression_renders(self, dialect):
+        expr = CreateMaterializedViewExpression(
+            dialect=dialect, view_name="mv", query=self._query(dialect)
+        )
+        sql, params = expr.to_sql()
+        assert sql.startswith('CREATE MATERIALIZED VIEW "mv" AS SELECT')
+        assert params == ()
+
+    def test_generic_expression_with_column_aliases(self, dialect):
+        expr = CreateMaterializedViewExpression(
+            dialect=dialect,
+            view_name="mv",
+            query=self._query(dialect),
+            column_aliases=["alias_c1"],
+        )
+        sql, _ = expr.to_sql()
+        assert '("alias_c1")' in sql
+
+    def test_generic_expression_requires_query(self, dialect):
+        expr = CreateMaterializedViewExpression(
+            dialect=dialect, view_name="mv", query=None
+        )
+        with pytest.raises(ValueError):
+            expr.to_sql()
+
+    def test_snowflake_expression_accepts_core_field_names(self, dialect):
+        """The core vocabulary (view_name/query) works on the Snowflake expression."""
+        expr = SnowflakeCreateMaterializedViewExpression(
+            dialect, view_name="mv", query=self._query(dialect)
+        )
+        sql, _ = expr.to_sql()
+        assert sql.startswith('CREATE MATERIALIZED VIEW "mv" AS SELECT')
+
+    def test_snowflake_expression_accepts_raw_query_string(self, dialect):
+        expr = SnowflakeCreateMaterializedViewExpression(
+            dialect, "mv", as_query="SELECT 1"
+        )
+        sql, _ = expr.to_sql()
+        assert sql == 'CREATE MATERIALIZED VIEW "mv" AS SELECT 1'
+
+    def test_field_name_aliases(self, dialect):
+        expr = SnowflakeCreateMaterializedViewExpression(
+            dialect, "mv", as_query="SELECT 1", column_list=["a"]
+        )
+        assert expr.name == expr.view_name == "mv"
+        assert expr.as_query == "SELECT 1"
+        assert expr.column_list == expr.column_aliases == ["a"]
+
+    def test_or_replace_and_if_not_exists_are_exclusive(self, dialect):
+        with pytest.raises(ValueError):
+            SnowflakeCreateMaterializedViewExpression(
+                dialect, "mv", as_query="SELECT 1", or_replace=True, if_not_exists=True
+            )
+
+    def test_view_name_is_required(self, dialect):
+        with pytest.raises(ValueError):
+            SnowflakeCreateMaterializedViewExpression(dialect, as_query="SELECT 1")
+
+    def test_tablespace_is_rejected(self, dialect):
+        """Snowflake has no TABLESPACE — refuse instead of dropping the clause."""
+        expr = SnowflakeCreateMaterializedViewExpression(
+            dialect, "mv", as_query="SELECT 1", tablespace="fast_ssd"
+        )
+        with pytest.raises(UnsupportedFeatureError):
+            expr.to_sql()
+
+    def test_storage_options_are_rejected(self, dialect):
+        expr = SnowflakeCreateMaterializedViewExpression(
+            dialect, "mv", as_query="SELECT 1", storage_options={"fillfactor": 70}
+        )
+        with pytest.raises(UnsupportedFeatureError):
+            expr.to_sql()
+
+    def test_with_data_is_not_rendered(self, dialect):
+        """Snowflake has no WITH [NO] DATA; the inherited flag must not leak out."""
+        expr = CreateMaterializedViewExpression(
+            dialect=dialect,
+            view_name="mv",
+            query=self._query(dialect),
+            with_data=False,
+        )
+        sql, _ = expr.to_sql()
+        assert "WITH DATA" not in sql
+        assert "WITH NO DATA" not in sql
