@@ -11,6 +11,11 @@ These formatters are independently callable; the generic core
 ``TableMixin`` CREATE TABLE renderer is not modified.
 """
 
+from typing import Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover
+    from ..expression.partition import SnowflakeClusterByClause
+
 
 class SnowflakeTableModifierMixin:
     """Mixin for Snowflake table DDL modifier support."""
@@ -18,6 +23,23 @@ class SnowflakeTableModifierMixin:
     def supports_create_or_replace_table(self) -> bool:
         """Snowflake supports CREATE OR REPLACE TABLE."""
         return True
+
+    def format_cluster_by_clause(self, expr: "SnowflakeClusterByClause") -> Tuple[str, tuple]:
+        """Format ``CLUSTER BY ( <expr> [, ...] )`` clustering keys.
+
+        Args:
+            expr: SnowflakeClusterByClause carrying the clustering key expressions.
+
+        Returns:
+            Tuple of (SQL string, parameters tuple).
+        """
+        parts = []
+        params = []
+        for key in expr.keys:
+            key_sql, key_params = key.to_sql()
+            parts.append(key_sql)
+            params.extend(key_params)
+        return f" CLUSTER BY ({', '.join(parts)})", tuple(params)
 
     def supports_transient_table(self) -> bool:
         """Snowflake supports TRANSIENT tables."""
@@ -27,9 +49,59 @@ class SnowflakeTableModifierMixin:
         """Snowflake supports CLUSTER BY clustering keys."""
         return True
 
+    def format_create_table_options(self, expr) -> Tuple[str, tuple]:
+        """Format the CREATE header modifiers for Snowflake.
+
+        Accepts both the generic ``CreateTableOptions`` (renders ``OR REPLACE``)
+        and the Snowflake ``SnowflakeCreateTableOptions`` (adds ``TRANSIENT``).
+        """
+        from rhosocial.activerecord.backend.dialect.exceptions import (
+            UnsupportedFeatureError,
+        )
+        from ..expression.table_options import SnowflakeCreateTableOptions
+
+        base_sql, params = super().format_create_table_options(expr)
+        parts = [base_sql] if base_sql else []
+        if isinstance(expr, SnowflakeCreateTableOptions) and expr.transient:
+            if not self.supports_transient_table():
+                raise UnsupportedFeatureError(self.name, "CREATE TRANSIENT TABLE")
+            parts.append("TRANSIENT")
+        return " ".join(parts), params
+
     def supports_search_optimization(self) -> bool:
         """Snowflake supports SEARCH OPTIMIZATION."""
         return True
+
+    def supports_table_comment(self) -> bool:
+        """Whether inline comments on ``CREATE TABLE`` are supported.
+
+        Snowflake natively supports both the inline ``COMMENT = 'text'`` table
+        option and the standalone ``COMMENT ON`` statement; the inline path is
+        the rendering path, so the capability advertises True.
+        """
+        return True
+
+    def supports_comment_on(self) -> bool:
+        """Whether standalone ``COMMENT ON`` statements are supported.
+
+        Snowflake natively supports ``COMMENT [IF EXISTS] ON <object> IS
+        'text'`` for tables, columns, views, and other objects; the generic
+        :class:`CommentOnMixin` rendering is used as-is.
+        """
+        return True
+
+    def format_table_comment(self, comment: str) -> Tuple[str, tuple]:
+        """Render a table-level ``COMMENT = 'text'`` option.
+
+        Snowflake's table-level comment form carries the ``=`` sign (unlike
+        the bare ``COMMENT 'text'`` of MySQL/MariaDB/ClickHouse, which the
+        generic core rendering emits); the column-level form stays bare and
+        is rendered by the generic ``format_column_definition``.
+        """
+        from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
+
+        escaped = SQLDialectBase._escape_sql_string(comment)
+        return f"COMMENT = '{escaped}'", ()
 
     def supports_create_table_like(self) -> bool:
         """Snowflake supports CREATE TABLE ... LIKE (empty copy)."""

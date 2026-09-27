@@ -49,24 +49,29 @@ class SnowflakeSchemaMixin:
         return False
 
     def supports_alter_schema(self) -> bool:
-        """Snowflake supports ALTER SCHEMA."""
-        return True
+        """Whether ``ALTER SCHEMA`` is supported.
+
+        Snowflake natively supports ALTER SCHEMA, but there is no
+        ``AlterSchemaExpression`` / formatter yet, so the capability is
+        advertised as unsupported to avoid a dead, unrenderable switch.
+        """
+        return False
 
     def supports_alter_schema_rename(self) -> bool:
-        """Snowflake supports ALTER SCHEMA RENAME TO."""
-        return True
+        """Snowflake supports ALTER SCHEMA RENAME TO (not modelled yet)."""
+        return False
 
     def supports_alter_schema_swap(self) -> bool:
-        """Snowflake supports ALTER SCHEMA SWAP WITH."""
-        return True
+        """Snowflake supports ALTER SCHEMA SWAP WITH (not modelled yet)."""
+        return False
 
     def supports_alter_schema_set_property(self) -> bool:
-        """Snowflake supports ALTER SCHEMA SET."""
-        return True
+        """Snowflake supports ALTER SCHEMA SET (not modelled yet)."""
+        return False
 
     def supports_alter_schema_managed_access(self) -> bool:
-        """Snowflake supports ALTER SCHEMA SET MANAGED ACCESS."""
-        return True
+        """Snowflake supports ALTER SCHEMA SET MANAGED ACCESS (not modelled yet)."""
+        return False
 
     def supports_undrop_schema(self) -> bool:
         """Snowflake supports UNDROP SCHEMA."""

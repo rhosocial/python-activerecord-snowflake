@@ -11,7 +11,7 @@ Snowflake SQL is largely ANSI SQL compliant with extensions for:
 - MERGE with complex conditions
 - Warehouse-based compute management
 """
-from typing import Any, Dict, Tuple, TYPE_CHECKING
+from typing import Any, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.transaction import (
@@ -48,6 +48,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     TransactionControlSupport,
     TruncateSupport,
     UpsertSupport,
+    UserDefinedTypeSupport,
     ViewSupport,
     WildcardSupport,
     WindowFunctionSupport,
@@ -57,6 +58,7 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     ArrayMixin,
     AutoIncrementMixin,
     CollationMixin,
+    CommentOnMixin,
     ConstraintMixin,
     CTEMixin,
     DDLColumnMixin,
@@ -86,8 +88,6 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     ViewMixin,
     WindowFunctionMixin,
 )
-from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
-from .collation import validate_snowflake_collation_name
 from .reserved_words import SNOWFLAKE_RESERVED_WORDS
 from .protocols import (
     SnowflakeArraySupport,
@@ -129,12 +129,14 @@ from .mixins import (
     SnowflakeTaskMixin,
     SnowflakeTimeTravelMixin,
     SnowflakeTransactionMixin,
+    SnowflakeTypeDDLMixin,
     SnowflakeTypeSupportMixin,
     SnowflakeUndropMixin,
     SnowflakeVariantMixin,
     SnowflakeAlterColumnModifierMixin,
     SnowflakeWarehouseMixin,
     SnowflakeSchemaMixin,
+    SnowflakeDatabaseMixin,
     # New mixins from dialect.py split
     SnowflakeDateTimeMixin,
     SnowflakeCollationMixin,
@@ -171,6 +173,7 @@ class SnowflakeDialect(
     SnowflakeAlterColumnModifierMixin,  # Before DDLColumnMixin to override format_*_action
     DDLColumnMixin,
     AutoIncrementMixin,
+    SnowflakeTypeDDLMixin,
     SnowflakeTypeSupportMixin,
     TransactionControlMixin,
     SetOperationMixin,
@@ -194,11 +197,13 @@ class SnowflakeDialect(
     ViewMixin,
     TruncateMixin,
     SnowflakeSchemaMixin,  # Before SchemaMixin to enable Snowflake schema DDL
+    SnowflakeDatabaseMixin,
     SchemaMixin,
     IndexMixin,
     SnowflakeTableModifierMixin,  # Before TableMixin to override create-table capability flags
     TableMixin,
     ConstraintMixin,
+    CommentOnMixin,
     # Snowflake-specific mixins (before generic IntrospectionMixin to override methods)
     SnowflakeTransactionMixin,
     SnowflakeTimeTravelMixin,
@@ -226,6 +231,7 @@ class SnowflakeDialect(
     CTESupport,
     ConstraintSupport,
     DDLTypeSupport,
+    UserDefinedTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
     GeneratedColumnSupport,
@@ -286,7 +292,11 @@ class SnowflakeDialect(
     feature gating where applicable.
     """
 
-    def __init__(self, version: Tuple[int, ...] = (8, 0, 0), **kwargs):
+    def __init__(
+        self,
+        version: Tuple[int, ...] = (8, 0, 0),
+        **kwargs: Any,
+    ) -> None:
         """Initialize Snowflake dialect with version.
 
         Args:

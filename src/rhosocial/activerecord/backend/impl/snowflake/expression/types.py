@@ -19,8 +19,9 @@ Key Snowflake types:
 - GEOGRAPHY
 - GEOMETRY
 """
-from typing import Any, Dict, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
+from rhosocial.activerecord.backend.expression.serialization import ExpressionRegistry
 from rhosocial.activerecord.backend.expression.types._base import DataType
 from rhosocial.activerecord.backend.expression.types.integer import IntegerType
 from rhosocial.activerecord.backend.expression.types.string import VarCharType
@@ -30,6 +31,9 @@ from rhosocial.activerecord.backend.expression.types.binary import BlobType
 from rhosocial.activerecord.backend.expression.types.datetime_ import DateType, TimeType, TimestampType
 from rhosocial.activerecord.backend.expression.types.json_ import JsonType
 from rhosocial.activerecord.backend.expression.types.array import ArrayType
+
+if TYPE_CHECKING:
+    from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
 
 class SnowflakeDataTypeMixin:
@@ -57,9 +61,8 @@ class SnowflakeVarcharType(SnowflakeDataTypeMixin, VarCharType):
 
     name = "snowflake_varchar"
 
-    def __init__(self, dialect=None, *, length: Optional[int] = None,
-                 dialect_options: Optional[Dict[str, Any]] = None):
-        super().__init__(dialect, length=length, dialect_options=dialect_options)
+    def __init__(self, dialect=None, *, length: Optional[int] = None):
+        super().__init__(dialect, length=length)
 
     def _type_params(self) -> tuple:
         return (self.length,)
@@ -81,10 +84,8 @@ class SnowflakeNumberType(SnowflakeDataTypeMixin, DecimalType):
     name = "snowflake_number"
 
     def __init__(self, dialect=None, *, precision: Optional[int] = None,
-                 scale: Optional[int] = None,
-                 dialect_options: Optional[Dict[str, Any]] = None):
-        super().__init__(dialect, precision=precision, scale=scale,
-                         dialect_options=dialect_options)
+                 scale: Optional[int] = None):
+        super().__init__(dialect, precision=precision, scale=scale)
 
     def _type_params(self) -> tuple:
         return (self.precision, self.scale)
@@ -105,9 +106,8 @@ class SnowflakeFloatType(SnowflakeDataTypeMixin, FloatType):
 
     name = "snowflake_float"
 
-    def __init__(self, dialect=None, *, precision: Optional[int] = None,
-                 dialect_options: Optional[Dict[str, Any]] = None):
-        super().__init__(dialect, precision=precision, dialect_options=dialect_options)
+    def __init__(self, dialect=None, *, precision: Optional[int] = None):
+        super().__init__(dialect, precision=precision)
 
     def _type_params(self) -> tuple:
         return (self.precision,)
@@ -139,9 +139,8 @@ class SnowflakeTimestampLtzType(SnowflakeDataTypeMixin, TimestampType):
 
     name = "snowflake_timestamp_ltz"
 
-    def __init__(self, dialect=None, *, precision: Optional[int] = None,
-                 dialect_options: Optional[Dict[str, Any]] = None):
-        super().__init__(dialect, precision=precision, dialect_options=dialect_options)
+    def __init__(self, dialect=None, *, precision: Optional[int] = None):
+        super().__init__(dialect, precision=precision)
 
     def _type_params(self) -> tuple:
         return (self.precision,)
@@ -160,9 +159,8 @@ class SnowflakeTimestampNtzType(SnowflakeDataTypeMixin, TimestampType):
 
     name = "snowflake_timestamp_ntz"
 
-    def __init__(self, dialect=None, *, precision: Optional[int] = None,
-                 dialect_options: Optional[Dict[str, Any]] = None):
-        super().__init__(dialect, precision=precision, dialect_options=dialect_options)
+    def __init__(self, dialect=None, *, precision: Optional[int] = None):
+        super().__init__(dialect, precision=precision)
 
     def _type_params(self) -> tuple:
         return (self.precision,)
@@ -181,9 +179,8 @@ class SnowflakeTimestampTzType(SnowflakeDataTypeMixin, TimestampType):
 
     name = "snowflake_timestamp_tz"
 
-    def __init__(self, dialect=None, *, precision: Optional[int] = None,
-                 dialect_options: Optional[Dict[str, Any]] = None):
-        super().__init__(dialect, precision=precision, dialect_options=dialect_options)
+    def __init__(self, dialect=None, *, precision: Optional[int] = None):
+        super().__init__(dialect, precision=precision)
 
     def _type_params(self) -> tuple:
         return (self.precision,)
@@ -210,9 +207,8 @@ class SnowflakeTimeType(SnowflakeDataTypeMixin, TimeType):
 
     name = "snowflake_time"
 
-    def __init__(self, dialect=None, *, precision: Optional[int] = None,
-                 dialect_options: Optional[Dict[str, Any]] = None):
-        super().__init__(dialect, precision=precision, dialect_options=dialect_options)
+    def __init__(self, dialect=None, *, precision: Optional[int] = None):
+        super().__init__(dialect, precision=precision)
 
     def _type_params(self) -> tuple:
         return (self.precision,)
@@ -235,9 +231,8 @@ class SnowflakeBinaryType(SnowflakeDataTypeMixin, BlobType):
 
     length: Optional[int] = None
 
-    def __init__(self, dialect=None, *, length: Optional[int] = None,
-                 dialect_options: Optional[Dict[str, Any]] = None):
-        super().__init__(dialect=dialect, dialect_options=dialect_options)
+    def __init__(self, dialect=None, *, length: Optional[int] = None):
+        super().__init__(dialect=dialect)
         self.length = length
 
     def _type_params(self) -> tuple:
@@ -277,10 +272,8 @@ class SnowflakeArrayType(SnowflakeDataTypeMixin, ArrayType):
 
     name = "snowflake_array"
 
-    def __init__(self, dialect=None, *, element_type: Optional[DataType] = None,
-                 dialect_options: Optional[Dict[str, Any]] = None):
-        super().__init__(dialect, element_type=element_type or IntegerType(),
-                         dialect_options=dialect_options)
+    def __init__(self, dialect=None, *, element_type: Optional[DataType] = None):
+        super().__init__(dialect, element_type=element_type or IntegerType())
 
     def _type_params(self) -> tuple:
         return (type(self.element_type),)
@@ -321,3 +314,56 @@ class SnowflakeGeometryType(SnowflakeDataTypeMixin, DataType):
 
     def format_type(self, dialect=None) -> str:
         return "GEOMETRY"
+
+
+class SnowflakeUserDefinedType(DataType):
+    """Reference to a Snowflake schema-level user-defined type."""
+
+    name = "snowflake_user_defined"
+
+    def __init__(
+        self,
+        dialect: Optional["SQLDialectBase"] = None,
+        *,
+        type_name: str,
+        schema_name: Optional[str] = None,
+        database_name: Optional[str] = None,
+    ) -> None:
+        super().__init__(dialect)
+        for field_name, value in (
+            ("type_name", type_name),
+            ("schema_name", schema_name),
+            ("database_name", database_name),
+        ):
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ValueError(f"{field_name} must be a non-empty string")
+        if database_name is not None and schema_name is None:
+            raise ValueError("schema_name is required when database_name is provided")
+        self.type_name = type_name
+        self.schema_name = schema_name
+        self.database_name = database_name
+
+    def _type_params(self) -> tuple:
+        return (self.database_name, self.schema_name, self.type_name)
+
+
+_SNOWFLAKE_DATA_TYPES = (
+    SnowflakeVarcharType,
+    SnowflakeNumberType,
+    SnowflakeFloatType,
+    SnowflakeBooleanType,
+    SnowflakeTimestampLtzType,
+    SnowflakeTimestampNtzType,
+    SnowflakeTimestampTzType,
+    SnowflakeDateType,
+    SnowflakeTimeType,
+    SnowflakeBinaryType,
+    SnowflakeVariantType,
+    SnowflakeObjectType,
+    SnowflakeArrayType,
+    SnowflakeGeographyType,
+    SnowflakeGeometryType,
+    SnowflakeUserDefinedType,
+)
+for _data_type in _SNOWFLAKE_DATA_TYPES:
+    ExpressionRegistry.register(_data_type)

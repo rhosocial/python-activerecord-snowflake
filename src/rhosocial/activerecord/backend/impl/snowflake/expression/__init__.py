@@ -15,10 +15,17 @@ from .types import (
     SnowflakeTimestampLtzType,
     SnowflakeTimestampNtzType,
     SnowflakeTimestampTzType,
+    SnowflakeUserDefinedType,
     SnowflakeVarcharType,
     SnowflakeVariantType,
 )
-from .partition import SnowflakePartitionClause
+from .table_options import SnowflakeCreateTableOptions
+from .database import SnowflakeCreateDatabaseExpression
+from .dml import SnowflakeInsertExpression
+from .partition import (
+    SnowflakeClusterByClause,
+    SnowflakeExternalPartitionClause,
+)
 from .identifier import SnowflakeIdentifierExpression
 from .sample import (
     SnowflakeSampleExpression,
@@ -74,6 +81,14 @@ from .ddl import (
     SnowflakeUndropObjectType,
     SnowflakeUndropExpression,
     SnowflakeCreateMaterializedViewExpression,
+    SnowflakeTypeField,
+    SnowflakeScalarTypeDefinition,
+    SnowflakeObjectTypeDefinition,
+    SnowflakeSetTypeCommentAction,
+    SnowflakeUnsetTypeCommentAction,
+    SnowflakeCreateTypeExpression,
+    SnowflakeAlterTypeExpression,
+    SnowflakeDropTypeExpression,
 )
 
 __all__ = [
@@ -90,9 +105,14 @@ __all__ = [
     "SnowflakeTimestampLtzType",
     "SnowflakeTimestampNtzType",
     "SnowflakeTimestampTzType",
+    "SnowflakeUserDefinedType",
     "SnowflakeVarcharType",
     "SnowflakeVariantType",
-    "SnowflakePartitionClause",
+    "SnowflakeCreateTableOptions",
+    "SnowflakeCreateDatabaseExpression",
+    "SnowflakeInsertExpression",
+    "SnowflakeClusterByClause",
+    "SnowflakeExternalPartitionClause",
     "SnowflakeIdentifierExpression",
     "SnowflakeSampleExpression",
     "SnowflakeSampleForm",
@@ -139,4 +159,12 @@ __all__ = [
     "SnowflakeUndropObjectType",
     "SnowflakeUndropExpression",
     "SnowflakeCreateMaterializedViewExpression",
+    "SnowflakeTypeField",
+    "SnowflakeScalarTypeDefinition",
+    "SnowflakeObjectTypeDefinition",
+    "SnowflakeSetTypeCommentAction",
+    "SnowflakeUnsetTypeCommentAction",
+    "SnowflakeCreateTypeExpression",
+    "SnowflakeAlterTypeExpression",
+    "SnowflakeDropTypeExpression",
 ]

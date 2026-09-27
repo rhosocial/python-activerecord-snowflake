@@ -97,6 +97,10 @@ class SnowflakeCapabilityMixin:
         """Snowflake supports indexes (clustering keys and search optimization)."""
         return True
 
+    def supports_drop_index_on_table(self) -> bool:
+        """Snowflake drops indexes/search-optimization by name (no ON <table>)."""
+        return False
+
     def supports_constraints(self) -> bool:
         """Snowflake supports constraints (PK, FK, UNIQUE, NOT NULL, CHECK)."""
         return True
