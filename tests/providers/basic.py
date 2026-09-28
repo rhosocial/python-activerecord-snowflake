@@ -205,7 +205,7 @@ class BasicProvider(IBasicSyncProvider, IBasicAsyncProvider, WorkerTestProtocol)
         return model_class
 
     async def _setup_async_model(self, model_class: Type[ActiveRecord], scenario_name: str, table_name: str) -> Type[ActiveRecord]:
-        from rhosocial.activerecord.backend.impl.snowflake.async_backend import (
+        from rhosocial.activerecord.backend.impl.snowflake.backend.async_backend import (
             AsyncSnowflakeBackend,
         )
 

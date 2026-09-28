@@ -143,7 +143,7 @@ class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
         return tuple(result)
 
     async def _setup_model_async(self, model_class: Type[ActiveRecord], scenario_name: str, table_name: str) -> Type[ActiveRecord]:
-        from rhosocial.activerecord.backend.impl.snowflake.async_backend import (
+        from rhosocial.activerecord.backend.impl.snowflake.backend.async_backend import (
             AsyncSnowflakeBackend,
         )
 
@@ -318,7 +318,7 @@ class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
         ]
         from rhosocial.activerecord.backend.options import ExecutionOptions
         from rhosocial.activerecord.backend.schema import StatementType
-        from rhosocial.activerecord.backend.impl.snowflake.async_backend import (
+        from rhosocial.activerecord.backend.impl.snowflake.backend.async_backend import (
             AsyncSnowflakeBackend,
         )
 

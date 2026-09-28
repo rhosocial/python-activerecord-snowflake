@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
-from rhosocial.activerecord.backend.impl.snowflake.async_backend import AsyncSnowflakeBackend
+from rhosocial.activerecord.backend.impl.snowflake.backend.async_backend import AsyncSnowflakeBackend
 from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.adapters import (

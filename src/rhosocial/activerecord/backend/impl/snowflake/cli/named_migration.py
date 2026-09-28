@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
-from rhosocial.activerecord.backend.impl.snowflake.async_backend import AsyncSnowflakeBackend
+from rhosocial.activerecord.backend.impl.snowflake.backend.async_backend import AsyncSnowflakeBackend
 
 from .connection import add_connection_args, resolve_connection_config_from_args
 from .output import create_provider
