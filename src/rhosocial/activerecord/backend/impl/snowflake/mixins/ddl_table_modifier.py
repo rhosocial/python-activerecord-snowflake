@@ -1,4 +1,4 @@
-# src/rhosocial/activerecord/backend/impl/snowflake/mixins/table_modifier.py
+# src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl_table_modifier.py
 """SnowflakeTableModifierMixin — table DDL modifier support.
 
 Snowflake table DDL differs from the SQL standard in several ways:
