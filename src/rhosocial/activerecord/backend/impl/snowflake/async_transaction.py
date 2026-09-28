@@ -10,7 +10,7 @@ from rhosocial.activerecord.backend.transaction import AsyncTransactionManager
 from .mixins import SnowflakeTransactionMixin
 
 if TYPE_CHECKING:
-    from .async_backend import AsyncSnowflakeBackend
+    from .backend.async_backend import AsyncSnowflakeBackend
 
 
 class AsyncSnowflakeTransactionManager(SnowflakeTransactionMixin, AsyncTransactionManager):
