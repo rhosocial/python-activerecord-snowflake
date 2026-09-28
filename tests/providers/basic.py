@@ -520,7 +520,7 @@ class BasicProvider(IBasicSyncProvider, IBasicAsyncProvider, WorkerTestProtocol)
         config_dict = SCENARIO_MAP[scenario_name]
 
         return {
-            'backend_module': 'rhosocial.activerecord.backend.impl.snowflake',
+            'backend_module': 'rhosocial.activerecord.backend.impl.snowflake.backend',
             'backend_class_name': backend_class_name,
             'config_class_module': 'rhosocial.activerecord.backend.impl.snowflake.config',
             'config_class_name': 'SnowflakeConnectionConfig',
