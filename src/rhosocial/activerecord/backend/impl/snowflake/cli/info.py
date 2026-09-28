@@ -122,7 +122,7 @@ def handle(args):
 
     if args.account or args.database:
         try:
-            from rhosocial.activerecord.backend.impl.snowflake import SnowflakeBackend
+            from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
             config = resolve_connection_config_from_args(args)
             backend = SnowflakeBackend(connection_config=config)
             backend.connect()

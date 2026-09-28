@@ -7,7 +7,7 @@ variables or config files.
 import os
 from typing import Dict, Any, Tuple, Type
 
-from rhosocial.activerecord.backend.impl.snowflake import SnowflakeBackend
+from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
 from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
 
 # Scenario name -> configuration dictionary mapping

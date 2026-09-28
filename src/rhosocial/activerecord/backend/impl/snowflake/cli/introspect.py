@@ -8,7 +8,8 @@ from dataclasses import asdict, is_dataclass
 from enum import Enum
 from typing import Any
 
-from rhosocial.activerecord.backend.impl.snowflake import SnowflakeBackend, AsyncSnowflakeBackend
+from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
+from rhosocial.activerecord.backend.impl.snowflake.async_backend import AsyncSnowflakeBackend
 from rhosocial.activerecord.backend.errors import ConnectionError, QueryError
 
 from .connection import add_connection_args, resolve_connection_config_from_args

@@ -54,7 +54,7 @@ pip install rhosocial-activerecord-snowflake
 
 ```python
 from rhosocial.activerecord.model import ActiveRecord
-from rhosocial.activerecord.backend.impl.snowflake import SnowflakeBackend
+from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
 from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
 from typing import Optional
 
@@ -88,7 +88,7 @@ user.save()
 Native Snowflake VARIANT support for JSON-like data:
 
 ```python
-from rhosocial.activerecord.backend.impl.snowflake import SnowflakeVariantAdapter
+from rhosocial.activerecord.backend.impl.snowflake.adapters import SnowflakeVariantAdapter
 
 # Store and query semi-structured data
 settings = {"theme": "dark", "notifications": True}

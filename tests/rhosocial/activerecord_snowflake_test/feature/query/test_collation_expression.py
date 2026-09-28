@@ -8,12 +8,10 @@ import os
 import pytest
 
 from rhosocial.activerecord.backend.expression import Column, Literal
-from rhosocial.activerecord.backend.impl.snowflake import (
-    SnowflakeBackend,
-    SnowflakeCollation,
-    SnowflakeConnectionConfig,
-    SnowflakeDialect,
-)
+from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
+from rhosocial.activerecord.backend.impl.snowflake.collation import SnowflakeCollation
+from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
+from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 
 
 @pytest.fixture

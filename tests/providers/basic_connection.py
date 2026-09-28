@@ -6,7 +6,7 @@ tests using fakesnow (DuckDB-based Snowflake emulator) or real Snowflake.
 from typing import Type, Tuple, List, Optional
 
 from rhosocial.activerecord.model import ActiveRecord, AsyncActiveRecord
-from rhosocial.activerecord.backend.impl.snowflake import SnowflakeBackend
+from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
 from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
 from rhosocial.activerecord.connection.pool import BackendPool, AsyncBackendPool, PoolConfig
 from rhosocial.activerecord.backend.options import ExecutionOptions
@@ -87,7 +87,9 @@ class BasicConnectionProvider(IBasicConnectionProvider):
         return pool, SyncTestUser
 
     async def setup_async_pool_and_model(self, scenario_name: str) -> Tuple[AsyncBackendPool, Type[AsyncActiveRecord]]:
-        from rhosocial.activerecord.backend.impl.snowflake import AsyncSnowflakeBackend
+        from rhosocial.activerecord.backend.impl.snowflake.async_backend import (
+            AsyncSnowflakeBackend,
+        )
 
         _, config = get_scenario(scenario_name)
 

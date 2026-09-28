@@ -7,7 +7,7 @@ AR model behavior without any real DB connection.
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 
-from rhosocial.activerecord.backend.impl.snowflake import SnowflakeBackend
+from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
 from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
 
 

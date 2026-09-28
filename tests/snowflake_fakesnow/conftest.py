@@ -9,7 +9,7 @@ so SnowflakeBackend can be used normally without any code changes.
 import pytest
 import fakesnow as _fakesnow
 
-from rhosocial.activerecord.backend.impl.snowflake import SnowflakeBackend
+from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
 from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
 
 # fakesnow patterns that should be treated as no-ops
@@ -148,7 +148,7 @@ def fs_model(fs_backend):
     registered = []
 
     def _register(model_class, ddl: str = None):
-        from rhosocial.activerecord.backend.impl.snowflake import SnowflakeBackend as SB
+        from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend as SB
         model_class.configure(fs_backend.config, SB)
         create_ddl = ddl or _generate_ddl(model_class)
         if create_ddl:

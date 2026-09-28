@@ -19,18 +19,18 @@ from rhosocial.activerecord.backend.expression.statements.ddl_type import (
     DropTypeExpression,
     TypeDefinition,
 )
-from rhosocial.activerecord.backend.impl.snowflake import (
+from rhosocial.activerecord.backend.impl.snowflake.expression import (
     SnowflakeAlterTypeExpression,
     SnowflakeCreateTypeExpression,
     SnowflakeDropTypeExpression,
     SnowflakeObjectTypeDefinition,
     SnowflakeScalarTypeDefinition,
     SnowflakeSetTypeCommentAction,
-    SnowflakeTypeDDLMixin,
     SnowflakeTypeField,
     SnowflakeUnsetTypeCommentAction,
     SnowflakeUserDefinedType,
 )
+from rhosocial.activerecord.backend.impl.snowflake.mixins import SnowflakeTypeDDLMixin
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.expression.types import (
     SnowflakeArrayType,

@@ -6,7 +6,7 @@ SNOWFLAKE_ACCOUNT environment variable is not set.
 import os
 import pytest
 
-from rhosocial.activerecord.backend.impl.snowflake import SnowflakeBackend
+from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
 from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
 
 REQUIRED_ENV_VARS = [
