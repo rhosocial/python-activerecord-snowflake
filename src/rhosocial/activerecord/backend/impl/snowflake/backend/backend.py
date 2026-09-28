@@ -302,5 +302,5 @@ class SnowflakeBackend(
     def _create_introspector(self):
         """Create a SyncSnowflakeIntrospector backed by a SyncIntrospectorExecutor."""
         from rhosocial.activerecord.backend.introspection.executor import SyncIntrospectorExecutor
-        from .introspection import SyncSnowflakeIntrospector
+        from ..introspection import SyncSnowflakeIntrospector
         return SyncSnowflakeIntrospector(self, SyncIntrospectorExecutor(self))

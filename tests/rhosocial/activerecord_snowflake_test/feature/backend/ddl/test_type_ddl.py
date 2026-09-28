@@ -446,18 +446,29 @@ def test_all_nestable_snowflake_data_types_round_trip():
 
 
 def test_public_exports_include_udt_ddl_api():
-    import rhosocial.activerecord.backend.impl.snowflake as snowflake
+    from rhosocial.activerecord.backend.impl.snowflake.expression import (
+        SnowflakeUserDefinedType,
+        SnowflakeTypeField,
+        SnowflakeScalarTypeDefinition,
+        SnowflakeObjectTypeDefinition,
+        SnowflakeSetTypeCommentAction,
+        SnowflakeUnsetTypeCommentAction,
+        SnowflakeCreateTypeExpression,
+        SnowflakeAlterTypeExpression,
+        SnowflakeDropTypeExpression,
+    )
+    from rhosocial.activerecord.backend.impl.snowflake.mixins import SnowflakeTypeDDLMixin
 
-    for name in (
-        "SnowflakeUserDefinedType",
-        "SnowflakeTypeField",
-        "SnowflakeScalarTypeDefinition",
-        "SnowflakeObjectTypeDefinition",
-        "SnowflakeSetTypeCommentAction",
-        "SnowflakeUnsetTypeCommentAction",
-        "SnowflakeCreateTypeExpression",
-        "SnowflakeAlterTypeExpression",
-        "SnowflakeDropTypeExpression",
-        "SnowflakeTypeDDLMixin",
+    for cls in (
+        SnowflakeUserDefinedType,
+        SnowflakeTypeField,
+        SnowflakeScalarTypeDefinition,
+        SnowflakeObjectTypeDefinition,
+        SnowflakeSetTypeCommentAction,
+        SnowflakeUnsetTypeCommentAction,
+        SnowflakeCreateTypeExpression,
+        SnowflakeAlterTypeExpression,
+        SnowflakeDropTypeExpression,
+        SnowflakeTypeDDLMixin,
     ):
-        assert hasattr(snowflake, name)
+        assert isinstance(cls, type)

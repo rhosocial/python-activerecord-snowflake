@@ -265,5 +265,5 @@ class AsyncSnowflakeBackend(
 
     def _create_introspector(self):
         """Create an AsyncSnowflakeIntrospector with a thread-pool executor."""
-        from .introspection import AsyncSnowflakeIntrospector, _SnowflakeAsyncIntrospectorExecutor
+        from ..introspection import AsyncSnowflakeIntrospector, _SnowflakeAsyncIntrospectorExecutor
         return AsyncSnowflakeIntrospector(self, _SnowflakeAsyncIntrospectorExecutor(self))
