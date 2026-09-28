@@ -4,7 +4,13 @@
 Every backend keeps both classes in this package: the sync class in
 ``backend.py`` and the async class in ``async_backend.py``. So the sync class
 is at ``impl.snowflake.backend.backend`` and the async class at
-``impl.snowflake.backend.async_backend``.
+``impl.snowflake.backend.async_backend``, and both are re-exported here.
 """
 
 from .backend import SnowflakeBackend
+from .async_backend import AsyncSnowflakeBackend
+
+__all__ = [
+    "SnowflakeBackend",
+    "AsyncSnowflakeBackend",
+]
