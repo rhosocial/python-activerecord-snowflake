@@ -56,7 +56,7 @@ from pydantic import BaseModel, Field
 
 # Local application imports
 from rhosocial.activerecord.model import ActiveRecord
-from rhosocial.activerecord.backend import StorageBackend
+from rhosocial.activerecord.backend.base import StorageBackend
 
 # Relative imports (within same package)
 from .base import BaseActiveRecord
@@ -65,7 +65,7 @@ from ..interface import IActiveRecord
 
 ### Line Length and Wrapping
 
-- Maximum line length: 100 characters
+- Maximum line length: 120 characters (ruff `line-length = 120`; black formats to 100, but 100 is not the limit)
 - Wrap long lines using parentheses:
 
 ```python
@@ -291,7 +291,7 @@ from typing import annotations
 
 import third_party
 
-from rhosocial.activerecord import local
+from rhosocial.activerecord.model import ActiveRecord
 from . import relative
 
 # Constants
@@ -414,12 +414,12 @@ raise DatabaseError(
 """Test module for specific feature."""
 
 import pytest
-from rhosocial.activerecord import Model
+from rhosocial.activerecord.model import ActiveRecord
 
 # Fixtures at top
 @pytest.fixture
 def sample_model():
-    return Model(name="test")
+    return ActiveRecord(name="test")
 
 # Test classes for organization
 class TestCRUDOperations:
@@ -612,8 +612,10 @@ class CustomTimestampMixin:
     __created_at_field__ = "created_at"
     __updated_at_field__ = "updated_at"
 
-    def before_save(self):
-        self.updated_at = datetime.now()
+    # Lifecycle is registered per instance against the ModelEvent enum --
+    # there is no before_save() / after_save() hook and nothing dispatches
+    # to one, so defining one here would be silently dead code:
+    #     self.on(ModelEvent.BEFORE_UPDATE, self._stamp)
 
 
 class DefaultCustomTimestampMixin(CustomTimestampMixin):
@@ -697,7 +699,7 @@ class MyExpression(mixins.ArithmeticMixin, mixins.ComparisonMixin, bases.SQLValu
 
     def to_sql(self) -> 'bases.SQLQueryAndParams':
         # Delegate formatting to dialect
-        formatted_value = self.dialect.format_string_literal(self.value)
+        formatted_value = self.dialect.format_literal(self.value)
         return formatted_value, (self.value,)
 ```
 
@@ -715,7 +717,7 @@ def format_identifier(self, identifier: str) -> str:
 - [ ] Path comment at file start matches actual location
 - [ ] All functions/classes have docstrings
 - [ ] Type hints on all function signatures
-- [ ] No line exceeds 100 characters
+- [ ] No line exceeds 120 characters
 - [ ] Imports sorted and grouped correctly
 - [ ] No commented-out code
 - [ ] Exception messages are informative

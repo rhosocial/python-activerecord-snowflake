@@ -25,13 +25,13 @@ test = [
 source .venv3.12/bin/activate
 
 # Run unit tests only (no Snowflake connection required)
-PYTHONPATH=src pytest tests/ -v -k "not integration"
+PYTHONPATH=src:tests pytest tests/ -v -k "not integration"
 
 # Run integration tests (requires snowflake_scenarios.yaml)
-PYTHONPATH=src pytest tests/ -v -k "integration"
+PYTHONPATH=src:tests pytest tests/ -v -k "integration"
 
 # Run all tests
-PYTHONPATH=src pytest tests/ -v
+PYTHONPATH=src:tests pytest tests/ -v
 ```
 
 ## Test Architecture
