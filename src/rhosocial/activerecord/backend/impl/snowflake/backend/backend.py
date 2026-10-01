@@ -200,6 +200,26 @@ class SnowflakeBackend(
 
         return self._version
 
+    def get_current_schema(self) -> Optional[str]:
+        """Get the namespace an unqualified reference resolves against.
+
+        Asks the server via CURRENT_SCHEMA(), the first existing entry in the
+        schema search path. None means the path resolves to no existing schema.
+        """
+        from ....expression import core
+        from ....expression.statements.dql import QueryExpression
+        from ..functions.schema import current_schema
+
+        query = QueryExpression(
+            dialect=self.dialect,
+            select=[current_schema(self.dialect)],
+        )
+        sql, params = query.to_sql()
+        row = self.fetch_one(sql, params)
+        if not row:
+            return None
+        return next(iter(row.values()), None)
+
     def introspect_and_adapt(self) -> None:
         """Introspect the Snowflake database and adapt type mappings."""
         pass
