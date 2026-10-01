@@ -1,6 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/truncate.py
 """Snowflake TRUNCATE support mixin."""
 from typing import Tuple, TYPE_CHECKING
+from ....expression.core import TableExpression
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 
@@ -31,7 +32,7 @@ class SnowflakeTruncateMixin:
                 "TRUNCATE ... CASCADE",
                 suggestion="Snowflake TRUNCATE has no CASCADE option.",
             )
-        return f"TRUNCATE TABLE {self.format_identifier(expr.table_name)}", ()
+        return f"TRUNCATE TABLE {TableExpression(self, expr.table_name, schema_name=expr.schema_name).to_sql()[0]}", ()
 
 
 __all__ = ['SnowflakeTruncateMixin']
