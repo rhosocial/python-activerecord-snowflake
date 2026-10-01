@@ -119,7 +119,7 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
             parts.append(cast(str, self.format_identifier(database_name)))
         if schema_name is not None:
             parts.append(cast(str, self.format_identifier(schema_name)))
-        parts.append(cast(str, TableExpression(self, expr.type_name, schema_name=expr.schema_name).to_sql()[0]))
+        parts.append(cast(str, self.format_identifier(expr.type_name)))
         return ".".join(parts)
 
     def format_create_type_statement(
