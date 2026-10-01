@@ -21,6 +21,7 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.types import (
     SnowflakeVariantType,
     SnowflakeVarcharType,
 )
+from rhosocial.activerecord.backend.expression.types import DataType, VarCharType
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 
 SNOWFLAKE_TYPES = [
@@ -202,11 +203,28 @@ class TestSupportsFormat1To1:
 
 
 class TestSuggestedDataTypes:
-    def test_returns_empty_dict(self):
+    def test_returns_a_dict_of_classes(self):
         dialect = SnowflakeDialect()
         result = dialect.suggested_data_types()
         assert isinstance(result, dict)
-        assert result == {}
+        for name, klass in result.items():
+            assert isinstance(klass, type), f"{name}: value is not a class"
+            assert issubclass(klass, DataType), f"{name}: value is not a DataType"
+
+    def test_enum_is_stored_as_varchar(self):
+        """Snowflake has no enum type, so the core one has to be refused with
+        a way forward rather than with nothing.
+
+        This was an empty dict, which left the core's refusal with no
+        substitute to name.
+        """
+        dialect = SnowflakeDialect()
+        assert dialect.suggested_data_types()["enum"] is VarCharType
+
+    def test_keys_are_disjoint_from_supported(self):
+        dialect = SnowflakeDialect()
+        overlap = set(dialect.supports_data_types()) & set(dialect.suggested_data_types())
+        assert not overlap, f"overlap between supported and suggested: {overlap}"
 
 
 class TestPrecisionValidation:
