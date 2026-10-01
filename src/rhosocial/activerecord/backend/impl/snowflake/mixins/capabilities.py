@@ -177,6 +177,15 @@ class SnowflakeCapabilityMixin:
         """
         return True
 
+    #: The JSON path function Snowflake spells this way. Declared so a
+    #: conformance check can tell it from a function inherited from the core,
+    #: which is MySQL's JSON_EXTRACT.
+    _JSON_FUNCTION_NAMES = ("GET_PATH",)
+
+    def supports_json_function(self, function_name: str) -> bool:
+        """Whether a named JSON function is available on this server."""
+        return function_name.upper() in self._JSON_FUNCTION_NAMES
+
     def format_json_function_expression(self, expr) -> Tuple[str, tuple]:
         """Render a JSON path with GET_PATH.
 
