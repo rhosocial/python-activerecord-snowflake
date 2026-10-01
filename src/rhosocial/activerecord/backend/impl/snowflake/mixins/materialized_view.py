@@ -2,6 +2,7 @@
 """SnowflakeMaterializedViewMixin — materialized view DDL support."""
 
 from typing import Any, Tuple, TYPE_CHECKING
+from ....expression.core import TableExpression
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 
@@ -59,7 +60,7 @@ class SnowflakeMaterializedViewMixin:
         parts.append("MATERIALIZED VIEW")
         if getattr(expr, "if_not_exists", False):
             parts.append("IF NOT EXISTS")
-        parts.append(self.format_view_name(expr))
+        parts.append(TableExpression(self, expr.view_name, schema_name=expr.schema_name).to_sql()[0])
 
         column_aliases = getattr(expr, "column_aliases", None)
         if column_aliases:
