@@ -262,7 +262,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
             parts.append(self.format_identifier(expr.database_name))
         if expr.schema_name is not None:
             parts.append(self.format_identifier(expr.schema_name))
-        parts.append(TableExpression(self, expr.type_name, schema_name=expr.schema_name).to_sql()[0])
+        parts.append(self.format_identifier(expr.type_name))
         return ".".join(parts), ()
 
     def format_data_type_snowflake_geography(self, expr: SnowflakeGeographyType) -> Tuple[str, tuple]:
