@@ -7,7 +7,7 @@ Uses DDLTypeMixin naming-convention dispatch for Snowflake-specific type SQL.
 from __future__ import annotations
 
 import re
-from typing import Tuple
+from typing import Dict, Tuple
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.dialect.mixins.ddl_type import DDLTypeMixin
@@ -337,3 +337,16 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
             return JsonType(dialect=self)
 
         return CustomType(dialect=self, raw=stripped)
+
+    def suggested_data_types(self) -> Dict[str, type]:
+        """Core types Snowflake stores some other way.
+
+        Snowflake has no enum type, so a model declaring one would be told the
+        type is unsupported with no route forward. The value is stored as
+        VARCHAR and constrained outside the type, so VARCHAR is what the
+        meaning becomes here.
+        """
+        from rhosocial.activerecord.backend.expression.types import VarCharType
+
+        return {"enum": VarCharType}
+
