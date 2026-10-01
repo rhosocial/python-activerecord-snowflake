@@ -72,13 +72,28 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
 
         Snowflake uses a three-level namespace: database.schema.table.
         The schema is configured in the connection config.
+
+        Delegates to the backend's ``_resolve_configured_schema`` so there is a
+        single place that knows how the config spelling works (``schema``, or
+        the legacy ``schema_name``).
         """
-        if hasattr(self._backend, 'config') and self._backend.config:
+        resolver = getattr(self._backend, "_resolve_configured_schema", None)
+        if callable(resolver):
+            resolved = resolver()
+            # Guard against mock backends: ``MagicMock`` auto-creates any
+            # attribute, so only a real string result may short-circuit.
+            if isinstance(resolved, str) and resolved:
+                return resolved
+        # Backends without the resolver (e.g. test doubles) fall back to the
+        # config directly.
+        config = getattr(self._backend, "config", None)
+        if config:
             schema = (
-                getattr(self._backend.config, 'schema', None)
-                or getattr(self._backend.config, 'schema_name', None)
+                getattr(config, "schema", None)
+                or getattr(config, "schema_name", None)
             )
-            return schema or ""
+            if isinstance(schema, str) and schema:
+                return schema
         return ""
 
     def _get_version(self) -> tuple:

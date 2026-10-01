@@ -178,12 +178,27 @@ class SnowflakeBackendMixin:
 
         return suggestions
 
-    def get_default_schema(self) -> Optional[str]:
-        """Get the default schema for Snowflake.
+    def _resolve_configured_schema(self) -> Optional[str]:
+        """Return the schema configured for this connection, if any.
 
-        Snowflake uses a three-level namespace: database.schema.table.
-        The default schema can be set in the connection config.
+        Snowflake uses a three-level namespace: ``database.schema.table``.
+        The schema comes from the connection config (``schema``, or the
+        legacy ``schema_name`` spelling).
+
+        .. note::
+           This was previously the public ``get_default_schema()``, which
+           overrode a core ``StorageBackend`` method. That core method had no
+           production caller, so the override only ever served introspection
+           -- and the introspector has its own copy in
+           ``introspection/introspector.py::_get_default_schema``. Renaming it
+           makes the actual scope explicit and stops it from reading as a
+           general-purpose hook.
+
+           This is *not* a statement-level default: a model that does not set
+           ``__schema_name__`` resolves through the connection's
+           ``search_path``, exactly as on every other backend.
         """
-        if hasattr(self, 'config') and self.config:
-            return getattr(self.config, 'schema', None) or getattr(self.config, 'schema_name', None)
-        return None
+        config = getattr(self, "config", None)
+        if not config:
+            return None
+        return getattr(config, "schema", None) or getattr(config, "schema_name", None)

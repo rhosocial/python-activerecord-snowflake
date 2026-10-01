@@ -321,7 +321,7 @@ class TestSnowflakeBackendDefaultSchema:
                 schema="PUBLIC",
             )
         )
-        assert backend.get_default_schema() == "PUBLIC"
+        assert backend._resolve_configured_schema() == "PUBLIC"
 
     def test_default_schema_none_when_not_set(self):
         backend = SnowflakeBackend(
@@ -332,4 +332,4 @@ class TestSnowflakeBackendDefaultSchema:
                 password="test_pass",
             )
         )
-        assert backend.get_default_schema() is None
+        assert backend._resolve_configured_schema() is None
