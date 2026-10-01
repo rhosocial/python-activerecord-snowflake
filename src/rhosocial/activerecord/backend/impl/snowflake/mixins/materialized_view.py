@@ -59,7 +59,7 @@ class SnowflakeMaterializedViewMixin:
         parts.append("MATERIALIZED VIEW")
         if getattr(expr, "if_not_exists", False):
             parts.append("IF NOT EXISTS")
-        parts.append(self._format_view_name(expr))
+        parts.append(self.format_view_name(expr))
 
         column_aliases = getattr(expr, "column_aliases", None)
         if column_aliases:
