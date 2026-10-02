@@ -144,6 +144,37 @@ model-level sugar for it, so the clause goes in a raw `where()` string.
 Note that `supports_returning_insert()` is also `True` here, unlike the other
 warehouse backends.
 
+### Schema names
+
+Snowflake is the one backend with a schema layer of its own. Its fully qualified
+name is `<database>.<schema>.<object>`, so a `schema_name` on its own does not
+identify an object — the database is part of the answer and is not carried by
+it.
+
+```python
+class Order(ActiveRecord):
+    __schema_name__ = "SALES"       # the schema
+    __table_name__ = "ORDERS"
+```
+
+```sql
+-- generated
+SELECT * FROM "SALES"."ORDERS"
+```
+
+The database comes from the connection config, not from the model. The schema is
+resolved against the session's current database, so a `schema_name` that names a
+schema in some *other* database addresses nothing here.
+
+`get_current_schema()` returns the active schema — the first existing entry in
+the session's schema search path. It is `None` when that path resolves to no
+existing schema, which is a legitimate state rather than an error, and the value
+is returned as-is.
+
+Because the schema search path is a session setting, changing it changes what
+"unqualified" means. Pin the schema on the model rather than relying on
+`search_path`.
+
 ## Known Limitations
 
 - **No connection pooling.** `pool_size`, `pool_min_size`, `pool_max_size` and
@@ -183,11 +214,17 @@ PYTHONPATH=tests .venv3.14-ubuntu26.04/bin/pytest \
 
 ## Documentation
 
-This repository has no `docs/` tree. Backend notes live in
-[.claude/snowflake_backend.md](.claude/snowflake_backend.md) and
-[.claude/testing.md](.claude/testing.md); core library documentation is at
-[python-activerecord/docs](https://github.com/rhosocial/python-activerecord/tree/main/docs).
+This repository has a bilingual `docs/` tree:
 
+- [English Documentation](docs/en_US/README.md)
+- [中文文档 (Chinese)](docs/zh_CN/README.md)
+
+Start with the [Schema Namespaces](docs/en_US/snowflake_specific_features/schema_namespace.md) guide, which
+covers `__schema_name__`, the DDL `schema_name` parameter, identifier quoting, and this
+backend's column-reference rules.
+
+Backend notes also live in [.claude/snowflake_backend.md](.claude/snowflake_backend.md) and [.claude/testing.md](.claude/testing.md); core library documentation is at
+[python-activerecord/docs](https://github.com/rhosocial/python-activerecord/tree/main/docs).
 ## Contributing
 
 See [CONTRIBUTING.md](https://github.com/rhosocial/python-activerecord/blob/main/CONTRIBUTING.md).
