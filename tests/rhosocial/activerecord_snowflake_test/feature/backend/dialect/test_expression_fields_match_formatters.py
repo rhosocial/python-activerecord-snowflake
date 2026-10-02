@@ -88,7 +88,7 @@ class TestQualifiedStatementsRender:
 
         expr = TruncateExpression(dialect, table_name="orders")
         assert expr.to_sql()[0] == 'TRUNCATE TABLE "orders"', expr.to_sql()[0]
-        qualified = TruncateExpression(dialect, table_name="orders", schema="app")
+        qualified = TruncateExpression(dialect, table_name="orders", schema_name="app")
         assert qualified.to_sql()[0] == (
             'TRUNCATE TABLE "app"."orders"'
         ), qualified.to_sql()[0]
