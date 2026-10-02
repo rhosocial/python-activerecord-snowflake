@@ -126,7 +126,7 @@ class TestExpressionSignatures:
             (
                 "rhosocial.activerecord.backend.expression.statements.ddl_truncate",
                 "TruncateExpression",
-                "schema",
+                "schema_name",
             ),
             (
                 "rhosocial.activerecord.backend.expression.statements.ddl_schema",
@@ -164,7 +164,7 @@ class TestExpressionSignatures:
 
         for cls, field in (
             (CreateMaterializedViewExpression, "schema_name"),
-            (TruncateExpression, "schema"),
+            (TruncateExpression, "schema_name"),
         ):
             params = inspect.signature(cls.__init__).parameters
             assert params[field].default is None, (
