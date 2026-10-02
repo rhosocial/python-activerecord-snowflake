@@ -1,7 +1,7 @@
 """Snowflake schema-level user-defined type DDL capability and SQL formatting."""
 
 from typing import Any, Tuple, Type, cast
-from ....expression.core import TableExpression
+from rhosocial.activerecord.backend.expression.core import TableExpression
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.dialect.mixins.user_defined_type import UserDefinedTypeMixin

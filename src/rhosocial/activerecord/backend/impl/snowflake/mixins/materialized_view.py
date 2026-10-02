@@ -2,7 +2,7 @@
 """SnowflakeMaterializedViewMixin — materialized view DDL support."""
 
 from typing import Any, Tuple, TYPE_CHECKING
-from ....expression.core import TableExpression
+from rhosocial.activerecord.backend.expression.core import TableExpression
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 

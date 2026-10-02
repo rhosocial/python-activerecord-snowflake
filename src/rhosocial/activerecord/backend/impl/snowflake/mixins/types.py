@@ -5,7 +5,7 @@ Uses DDLTypeMixin naming-convention dispatch for Snowflake-specific type SQL.
 """
 
 from __future__ import annotations
-from ....expression.core import TableExpression
+from rhosocial.activerecord.backend.expression.core import TableExpression
 
 import re
 from typing import Tuple

@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/truncate.py
 """Snowflake TRUNCATE support mixin."""
 from typing import Tuple, TYPE_CHECKING
-from ....expression.core import TableExpression
+from rhosocial.activerecord.backend.expression.core import TableExpression
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 

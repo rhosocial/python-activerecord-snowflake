@@ -235,8 +235,8 @@ class AsyncSnowflakeBackend(
         Asks the server via CURRENT_SCHEMA(), the first existing entry in the
         schema search path. None means the path resolves to no existing schema.
         """
-        from ....expression import core
-        from ....expression.statements.dql import QueryExpression
+        from rhosocial.activerecord.backend.expression import core
+        from rhosocial.activerecord.backend.expression.statements.dql import QueryExpression
         from ..functions.schema import current_schema
 
         query = QueryExpression(
