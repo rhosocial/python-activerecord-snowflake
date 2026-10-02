@@ -329,6 +329,13 @@ class SnowflakeUserDefinedType(DataType):
         schema_name: Optional[str] = None,
         database_name: Optional[str] = None,
     ) -> None:
+        """
+        Args:
+            schema_name: Namespace to qualify the type with, e.g. ``app``.
+                None leaves the name unqualified. An empty string raises
+                ValueError, and a dialect with no namespace raises
+                UnsupportedFeatureError.
+        """
         super().__init__(dialect)
         for field_name, value in (
             ("type_name", type_name),

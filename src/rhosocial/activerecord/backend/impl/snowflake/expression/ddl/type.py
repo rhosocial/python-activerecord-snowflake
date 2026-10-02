@@ -1,3 +1,4 @@
+# src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/type.py
 """Snowflake schema-level user-defined type DDL expressions."""
 
 from collections.abc import Mapping as ABCMapping
@@ -166,6 +167,13 @@ class SnowflakeCreateTypeExpression(CreateTypeExpression):
         or_replace: bool = False,
         comment: Optional[str] = None,
     ) -> None:
+        """
+        Args:
+            schema_name: Namespace to qualify the type with, e.g. ``app``.
+                None leaves the name unqualified. An empty string raises
+                ValueError, and a dialect with no namespace raises
+                UnsupportedFeatureError.
+        """
         _validate_database_qualification(database_name, schema_name)
         if comment is not None and not isinstance(comment, str):
             raise TypeError("comment must be a string or None")
@@ -194,6 +202,13 @@ class SnowflakeAlterTypeExpression(AlterTypeExpression):
         schema_name: Optional[str] = None,
         if_exists: bool = False,
     ) -> None:
+        """
+        Args:
+            schema_name: Namespace to qualify the type with, e.g. ``app``.
+                None leaves the name unqualified. An empty string raises
+                ValueError, and a dialect with no namespace raises
+                UnsupportedFeatureError.
+        """
         _validate_database_qualification(database_name, schema_name)
         super().__init__(
             dialect,
@@ -219,6 +234,13 @@ class SnowflakeDropTypeExpression(DropTypeExpression):
         cascade: bool = False,
         restrict: bool = False,
     ) -> None:
+        """
+        Args:
+            schema_name: Namespace to qualify the type with, e.g. ``app``.
+                None leaves the name unqualified. An empty string raises
+                ValueError, and a dialect with no namespace raises
+                UnsupportedFeatureError.
+        """
         _validate_database_qualification(database_name, schema_name)
         if not isinstance(cascade, bool):
             raise TypeError("cascade must be a bool")
