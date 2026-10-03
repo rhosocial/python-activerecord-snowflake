@@ -152,7 +152,20 @@ class SnowflakeUnsetTypeCommentAction(TypeAlterAction):
     action_kind = "snowflake.unset_type_comment"
 
 
-class SnowflakeCreateTypeExpression(CreateTypeExpression):
+class SnowflakeTypeExpression:
+    """Declares the database level of a Snowflake type name.
+
+    Snowflake addresses a type as ``database.schema.type``; the other
+    backends have no database level at all, so the field lives on the
+    Snowflake expressions rather than on the core ones. Declaring it here
+    lets the formatter ask whether it is present instead of reaching for it
+    with a default.
+    """
+
+    database_name: Optional[str]
+
+
+class SnowflakeCreateTypeExpression(SnowflakeTypeExpression, CreateTypeExpression):
     """CREATE TYPE expression with Snowflake qualification and comment syntax."""
 
     def __init__(
@@ -189,7 +202,7 @@ class SnowflakeCreateTypeExpression(CreateTypeExpression):
         self.comment = comment
 
 
-class SnowflakeAlterTypeExpression(AlterTypeExpression):
+class SnowflakeAlterTypeExpression(SnowflakeTypeExpression, AlterTypeExpression):
     """ALTER TYPE expression with Snowflake database/schema qualification."""
 
     def __init__(
@@ -220,7 +233,7 @@ class SnowflakeAlterTypeExpression(AlterTypeExpression):
         self.database_name = database_name
 
 
-class SnowflakeDropTypeExpression(DropTypeExpression):
+class SnowflakeDropTypeExpression(SnowflakeTypeExpression, DropTypeExpression):
     """DROP TYPE expression with Snowflake database/schema qualification."""
 
     def __init__(

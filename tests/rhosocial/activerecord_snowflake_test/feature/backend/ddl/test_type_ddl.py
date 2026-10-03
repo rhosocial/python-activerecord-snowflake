@@ -472,3 +472,42 @@ def test_public_exports_include_udt_ddl_api():
         SnowflakeTypeDDLMixin,
     ):
         assert isinstance(cls, type)
+
+
+class TestTypeNamespaceValidation:
+    """An empty namespace must be refused rather than rendered.
+
+    The type formatters used to assemble the name by hand, which bypassed
+    the dialect's namespace validation: an empty string rendered as
+    ``""."label"`` instead of raising, a statement that matches nothing.
+    """
+
+    def test_empty_schema_is_refused_on_drop(self):
+        dialect = _dialect()
+        with pytest.raises(ValueError, match="non-empty string"):
+            DropTypeExpression(dialect, "label", schema_name="").to_sql()
+
+    def test_empty_schema_is_refused_on_alter(self):
+        dialect = _dialect()
+        action = SnowflakeSetTypeCommentAction(dialect, "comment")
+        with pytest.raises(ValueError, match="non-empty string"):
+            AlterTypeExpression(dialect, "age", [action], schema_name="").to_sql()
+
+    def test_non_string_namespace_is_refused_on_drop(self):
+        dialect = _dialect()
+        with pytest.raises((TypeError, ValueError)):
+            DropTypeExpression(dialect, "label", schema_name=5).to_sql()
+
+    def test_three_part_name_still_renders(self):
+        """The Snowflake-only database level is unaffected."""
+        dialect = _dialect()
+        sql, _ = SnowflakeDropTypeExpression(
+            dialect, "label", database_name="DB", schema_name="APP"
+        ).to_sql()
+        assert sql == 'DROP TYPE "DB"."APP"."label"'
+
+    def test_core_expression_has_no_database_level(self):
+        """A core type expression renders two parts at most."""
+        dialect = _dialect()
+        sql, _ = DropTypeExpression(dialect, "label", schema_name="APP").to_sql()
+        assert sql == 'DROP TYPE "APP"."label"'

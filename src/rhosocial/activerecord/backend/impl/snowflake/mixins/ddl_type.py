@@ -111,16 +111,30 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
     def supports_multiple_type_alter_actions(self) -> bool:
         return False
 
-    def _format_type_name(self, expr: Any) -> str:
-        parts = []
-        database_name = getattr(expr, "database_name", None)
-        schema_name = getattr(expr, "schema_name", None)
-        if database_name is not None:
-            parts.append(cast(str, self.format_identifier(database_name)))
-        if schema_name is not None:
-            parts.append(cast(str, self.format_identifier(schema_name)))
-        parts.append(cast(str, self.format_identifier(expr.type_name)))
-        return ".".join(parts)
+    def format_type_name(self, expr: Any) -> str:
+        """Render a possibly three-part type name.
+
+        Snowflake types are addressed as ``database.schema.type``, so the
+        database is the outermost part. The namespace is validated through
+        SchemaSupport before it is rendered, which is what keeps an empty
+        string from becoming ``""."label"`` -- the value a caller meant to be
+        unqualified would have produced a statement that matches nothing.
+        """
+        from rhosocial.activerecord.backend.dialect.protocols import SchemaSupport
+        from ..expression.ddl.type import SnowflakeTypeExpression
+
+        if isinstance(self, SchemaSupport):
+            self.validate_schema_name(expr)
+
+        name_sql = TableExpression(
+            self, name=expr.type_name, schema_name=expr.schema_name
+        ).to_sql()[0]
+        if not isinstance(expr, SnowflakeTypeExpression):
+            return name_sql
+        database_name = expr.database_name
+        if database_name is None:
+            return name_sql
+        return f"{self.format_identifier(database_name)}.{name_sql}"
 
     def format_create_type_statement(
         self,
@@ -145,7 +159,7 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
         parts.append("TYPE")
         if expr.if_not_exists:
             parts.append("IF NOT EXISTS")
-        parts.extend((self._format_type_name(expr), definition_sql))
+        parts.extend((self.format_type_name(expr), definition_sql))
         comment = getattr(expr, "comment", None)
         if comment is not None:
             if not isinstance(comment, str):
@@ -178,7 +192,7 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
         parts = ["ALTER TYPE"]
         if expr.if_exists:
             parts.append("IF EXISTS")
-        parts.extend((self._format_type_name(expr), ", ".join(action_parts)))
+        parts.extend((self.format_type_name(expr), ", ".join(action_parts)))
         return " ".join(parts), tuple(action_params)
 
     def format_drop_type_statement(
@@ -192,7 +206,7 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
             raise UnsupportedFeatureError(self.name, "DROP TYPE CASCADE")
         if getattr(expr, "restrict", False):
             raise UnsupportedFeatureError(self.name, "DROP TYPE RESTRICT")
-        return f"DROP TYPE {self._format_type_name(expr)}", ()
+        return f"DROP TYPE {self.format_type_name(expr)}", ()
 
     def format_type_definition(
         self,
