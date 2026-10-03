@@ -62,9 +62,10 @@ class TestSnowflakeCreateTableFamily:
         assert params == (1,)
 
     def test_create_or_replace(self, dialect):
+        from rhosocial.activerecord.backend.expression.core import TableExpression
         expr = CreateTableExpression(
             dialect,
-            table="t",
+            table=TableExpression(dialect, "t"),
             columns=[],
             table_options=CreateTableOptions(dialect, or_replace=True),
         )
@@ -72,9 +73,10 @@ class TestSnowflakeCreateTableFamily:
         assert sql.startswith("CREATE OR REPLACE TABLE")
 
     def test_create_transient(self, dialect):
+        from rhosocial.activerecord.backend.expression.core import TableExpression
         expr = CreateTableExpression(
             dialect,
-            table="t",
+            table=TableExpression(dialect, "t"),
             columns=[],
             table_options=SnowflakeCreateTableOptions(dialect, transient=True),
         )
@@ -82,9 +84,10 @@ class TestSnowflakeCreateTableFamily:
         assert sql.startswith("CREATE TRANSIENT TABLE")
 
     def test_create_or_replace_transient(self, dialect):
+        from rhosocial.activerecord.backend.expression.core import TableExpression
         expr = CreateTableExpression(
             dialect,
-            table="t",
+            table=TableExpression(dialect, "t"),
             columns=[],
             table_options=SnowflakeCreateTableOptions(
                 dialect, or_replace=True, transient=True
