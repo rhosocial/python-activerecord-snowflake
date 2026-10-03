@@ -22,12 +22,10 @@ import pytest
 
 #: Statement fields a formatter may read that some expression classes carry
 #: under a different name. Reading these by their own name is the defect.
-#: TruncateExpression names the field `schema`; the DDL statements name it
-#: `schema_name`. Snowflake's TRUNCATE is one formatter here that reads the
-#: alias, so the alias is exercised below rather than excused.
-KNOWN_ALIASES = {
-    "schema": {"TruncateExpression"},
-}
+#: The DDL statements all name the field `schema_name`; TruncateExpression
+#: carries no schema field of its own and takes a TableExpression instead, so
+#: no formatter here reads an alias.
+KNOWN_ALIASES: dict = {}
 
 
 class TestQualifiedStatementsRender:
@@ -77,18 +75,21 @@ class TestQualifiedStatementsRender:
             'SELECT "id" FROM "orders"'
         ), qualified.to_sql()[0]
 
-    def test_truncate_reads_the_schema_alias(self, dialect):
-        """One formatter here reads ``expr.schema``, not ``schema_name``.
+    def test_truncate_qualifies_through_its_table(self, dialect):
+        """TRUNCATE carries the namespace on the ``TableExpression`` it is given.
 
-        TruncateExpression carries the field under the core alias, so the
-        keyword is ``schema`` here. Pinning it means renaming the field in core
-        breaks this rather than silently rendering an unqualified name.
+        Pinning both the unqualified and the qualified build means a change in
+        core that stops the schema reaching the SQL breaks this, rather than
+        silently rendering an unqualified name.
         """
         from rhosocial.activerecord.backend.expression import TruncateExpression
+        from rhosocial.activerecord.backend.expression.core import TableExpression
 
-        expr = TruncateExpression(dialect, table_name="orders")
+        expr = TruncateExpression(dialect, table=TableExpression(dialect, "orders"))
         assert expr.to_sql()[0] == 'TRUNCATE TABLE "orders"', expr.to_sql()[0]
-        qualified = TruncateExpression(dialect, table_name="orders", schema_name="app")
+        qualified = TruncateExpression(
+            dialect, table=TableExpression(dialect, "orders", schema_name="app")
+        )
         assert qualified.to_sql()[0] == (
             'TRUNCATE TABLE "app"."orders"'
         ), qualified.to_sql()[0]
