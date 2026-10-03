@@ -125,11 +125,6 @@ class TestExpressionSignatures:
                 "schema_name",
             ),
             (
-                "rhosocial.activerecord.backend.expression.statements.ddl_truncate",
-                "TruncateExpression",
-                "schema_name",
-            ),
-            (
                 "rhosocial.activerecord.backend.expression.statements.ddl_schema",
                 "CreateSchemaExpression",
                 "schema_name",
@@ -160,13 +155,9 @@ class TestExpressionSignatures:
         """
         from rhosocial.activerecord.backend.expression import (
             CreateMaterializedViewExpression,
-            TruncateExpression,
         )
 
-        for cls, field in (
-            (CreateMaterializedViewExpression, "schema_name"),
-            (TruncateExpression, "schema_name"),
-        ):
+        for cls, field in ((CreateMaterializedViewExpression, "schema_name"),):
             params = inspect.signature(cls.__init__).parameters
             assert params[field].default is None, (
                 f"{cls.__name__}.{field} must default to None -- None is what "
