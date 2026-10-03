@@ -24,6 +24,7 @@ from .show import SnowflakeShowMixin
 from .stage import SnowflakeStageMixin
 from .stream import SnowflakeStreamMixin
 from .ddl_table_modifier import SnowflakeTableModifierMixin
+from .table import SnowflakeTableMixin
 from .task import SnowflakeTaskMixin
 from .time_travel import SnowflakeTimeTravelMixin
 from .transaction import (
@@ -67,6 +68,7 @@ __all__ = [
     "SnowflakeStageMixin",
     "SnowflakeStreamMixin",
     "SnowflakeTableModifierMixin",
+    "SnowflakeTableMixin",
     "SnowflakeTaskMixin",
     "SnowflakeTimeTravelMixin",
     "SnowflakeTransactionMixin",

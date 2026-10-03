@@ -16,10 +16,10 @@ Usage:
     )
     print(sql, params)
 """
-from typing import Optional
-
 from rhosocial.activerecord.backend.expression.core import Column, Literal
-from rhosocial.activerecord.backend.expression.predicates import ComparisonPredicate
+from rhosocial.activerecord.backend.impl.snowflake.expression.table import (
+    SnowflakeTableExpression,
+)
 from rhosocial.activerecord.backend.expression.statements.dql import QueryExpression
 from rhosocial.activerecord.backend.expression.statements.dml import MergeExpression, MergeAction, MergeActionType
 
@@ -83,6 +83,29 @@ def variant_data_query(dialect, table: str):
     )
 
 
+def _split_qualified(dialect, qualified: str, alias: str) -> SnowflakeTableExpression:
+    """Turn a dotted name into a table reference with its own namespaces.
+
+    A caller writing ``"RAW.STAGING.incoming"`` means three levels, and each
+    needs its own quoting. Handing the whole string over as the table name would
+    quote it as one identifier -- ``"RAW.STAGING.incoming"`` -- which is a
+    different name that happens to look similar.
+    """
+    parts = qualified.split(".")
+    if len(parts) == 1:
+        return SnowflakeTableExpression(dialect, parts[0], alias=alias)
+    if len(parts) == 2:
+        return SnowflakeTableExpression(dialect, parts[1], schema_name=parts[0], alias=alias)
+    if len(parts) == 3:
+        return SnowflakeTableExpression(
+            dialect, parts[2], schema_name=parts[1], database_name=parts[0], alias=alias
+        )
+    raise ValueError(
+        f"table name has {len(parts)} parts, expected name, schema.name or "
+        f"database.schema.name: {qualified!r}"
+    )
+
+
 def merge_upsert(dialect, source: str, target: str, key_column: str = "id"):
     """MERGE INTO upsert operation.
 
@@ -91,30 +114,22 @@ def merge_upsert(dialect, source: str, target: str, key_column: str = "id"):
 
     Args:
         dialect: SnowflakeDialect instance.
-        source: Source table/subquery name.
-        target: Target table name.
+        source: Source table name. May be qualified, e.g. ``RAW.STAGING.new``.
+        target: Target table name. May be qualified independently of the source;
+            a merge across two schemas is ordinary here, and neither side's
+            database qualifies the other.
         key_column: Column used for match condition.
     """
     return MergeExpression(
-        dialect=dialect,
-        target_table=target,
-        source=source,
-        on_condition=ComparisonPredicate(
-            dialect, '=',
-            Column(dialect, key_column, table='target'),
-            Column(dialect, key_column, table='src'),
-        ),
+        dialect,
+        _split_qualified(dialect, target, "target"),
+        _split_qualified(dialect, source, "src"),
+        Column(dialect, key_column, table="target") == Column(dialect, key_column, table="src"),
         when_matched=[
-            MergeAction(
-                action_type=MergeActionType.UPDATE,
-                values=None,
-            ),
+            MergeAction(dialect, action_type=MergeActionType.UPDATE),
         ],
         when_not_matched=[
-            MergeAction(
-                action_type=MergeActionType.INSERT,
-                values=None,
-            ),
+            MergeAction(dialect, action_type=MergeActionType.INSERT),
         ],
     )
 
@@ -131,9 +146,8 @@ def three_part_query(dialect, database: str, schema: str, table: str):
         schema: Schema name.
         table: Table name.
     """
-    qualified_name = f'"{database}"."{schema}"."{table}"'
     return QueryExpression(
-        dialect=dialect,
+        dialect,
         select=[Column(dialect, '*')],
-        from_=qualified_name,
+        from_=SnowflakeTableExpression(dialect, table, schema_name=schema, database_name=database),
     )

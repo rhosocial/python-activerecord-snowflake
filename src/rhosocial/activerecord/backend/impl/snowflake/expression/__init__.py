@@ -27,6 +27,7 @@ from .partition import (
     SnowflakeExternalPartitionClause,
 )
 from .identifier import SnowflakeIdentifierExpression
+from .table import SnowflakeTableExpression
 from .sample import (
     SnowflakeSampleExpression,
     SnowflakeSampleForm,
@@ -114,6 +115,7 @@ __all__ = [
     "SnowflakeClusterByClause",
     "SnowflakeExternalPartitionClause",
     "SnowflakeIdentifierExpression",
+    "SnowflakeTableExpression",
     "SnowflakeSampleExpression",
     "SnowflakeSampleForm",
     "SnowflakeSamplingMethod",

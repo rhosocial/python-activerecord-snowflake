@@ -125,6 +125,7 @@ from .mixins import (
     SnowflakeShowMixin,
     SnowflakeStageMixin,
     SnowflakeStreamMixin,
+    SnowflakeTableMixin,
     SnowflakeTableModifierMixin,
     SnowflakeTaskMixin,
     SnowflakeTimeTravelMixin,
@@ -200,6 +201,7 @@ class SnowflakeDialect(
     SnowflakeDatabaseMixin,
     SchemaMixin,
     IndexMixin,
+    SnowflakeTableMixin,  # Before TableMixin: renders database.schema.table
     SnowflakeTableModifierMixin,  # Before TableMixin to override create-table capability flags
     TableMixin,
     ConstraintMixin,
