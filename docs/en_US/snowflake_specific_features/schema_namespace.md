@@ -3,7 +3,7 @@
 # Snowflake Schema Namespaces
 
 > This page covers what is specific to this backend: what a `schema_name` names
-> here, why one level of qualification is all the expression layer carries, how
+> here, how many levels of qualification a table reference carries here, how
 > a qualified name is rendered, what a table alias does to column references,
 > which schema an unqualified name resolves against, and how `SEARCH_PATH`
 > differs from the PostgreSQL `search_path` it is named after.
@@ -23,6 +23,14 @@ Every SQL fragment below was rendered by the expression layer with
 
 ```
 PYTHONPATH=src .venv3.14-ubuntu26.04/bin/python
+```
+
+That recipe assumes the installed core is the one this page describes. Where it
+is not, both halves of the import have to be pinned to the same branch, backend
+first:
+
+```
+PYTHONPATH=<core-worktree>/src:src <venv>/bin/python
 ```
 
 `SnowflakeDialect` takes its version as a tuple; `(8, 0, 0)` is the default and
@@ -71,8 +79,9 @@ database, so a schema name alone does not identify an object:
 > — [Object name resolution][name-resolution]
 
 > **A `schema_name` is one level of the two that are needed.** The other level is
-> the database, and the database comes from the connection, not from the model.
-> This is stated in the core guide's backend support matrix as well.
+> the database. No model declaration reaches it: it comes from the connection, or
+> from a statement assembled by hand. This is stated in the core guide's backend
+> support matrix as well.
 
 [ddl-database]: https://docs.snowflake.com/en/sql-reference/ddl-database
 [name-resolution]: https://docs.snowflake.com/en/sql-reference/name-resolution
@@ -90,8 +99,9 @@ SELECT "app"."orders"."id" FROM "app"."orders"
 
 The isolation comes from the connection's database, not from the rendered
 reference. Reach another database's object and the rendered name has to carry
-the database — which, as the next section shows, nothing in the expression layer
-can currently produce.
+the database — which means the statement has to be handed a
+`SnowflakeTableExpression` rather than the reference a model builds. See
+[A table reference carries two levels](#a-table-reference-carries-two-levels).
 
 Two things in Snowflake's own name resolution bear on this and are worth reading
 alongside the rendering:
@@ -110,7 +120,7 @@ alongside the rendering:
   `format_table` emits exactly one dot between two segments, so there is no way
   to ask for the empty middle one.
 
-## One level of qualification is what the expression layer carries
+## A table reference carries two levels
 
 A core `TableExpression` stops at the schema, so this backend adds the level Snowflake
 actually has:
@@ -118,30 +128,70 @@ actually has:
 ```python
 from rhosocial.activerecord.backend.impl.snowflake.expression import SnowflakeTableExpression
 
-SnowflakeTableExpression(dialect, "t").to_sql()[0]
+SnowflakeTableExpression(d, "t").to_sql()[0]
 # "t"
 
-SnowflakeTableExpression(dialect, "t", schema_name="S").to_sql()[0]
+SnowflakeTableExpression(d, "t", schema_name="S").to_sql()[0]
 # "S"."t"
 
-SnowflakeTableExpression(dialect, "t", schema_name="S", database_name="DB").to_sql()[0]
+SnowflakeTableExpression(d, "t", schema_name="S", database_name="DB").to_sql()[0]
 # "DB"."S"."t"
 ```
 
 Each level is quoted on its own terms, so a two-level name is never given three parts and a
-three-part name does not become one quoted segment. A plain core `TableExpression` renders
-as before, at whichever level it was built.
+three-part name does not become one quoted segment. The branch is on the class, not on the
+presence of the field, so a plain core `TableExpression` renders as before, at whichever
+level it was built.
 
-`Column`, `WildcardExpression` and the index expressions still take a `schema_name` and
-nothing above it — a column reference names an object, it does not qualify a database.
+`SnowflakeTableExpression` **is** a `TableExpression`, so every statement below that takes
+a qualified table reference accepts it — DDL and DML included:
+
+```python
+DropTableExpression(
+    d, SnowflakeTableExpression(d, "orders", schema_name="app", database_name="TESTDB")
+).to_sql()[0]
+# DROP TABLE "TESTDB"."app"."orders"
+```
+
+Two details about the extra field are worth knowing:
+
+- **The database may stand alone**, which renders two levels rather than three. The TYPE
+  DDL further down refuses that combination; a table reference does not.
+
+  ```python
+  SnowflakeTableExpression(d, "t", database_name="DB").to_sql()[0]
+  # "DB"."t"
+  ```
+
+- **An empty `database_name` is dropped silently**, where an empty `schema_name` raises:
+
+  ```python
+  SnowflakeTableExpression(d, "t", database_name="", schema_name="S").to_sql()[0]
+  # "S"."t"
+
+  SnowflakeTableExpression(d, "t", database_name="DB", schema_name="").to_sql()
+  # ValueError: SnowflakeTableExpression.schema_name must be a non-empty string; use
+  # None for an unqualified reference
+  ```
+
+`Column` and `WildcardExpression` have no equivalent: they take a `schema_name` and stop
+there — a column reference names an object, it does not qualify a database. The index
+statements take no database field at all, and there `schema_name` qualifies the index name
+only, with the table qualified by its own reference; see
+[DDL takes a schema of its own](#ddl-takes-a-schema-of-its-own).
 
 ```python
 TableExpression(d, "orders", schema_name="TESTDB.app").to_sql()[0]
 # "TESTDB.app"."orders"    -- a schema literally named "TESTDB.app"
 ```
 
-The database level reaches a statement by two other routes, and neither is a
-model-level namespace:
+**The model layer never builds one.** `build_table_reference()` and the query builder both
+go through the core `TableExpression`, so `__schema_name__` stops at `schema.table` however
+the model is declared. The database level is reachable only where a statement is assembled
+by hand.
+
+The database level also reaches a statement by two routes that are not table references at
+all, and neither is a model-level namespace:
 
 - **The connection.** `SnowflakeConnectionConfig.database` is handed to
   `snowflake.connector.connect()` as the connection's `database`, and
@@ -160,57 +210,64 @@ model-level namespace:
   ```
 
   That is a way to get a three-part name past the connection, not a way to get
-  one out of `TableExpression`.
+  one out of a model.
 
-### The one place two levels are accepted
+### The TYPE DDL takes the same two levels, and insists on both
 
-Snowflake's user-defined TYPE DDL is the exception, and it is a real exception
-rather than a general capability:
+Snowflake's user-defined TYPE DDL carries a `database_name` too, and unlike
+`SnowflakeTableExpression` it refuses to take the database alone:
 
 ```python
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
     SnowflakeCreateTypeExpression,
+    SnowflakeAlterTypeExpression,
+    SnowflakeDropTypeExpression,
     SnowflakeScalarTypeDefinition,
+    SnowflakeSetTypeCommentAction,
     SnowflakeVarcharType,
 )
 
-definition = SnowflakeScalarTypeDefinition(d, SnowflakeVarcharType(d))
+d10 = SnowflakeDialect(version=(10, 8, 0))
+definition = SnowflakeScalarTypeDefinition(d10, SnowflakeVarcharType(d10))
 
 SnowflakeCreateTypeExpression(
-    d, "label", definition, database_name="TESTDB", schema_name="app",
+    d10, "label", definition, database_name="TESTDB", schema_name="app",
 ).to_sql()[0]
 # CREATE TYPE "TESTDB"."app"."label" AS VARCHAR
 
 SnowflakeCreateTypeExpression(
-    d, "label", definition, schema_name="app",
+    d10, "label", definition, schema_name="app",
 ).to_sql()[0]
 # CREATE TYPE "app"."label" AS VARCHAR
 ```
 
-`SnowflakeCreateTypeExpression`, `SnowflakeAlterTypeExpression` and
-`SnowflakeDropTypeExpression` each take `database_name` alongside `schema_name`,
-and refuse to take the database alone:
+```python
+SnowflakeCreateTypeExpression(d10, "label", definition, database_name="TESTDB")
+# ValueError: schema_name is required when database_name is provided
+```
 
-```
-ValueError: schema_name is required when database_name is provided
-```
+`SnowflakeCreateTypeExpression`, `SnowflakeAlterTypeExpression` and
+`SnowflakeDropTypeExpression` each take `database_name` alongside `schema_name`.
+That check runs **when the expression is built**, not while rendering, which is
+the opposite of the empty-string rule described further down.
 
 ```python
-SnowflakeAlterTypeExpression(d, "label", [action], database_name="TESTDB",
-                             schema_name="app").to_sql()[0]
+SnowflakeAlterTypeExpression(d10, "label", [SnowflakeSetTypeCommentAction(d10, "c")],
+                             database_name="TESTDB", schema_name="app").to_sql()[0]
 # ALTER TYPE "TESTDB"."app"."label" SET COMMENT = 'c'
 
-SnowflakeDropTypeExpression(d, "label", database_name="TESTDB", schema_name="app").to_sql()[0]
+SnowflakeDropTypeExpression(d10, "label", database_name="TESTDB", schema_name="app").to_sql()[0]
 # DROP TYPE "TESTDB"."app"."label"
 ```
 
-That check runs **when the expression is built**, not while rendering, which is
-the opposite of the empty-string rule described further down. The TYPE DDL also
-requires a server version of 10.8 or newer; on an older dialect all three
-statements raise `UnsupportedFeatureError` before any of this is reached.
+The TYPE DDL also requires a server version of 10.8 or newer, which is why the
+examples above use `d10` rather than `d`: on the default `(8, 0, 0)` all three
+statements raise `UnsupportedFeatureError` while rendering. The
+`schema_name`-without-`database_name` check still runs first, at construction,
+because it never reaches a formatter.
 
-Nothing about `TableExpression` follows this shape. Do not assume a three-part
-name is reachable for a table because it is reachable for a type.
+Nothing about the empty-value rule follows this shape either — see
+[The empty string, and when it is caught](#the-empty-string-and-when-it-is-caught).
 
 ### `CREATE SCHEMA` and `DROP SCHEMA` cannot name their database
 
@@ -536,9 +593,11 @@ Order.query().join(User, on=Order.c.user_id == User.c.id).select(
 #   ON "app"."orders"."user_id" = "crm"."users"."id"
 ```
 
-Cross-**schema** is the limit. A cross-**database** join needs both ranges to
-carry their database, and nothing in the expression layer can render that — see
-[One level of qualification is what the expression layer carries](#one-level-of-qualification-is-what-the-expression-layer-carries).
+Cross-**schema** is what the query builder reaches. A cross-**database** join
+needs both ranges to carry their database, and the builder builds a core
+`TableExpression` for each model, so it never does. Handing both sides a
+`SnowflakeTableExpression` does render it — see
+[A table reference carries two levels](#a-table-reference-carries-two-levels).
 
 ## Set operations
 
@@ -551,9 +610,9 @@ Order.query().select(Order.c.id).union(User.query().select(User.c.id)).to_sql()[
 #   UNION SELECT "crm"."users"."id" FROM "crm"."users"
 ```
 
-A `UNION` over two schema-bound models needs no special handling. A `UNION` over
-two databases would need each branch to carry its database, and cannot be
-expressed here.
+A `UNION` over two schema-bound models needs no special handling. One over two
+databases is reachable the same way as the join above — each branch is built by
+hand with its own `database_name` — but the query builder does not do it.
 
 ## CTEs
 
@@ -569,6 +628,11 @@ inner = QueryExpression(
     dialect=d,
     select=[Column(d, "id", table="orders", schema_name="app")],
     from_=[TableExpression(d, "orders", schema_name="app")],
+)
+main = QueryExpression(
+    dialect=d,
+    select=[Column(d, "id", table="recent_orders")],
+    from_=[TableExpression(d, "recent_orders")],
 )
 
 WithQueryExpression(d, [CTEExpression(d, "recent_orders", inner)], main).to_sql()[0]
@@ -601,15 +665,21 @@ DDL is built — a migration has to name the schema it means — but every state
 that names a schema-bearing object accepts a `schema_name` of its own, so
 qualification no longer has to be assembled by hand.
 
+Every one of those statements takes its **table** as a `TableExpression` and
+rejects a bare string at construction, which is why the calls below read the way
+they do:
+
 ```python
 DropTableExpression(d, TableExpression(d, "orders", schema_name="app"),
                     if_exists=True).to_sql()[0]
 # DROP TABLE IF EXISTS "app"."orders"
 
-TruncateExpression(d, "orders", schema_name="app").to_sql()[0]
+TruncateExpression(d, TableExpression(d, "orders", schema_name="app")).to_sql()[0]
 # TRUNCATE TABLE "app"."orders"
 
-CreateIndexExpression(d, "idx_orders_id", "orders", ["id"], schema_name="app").to_sql()[0]
+CreateIndexExpression(d, "idx_orders_id",
+                      TableExpression(d, "orders", schema_name="app"), ["id"],
+                      schema_name="app").to_sql()[0]
 # CREATE INDEX "app"."idx_orders_id" ON "app"."orders" ("id")
 
 DropIndexExpression(d, "idx_orders_id", schema_name="app").to_sql()[0]
@@ -628,8 +698,33 @@ CreateSequenceExpression(d, "s_orders", schema_name="app").to_sql()[0]
 # CREATE SEQUENCE "app"."s_orders" NO CYCLE
 ```
 
-`CreateIndexExpression` has one `schema_name` and it covers both names: the index
-and the table it is built on land in the same schema.
+`TruncateExpression` has no `schema_name` parameter at all — its namespace lives
+entirely in the reference. Handing it a string fails before the namespace is even
+considered:
+
+```python
+TruncateExpression(d, "orders", schema_name="app")
+# TypeError: TruncateExpression.__init__() got an unexpected keyword argument
+# 'schema_name'
+
+CreateIndexExpression(d, "idx_orders_id", "orders", ["id"], schema_name="app")
+# TypeError: table must be a TableExpression, got str
+```
+
+**`schema_name` on an index statement qualifies the index name only.** The table
+is qualified by its own `TableExpression`, so the two need not agree, and giving
+both happens to agree on nothing:
+
+```python
+CreateIndexExpression(d, "idx_shared",
+                      TableExpression(d, "orders", schema_name="sales"), ["user_id"],
+                      schema_name="app").to_sql()[0]
+# CREATE INDEX "app"."idx_shared" ON "sales"."orders" ("user_id")
+```
+
+`DropIndexExpression` takes the same pair, and its `table` argument is optional
+because `DROP INDEX` has no `ON` clause to render — the table is accepted and then
+ignored.
 
 The DML statements qualify the same way, taking a qualified `TableExpression`:
 
@@ -639,11 +734,23 @@ InsertExpression(d, TableExpression(d, "users", schema_name="app"), source,
 # INSERT INTO "app"."users" ("id", "name")
 
 UpdateExpression(d, TableExpression(d, "users", schema_name="app"),
-                 {"name": value}).to_sql()[0]
+                 {"name": value}, where=predicate).to_sql()[0]
 # UPDATE "app"."users" SET "name" = %s WHERE "app"."users"."id" = %s
 
-DeleteExpression(d, [TableExpression(d, "users", schema_name="app")]).to_sql()[0]
+DeleteExpression(d, [TableExpression(d, "users", schema_name="app")],
+                 where=predicate).to_sql()[0]
 # DELETE FROM "app"."users" WHERE "app"."users"."id" = %s
+```
+
+where `source` is a `ValuesSource`, `value` is a `Literal` and `predicate` is a
+`ComparisonPredicate` over `Column(d, "id", table="users", schema_name="app")`.
+All three targets reject a bare string, each with its own message:
+
+```
+TypeError: into must be a TableExpression, got str
+TypeError: table must be a TableExpression, got str
+TypeError: tables must be a TableExpression, got str
+TypeError: every table in tables must be a TableExpression, got str
 ```
 
 Because soft delete rebuilds an `UPDATE` against the model's range, `restore()`
@@ -653,8 +760,11 @@ that path.
 Two statements are refused on Snowflake rather than qualified:
 
 ```python
-TruncateExpression(d, "orders", schema_name="app", restart_identity=True).to_sql()
-# UnsupportedFeatureError: Snowflake TRUNCATE has no RESTART IDENTITY option.
+TruncateExpression(d, TableExpression(d, "orders", schema_name="app"),
+                   restart_identity=True).to_sql()
+# UnsupportedFeatureError: 'Snowflake' dialect does not support TRUNCATE ...
+# RESTART IDENTITY. Suggestion: Snowflake TRUNCATE has no RESTART IDENTITY
+# option.
 
 RefreshMaterializedViewExpression(d, "v_orders", schema_name="app").to_sql()
 # UnsupportedFeatureError: 'Snowflake' dialect does not support REFRESH
@@ -889,25 +999,27 @@ On Snowflake that is the table in the session's current schema, or in the first
 schema on the search path that exists — so the statement runs, and writes to
 somewhere else.
 
-Two places do **not** apply this rule, and both are worth knowing before relying
-on it:
-
-- **The Snowflake TYPE DDL.** `SnowflakeCreateTypeExpression`,
-  `SnowflakeAlterTypeExpression` and `SnowflakeDropTypeExpression` render the
-  namespace themselves rather than through the core validator, so an empty value
-  produces an empty quoted segment instead of raising:
-
-  ```python
-  SnowflakeDropTypeExpression(d, "label", schema_name="").to_sql()[0]
-  # DROP TYPE ""."label"
-  ```
-
-  Their own check is narrower: `database_name` without `schema_name` is refused,
-  at construction.
+The rule holds everywhere on this backend, but the class named in the message is
+the one that *validated* the value, which is not always the class you wrote:
 
 - **`TruncateExpression`** raises the `TableExpression` wording, because it
-  renders its table through a `TableExpression` internally. The message names the
-  object that validated the value, not the statement you wrote.
+  renders its table through a `TableExpression` internally.
+- **The Snowflake TYPE DDL** renders the namespace itself rather than through a
+  reference, so there is no `TableExpression` for the message to name — it names
+  its own class:
+
+  ```python
+  SnowflakeDropTypeExpression(d10, "label", schema_name="").to_sql()
+  # ValueError: SnowflakeDropTypeExpression.schema_name must be a non-empty
+  # string; use None for an unqualified reference
+  ```
+
+  An empty value is still refused, not turned into an empty quoted segment. Their
+  own separate check is the narrower one: `database_name` without `schema_name`,
+  refused at construction.
+
+`SnowflakeTableExpression` applies the rule to its `schema_name` and, as noted
+above, does not apply it to `database_name`.
 
 ## Common mistakes
 
@@ -960,9 +1072,11 @@ stores `APP`; `__schema_name__ = "app"` renders `"app"` and will not find it. Se
 alias and the column accessor from the same name, and pair them with
 `join(..., alias=...)`. See [Aliasing the range](#aliasing-the-range).
 
-**Expecting construction to raise.** Nothing rejects a bad `schema_name` until the
-statement renders. A model-level mistake therefore survives every step up to and
-including query building, and fails at the point the SQL is assembled.
+**Expecting construction to raise for a bad `schema_name`.** Nothing rejects it
+until the statement renders. A model-level mistake therefore survives every step
+up to and including query building, and fails at the point the SQL is assembled.
+The one thing that *is* caught at construction is a bare string handed to a
+statement that names a table — that one is a `TypeError`, not a `ValueError`.
 
 **Looking for `search_path` on the config.** There is no such field. `schema`
 sets the session's current schema; `session_parameters` forwards Snowflake's own
@@ -994,5 +1108,8 @@ this dialect, so `CTEQuery` raises. See [CTEs](#ctes).
   statement that touches the model, since an unaliased range carries its schema
   all the way through.
 - **Several databases** — a separate connection per database, not a wider
-  `schema_name`. A single statement spanning two databases cannot be expressed
-  through the current expression layer.
+  `schema_name`. A single statement spanning two databases is reachable, but only
+  where it is assembled by hand: hand each range a `SnowflakeTableExpression`
+  carrying its own `database_name`. Nothing the model layer builds does this, so
+  in practice one connection per database remains the only shape that needs no
+  hand-written SQL.

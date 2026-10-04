@@ -2,8 +2,8 @@
 
 # Snowflake Schema 命名空间
 
-> 本文只讲本后端特有的部分：`schema_name` 在这里指向什么、表达式层为什么只带一级
-> 限定、限定名如何渲染、表别名如何影响列引用、不加限定的名字最终落在哪个 schema
+> 本文只讲本后端特有的部分：`schema_name` 在这里指向什么、表引用在这里能带几级限定、
+> 限定名如何渲染、表别名如何影响列引用、不加限定的名字最终落在哪个 schema
 > 上，以及 `SEARCH_PATH` 与名字相近的 PostgreSQL `search_path` 有哪些实质差别。
 >
 > 模型层的通用部分——怎么在模型上声明 `__schema_name__`、schema 何时进入 SQL、
@@ -19,6 +19,13 @@
 
 ```
 PYTHONPATH=src .venv3.14-ubuntu26.04/bin/python
+```
+
+这条命令假定装好的 core 就是本文描述的那一份。若不是，两段 import 都要钉在同一分支上，
+且后端在前：
+
+```
+PYTHONPATH=<core-worktree>/src:src <venv>/bin/python
 ```
 
 `SnowflakeDialect` 以元组形式接收版本号，`(8, 0, 0)` 是默认值，本页大部分示例用的
@@ -61,8 +68,8 @@ PostgreSQL、SQL Server 与 Oracle 那样，在 database 内部有一层真正�
 >
 > —— [Object name resolution][name-resolution]
 
-> **`schema_name` 只是所需两级中的一级。** 另一级是 database，而 database 来自连接，
-> 不来自模型。核心库的支持矩阵同样记着这一点。
+> **`schema_name` 只是所需两级中的一级。** 另一级是 database。没有任何模型声明够得着
+> 它：它来自连接，或者来自手工拼装的语句。核心库的支持矩阵同样记着这一点。
 
 [ddl-database]: https://docs.snowflake.com/en/sql-reference/ddl-database
 [name-resolution]: https://docs.snowflake.com/en/sql-reference/name-resolution
@@ -77,8 +84,10 @@ PostgreSQL、SQL Server 与 Oracle 那样，在 database 内部有一层真正�
 SELECT "app"."orders"."id" FROM "app"."orders"
 ```
 
-隔离来自连接所挂的 database，而不是渲染出来的限定名。要访问另一个 database 里的
-对象，渲染出的名字就必须带上 database——而下一节会说明，当前的表达式层做不到这件事。
+隔离来自连接所挂的 database，而不是渲染出来的限定名。要访问另一个 database 里的对象，
+渲染出的名字就必须带上 database——也就是说，那条语句拿到的必须是
+`SnowflakeTableExpression`，而不是模型构造出来的那个引用。见
+[表引用带两级](#表引用带两级)。
 
 Snowflake 自身的名字解析里有两条规则值得和上面的渲染放在一起看：
 
@@ -91,7 +100,7 @@ Snowflake 自身的名字解析里有两条规则值得和上面的渲染放在�
   兼容 SQL Server、Netezza 之类的系统而提供，并不建议在新查询中使用。本后端生成不了
   这种形式：`format_table` 在两段之间恰好输出一个点号，没有办法要求中间那段为空。
 
-## 表达式层只带一级限定
+## 表引用带两级
 
 核心库的 `TableExpression` 只到 schema 这一层，所以本后端补上了 Snowflake 实际拥有的
 那一级：
@@ -110,10 +119,44 @@ SnowflakeTableExpression(d, "t", schema_name="S", database_name="DB").to_sql()[0
 ```
 
 每一级各自按自己的规则加引号，因此两段的名字不会被凑成三段，三段的名字也不会塌成一个
-带引号的段。核心库原本的 `TableExpression` 行为不变，按它被构造时的层级渲染。
+带引号的段。分支判断落在类上，而不是落在字段是否存在上，所以核心库原本的
+`TableExpression` 行为不变，按它被构造时的层级渲染。
 
-`Column`、`WildcardExpression` 与索引表达式仍然只接受 `schema_name`，不接受它上面的任何
-一级——列引用是在给对象命名，不是在给 database 限定。
+`SnowflakeTableExpression` **就是** `TableExpression`，因此下文每一条接受限定表引用的
+语句都接受它，DDL 与 DML 都不例外：
+
+```python
+DropTableExpression(
+    d, SnowflakeTableExpression(d, "orders", schema_name="app", database_name="TESTDB")
+).to_sql()[0]
+# DROP TABLE "TESTDB"."app"."orders"
+```
+
+这个多出来的字段有两处细节值得知道：
+
+- **database 可以单独出现**，那样渲染出的是两级而不是三级。后文的 TYPE DDL 拒绝这种
+  组合，表引用不拒绝。
+
+  ```python
+  SnowflakeTableExpression(d, "t", database_name="DB").to_sql()[0]
+  # "DB"."t"
+  ```
+
+- **`database_name` 为空串时被静默丢弃**，而 `schema_name` 为空串会抛异常：
+
+  ```python
+  SnowflakeTableExpression(d, "t", database_name="", schema_name="S").to_sql()[0]
+  # "S"."t"
+
+  SnowflakeTableExpression(d, "t", database_name="DB", schema_name="").to_sql()
+  # ValueError: SnowflakeTableExpression.schema_name must be a non-empty string; use
+  # None for an unqualified reference
+  ```
+
+`Column` 与 `WildcardExpression` 没有对应物：它们只接受 `schema_name`，到此为止——列引用
+是在给对象命名，不是在给 database 限定。索引那几条根本没有 database 字段，而且那儿的
+`schema_name` **只**限定索引名，表由它自己的引用限定，见
+[DDL 自带 schema](#ddl-自带-schema)。
 
 顺带一个容易踩的坑：把点号写进 `schema_name` 不会得到三段式，它只会得到一个名字里带点号的
 schema：
@@ -123,7 +166,11 @@ TableExpression(d, "orders", schema_name="TESTDB.app").to_sql()[0]
 # "TESTDB.app"."orders"    -- 一个名字就叫 "TESTDB.app" 的 schema
 ```
 
-database 这一级只能从另外两条途径进入语句，两条都不是模型级的命名空间：
+**模型层永远不会构造它。** `build_table_reference()` 与查询构造器走的都是核心库的
+`TableExpression`，因此无论模型怎么声明，`__schema_name__` 都止步于 `schema.table`。
+database 这一级只有手工拼装的语句才够得着。
+
+database 这一级还有两条与表引用无关的途径同样能进入语句，两条都不是模型级的命名空间：
 
 - **连接。** `SnowflakeConnectionConfig.database` 作为连接的 `database` 交给
   `snowflake.connector.connect()`，`SnowflakeConnectionConfig.schema`（或旧的
@@ -138,54 +185,60 @@ database 这一级只能从另外两条途径进入语句，两条都不是模�
   # ('IDENTIFIER(%s)', ('TESTDB.app.orders',))
   ```
 
-  这是把三段式名字送到服务端的途径，不是从 `TableExpression` 里取到三段式名字的途径。
+  这是把三段式名字送到服务端的途径，不是从一个模型里取到三段式名字的途径。
 
-### 唯一接受两级的入口
+### TYPE 的 DDL 同样接受两级，而且两级都要
 
-Snowflake 的用户自定义 TYPE DDL 是例外，而且是一个实打实的例外，不是通用能力：
+Snowflake 的用户自定义 TYPE DDL 也带 `database_name`，并且与 `SnowflakeTableExpression`
+不同，它拒绝只给 database 的写法：
 
 ```python
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
     SnowflakeCreateTypeExpression,
+    SnowflakeAlterTypeExpression,
+    SnowflakeDropTypeExpression,
     SnowflakeScalarTypeDefinition,
+    SnowflakeSetTypeCommentAction,
     SnowflakeVarcharType,
 )
 
-definition = SnowflakeScalarTypeDefinition(d, SnowflakeVarcharType(d))
+d10 = SnowflakeDialect(version=(10, 8, 0))
+definition = SnowflakeScalarTypeDefinition(d10, SnowflakeVarcharType(d10))
 
 SnowflakeCreateTypeExpression(
-    d, "label", definition, database_name="TESTDB", schema_name="app",
+    d10, "label", definition, database_name="TESTDB", schema_name="app",
 ).to_sql()[0]
 # CREATE TYPE "TESTDB"."app"."label" AS VARCHAR
 
 SnowflakeCreateTypeExpression(
-    d, "label", definition, schema_name="app",
+    d10, "label", definition, schema_name="app",
 ).to_sql()[0]
 # CREATE TYPE "app"."label" AS VARCHAR
 ```
 
-`SnowflakeCreateTypeExpression`、`SnowflakeAlterTypeExpression` 与
-`SnowflakeDropTypeExpression` 都在 `schema_name` 之外接受 `database_name`，并且拒绝
-只给 database 的写法：
+```python
+SnowflakeCreateTypeExpression(d10, "label", definition, database_name="TESTDB")
+# ValueError: schema_name is required when database_name is provided
+```
 
-```
-ValueError: schema_name is required when database_name is provided
-```
+`SnowflakeCreateTypeExpression`、`SnowflakeAlterTypeExpression` 与
+`SnowflakeDropTypeExpression` 都在 `schema_name` 之外接受 `database_name`。这项检查发生在
+**构造表达式时**，而不是渲染时，与后文空串那条规则正好相反。
 
 ```python
-SnowflakeAlterTypeExpression(d, "label", [action], database_name="TESTDB",
-                             schema_name="app").to_sql()[0]
+SnowflakeAlterTypeExpression(d10, "label", [SnowflakeSetTypeCommentAction(d10, "c")],
+                             database_name="TESTDB", schema_name="app").to_sql()[0]
 # ALTER TYPE "TESTDB"."app"."label" SET COMMENT = 'c'
 
-SnowflakeDropTypeExpression(d, "label", database_name="TESTDB", schema_name="app").to_sql()[0]
+SnowflakeDropTypeExpression(d10, "label", database_name="TESTDB", schema_name="app").to_sql()[0]
 # DROP TYPE "TESTDB"."app"."label"
 ```
 
-这项检查发生在**构造表达式时**，而不是渲染时，与后文空串那条规则正好相反。TYPE 的
-DDL 还要求服务端版本在 10.8 及以上；版本更低时这三条语句都会在到达这里之前抛出
-`UnsupportedFeatureError`。
+TYPE 的 DDL 还要求服务端版本在 10.8 及以上，这也是上面示例用 `d10` 而不是 `d` 的原因：
+在默认的 `(8, 0, 0)` 上，这三条语句都会在渲染时抛出 `UnsupportedFeatureError`。
+`schema_name` 缺 `database_name` 那道检查仍然先跑，因为它根本不进格式化器。
 
-`TableExpression` 不具备这个形态。不要因为 TYPE 能写出三段式，就认为表也能。
+空串那条规则这里也不例外，见[空串，以及它在哪一步被拦下](#空串以及它在哪一步被拦下)。
 
 ### `CREATE SCHEMA` 与 `DROP SCHEMA` 无法指定 database
 
@@ -487,9 +540,9 @@ Order.query().join(User, on=Order.c.user_id == User.c.id).select(
 #   ON "app"."orders"."user_id" = "crm"."users"."id"
 ```
 
-跨 schema 就是上限。跨 database 的 join 要求两侧范围都带上各自的 database，而表达式层
-生成不出这种形式，见
-[表达式层只带一级限定](#表达式层只带一级限定)。
+查询构造器能达到的上限是跨 schema。跨 database 的 join 要求两侧范围都带上各自的
+database，而构造器为每个模型建的都是核心库的 `TableExpression`，所以它到不了。两侧都
+改传 `SnowflakeTableExpression` 就能渲染出来，见[表引用带两级](#表引用带两级)。
 
 ## 集合运算
 
@@ -502,8 +555,9 @@ Order.query().select(Order.c.id).union(User.query().select(User.c.id)).to_sql()[
 #   UNION SELECT "crm"."users"."id" FROM "crm"."users"
 ```
 
-对两个绑定了 schema 的模型做 `UNION` 不需要特殊处理。对两个 database 做 `UNION` 则要求
-每个分支都带上自己的 database，这里表达不了。
+对两个绑定了 schema 的模型做 `UNION` 不需要特殊处理。对两个 database 做 `UNION` 则与上面
+那个 join 同理：每个分支手工构造、各带自己的 `database_name` 就能写出来，只是查询构造器
+不会替你做。
 
 ## CTE
 
@@ -518,6 +572,11 @@ inner = QueryExpression(
     dialect=d,
     select=[Column(d, "id", table="orders", schema_name="app")],
     from_=[TableExpression(d, "orders", schema_name="app")],
+)
+main = QueryExpression(
+    dialect=d,
+    select=[Column(d, "id", table="recent_orders")],
+    from_=[TableExpression(d, "recent_orders")],
 )
 
 WithQueryExpression(d, [CTEExpression(d, "recent_orders", inner)], main).to_sql()[0]
@@ -548,15 +607,20 @@ CTEQuery(backend)
 它指的是哪个 schema——但凡是会指名某个带 schema 的对象的语句，都接受各自的
 `schema_name`，因此限定不必再手工拼装。
 
+这些语句的**表**一律收 `TableExpression`，传裸字符串在构造期就抛异常，这也是下面这些调用
+看起来费事的原因：
+
 ```python
 DropTableExpression(d, TableExpression(d, "orders", schema_name="app"),
                     if_exists=True).to_sql()[0]
 # DROP TABLE IF EXISTS "app"."orders"
 
-TruncateExpression(d, "orders", schema_name="app").to_sql()[0]
+TruncateExpression(d, TableExpression(d, "orders", schema_name="app")).to_sql()[0]
 # TRUNCATE TABLE "app"."orders"
 
-CreateIndexExpression(d, "idx_orders_id", "orders", ["id"], schema_name="app").to_sql()[0]
+CreateIndexExpression(d, "idx_orders_id",
+                      TableExpression(d, "orders", schema_name="app"), ["id"],
+                      schema_name="app").to_sql()[0]
 # CREATE INDEX "app"."idx_orders_id" ON "app"."orders" ("id")
 
 DropIndexExpression(d, "idx_orders_id", schema_name="app").to_sql()[0]
@@ -575,8 +639,30 @@ CreateSequenceExpression(d, "s_orders", schema_name="app").to_sql()[0]
 # CREATE SEQUENCE "app"."s_orders" NO CYCLE
 ```
 
-`CreateIndexExpression` 只有一个 `schema_name`，并且同时管住两个名字：索引与它所建的表
-落在同一个 schema。
+`TruncateExpression` 根本没有 `schema_name` 参数——它的命名空间完全住在那个引用里。传字符串
+会在命名空间被考虑之前就失败：
+
+```python
+TruncateExpression(d, "orders", schema_name="app")
+# TypeError: TruncateExpression.__init__() got an unexpected keyword argument
+# 'schema_name'
+
+CreateIndexExpression(d, "idx_orders_id", "orders", ["id"], schema_name="app")
+# TypeError: table must be a TableExpression, got str
+```
+
+**索引语句上的 `schema_name` 只限定索引名。** 表由它自己的 `TableExpression` 限定，两者
+不必一致，两边都传恰好也没什么关系：
+
+```python
+CreateIndexExpression(d, "idx_shared",
+                      TableExpression(d, "orders", schema_name="sales"), ["user_id"],
+                      schema_name="app").to_sql()[0]
+# CREATE INDEX "app"."idx_shared" ON "sales"."orders" ("user_id")
+```
+
+`DropIndexExpression` 收同一对参数，其中 `table` 是可选的——`DROP INDEX` 没有 `ON` 子句
+可渲染，因此那个表参数被接受后即被忽略。
 
 DML 语句的限定方式相同，传入带限定的 `TableExpression`：
 
@@ -586,11 +672,23 @@ InsertExpression(d, TableExpression(d, "users", schema_name="app"), source,
 # INSERT INTO "app"."users" ("id", "name")
 
 UpdateExpression(d, TableExpression(d, "users", schema_name="app"),
-                 {"name": value}).to_sql()[0]
+                 {"name": value}, where=predicate).to_sql()[0]
 # UPDATE "app"."users" SET "name" = %s WHERE "app"."users"."id" = %s
 
-DeleteExpression(d, [TableExpression(d, "users", schema_name="app")]).to_sql()[0]
+DeleteExpression(d, [TableExpression(d, "users", schema_name="app")],
+                 where=predicate).to_sql()[0]
 # DELETE FROM "app"."users" WHERE "app"."users"."id" = %s
+```
+
+这里 `source` 是 `ValuesSource`，`value` 是 `Literal`，`predicate` 是针对
+`Column(d, "id", table="users", schema_name="app")` 的 `ComparisonPredicate`。三个目标
+都拒绝裸字符串，且各有各的信息：
+
+```
+TypeError: into must be a TableExpression, got str
+TypeError: table must be a TableExpression, got str
+TypeError: tables must be a TableExpression, got str
+TypeError: every table in tables must be a TableExpression, got str
 ```
 
 软删除会针对模型的范围重建一条 `UPDATE`，因此 `restore()` 与 `delete()` 一样把命名空间
@@ -599,8 +697,11 @@ DeleteExpression(d, [TableExpression(d, "users", schema_name="app")]).to_sql()[0
 有两条语句在 Snowflake 上是被拒绝而不是被限定的：
 
 ```python
-TruncateExpression(d, "orders", schema_name="app", restart_identity=True).to_sql()
-# UnsupportedFeatureError: Snowflake TRUNCATE has no RESTART IDENTITY option.
+TruncateExpression(d, TableExpression(d, "orders", schema_name="app"),
+                   restart_identity=True).to_sql()
+# UnsupportedFeatureError: 'Snowflake' dialect does not support TRUNCATE ...
+# RESTART IDENTITY. Suggestion: Snowflake TRUNCATE has no RESTART IDENTITY
+# option.
 
 RefreshMaterializedViewExpression(d, "v_orders", schema_name="app").to_sql()
 # UnsupportedFeatureError: 'Snowflake' dialect does not support REFRESH
@@ -806,22 +907,25 @@ ValueError: TableExpression.schema_name must be a string or None, not int
 察觉。在 Snowflake 上那就是会话当前 schema 里的表，或者搜索路径上第一个存在的 schema
 里的表——语句照样执行，只是写到了别处。
 
-有**两处不适用**这条规则，在依赖它之前值得知道：
-
-- **Snowflake 的 TYPE DDL。** `SnowflakeCreateTypeExpression`、
-  `SnowflakeAlterTypeExpression` 与 `SnowflakeDropTypeExpression` 自己渲染命名空间，
-  不走核心层的校验，因此空值会渲染出一个空的带引号段，而不是抛异常：
-
-  ```python
-  SnowflakeDropTypeExpression(d, "label", schema_name="").to_sql()[0]
-  # DROP TYPE ""."label"
-  ```
-
-  它们自己的检查范围更窄：只给 `database_name` 而不给 `schema_name` 会被拒绝，且发生在
-  构造阶段。
+这条规则在本后端处处成立，只是异常信息里指名的类，是**执行校验**的那个，未必是你写下的
+那个：
 
 - **`TruncateExpression`** 抛的是 `TableExpression` 的措辞，因为它内部通过一个
-  `TableExpression` 渲染表名。信息指的是执行校验的那个对象，而不是你写下的那条语句。
+  `TableExpression` 渲染表名。
+- **Snowflake 的 TYPE DDL** 命名空间是自己渲染的，不经过任何引用，因此报错信息里没有
+  `TableExpression` 可指，只能指名自己的类：
+
+  ```python
+  SnowflakeDropTypeExpression(d10, "label", schema_name="").to_sql()
+  # ValueError: SnowflakeDropTypeExpression.schema_name must be a non-empty
+  # string; use None for an unqualified reference
+  ```
+
+  空值仍然会被拒绝，而不是变成一个空的带引号段。它们另有一道更窄的检查：只给
+  `database_name` 而不给 `schema_name`，在构造阶段就被拒绝。
+
+`SnowflakeTableExpression` 对它的 `schema_name` 适用这条规则，对 `database_name` 则如上
+所述不适用。
 
 ## 常见错误
 
@@ -865,8 +969,10 @@ TableExpression(d, "orders", schema_name="TESTDB.app").to_sql()[0]
 **join 只给一侧取别名，或只给列那一侧取别名。** 范围别名与列访问器要用同一个名字，并与
 `join(..., alias=...)` 配对。见[给范围取别名](#给范围取别名)。
 
-**指望构造时就抛异常。** 在语句渲染之前，没有任何环节会拒绝不合法的 `schema_name`。
-模型层的错误因此能一路存活到查询构造完成那一刻，在拼装 SQL 的环节才失败。
+**指望构造时就因为不合法的 `schema_name` 抛异常。** 在语句渲染之前，没有任何环节会拒绝
+它，模型层的错误因此能一路存活到查询构造完成那一刻，在拼装 SQL 的环节才失败。唯一在
+构造期就被拦下的是「给点名表的语句塞一个裸字符串」——那一条是 `TypeError`，不是
+`ValueError`。
 
 **在配置上找 `search_path`。** 没有这个字段。`schema` 设置会话的当前 schema，
 `session_parameters` 转发 Snowflake 自己的参数。见
@@ -890,5 +996,7 @@ TableExpression(d, "orders", schema_name="TESTDB.app").to_sql()[0]
 - **一个 database 里多个 schema** —— 在偏离的那些模型上设 `__schema_name__`。跨 schema
   的 join 不需要额外配置，两侧各自限定自己的范围。代价是每一条碰到该模型的语句都会出现
   三段式列引用——不带别名的范围会把 schema 一路带到底。
-- **多个 database** —— 每个 database 一条连接，而不是把 `schema_name` 写得更宽。一条
-  跨越两个 database 的语句，用当前的表达式层表达不出来。
+- **多个 database** —— 每个 database 一条连接，而不是把 `schema_name` 写得更宽。跨两个
+  database 的语句写得出来，但只在手工拼装的地方：给每个范围一个带自己 `database_name`
+  的 `SnowflakeTableExpression`。模型层构造的东西一件都不这么做，因此实际上「一个
+  database 一条连接」仍然是唯一不需要手写 SQL 的形态。
