@@ -69,14 +69,14 @@ class TestSnowflakeInsertOverwrite:
 
     def test_insert_overwrite_standalone(self, dialect, select_source):
         expr = InsertExpression(
-            dialect, into="t", source=select_source, columns=["id", "name"]
+            dialect, into=TableExpression(dialect, "t"), source=select_source, columns=["id", "name"]
         )
         sql, _ = dialect.format_insert_overwrite_statement(expr)
         assert sql.startswith("INSERT OVERWRITE INTO ")
 
     def test_plain_insert_unchanged(self, dialect, select_source):
         expr = InsertExpression(
-            dialect, into="t", source=select_source, columns=["id", "name"]
+            dialect, into=TableExpression(dialect, "t"), source=select_source, columns=["id", "name"]
         )
         sql, _ = expr.to_sql()
         assert sql.startswith("INSERT INTO ")
