@@ -55,7 +55,7 @@ class TestSnowflakeInsertOverwrite:
     def test_insert_overwrite_via_dialect_option(self, dialect, select_source):
         expr = SnowflakeInsertExpression(
             dialect,
-            into="t",
+            into=TableExpression(dialect, "t"),
             source=select_source,
             columns=["id", "name"],
             overwrite=True,
@@ -94,7 +94,7 @@ class TestSnowflakeInsertOverwrite:
         ]
         expr = SnowflakeInsertExpression(
             dialect,
-            into="t",
+            into=TableExpression(dialect, "t"),
             source=ValuesSource(dialect, values),
             overwrite=True,
         )
