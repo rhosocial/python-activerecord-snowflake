@@ -112,13 +112,28 @@ alongside the rendering:
 
 ## One level of qualification is what the expression layer carries
 
-This is a limitation of this library, not of Snowflake. Stated plainly:
+A core `TableExpression` stops at the schema, so this backend adds the level Snowflake
+actually has:
 
-> **The table, view, column and index expressions in this backend accept a
-> `schema_name` and nothing above it. There is no `database_name` field on
-> `TableExpression`, `Column`, `WildcardExpression` or `QualifiedIdentifierExpression`,
-> and no dialect hook that would add one. A schema is always rendered as exactly
-> one quoted segment, so a dotted value stays inside that segment.**
+```python
+from rhosocial.activerecord.backend.impl.snowflake.expression import SnowflakeTableExpression
+
+SnowflakeTableExpression(dialect, "t").to_sql()[0]
+# "t"
+
+SnowflakeTableExpression(dialect, "t", schema_name="S").to_sql()[0]
+# "S"."t"
+
+SnowflakeTableExpression(dialect, "t", schema_name="S", database_name="DB").to_sql()[0]
+# "DB"."S"."t"
+```
+
+Each level is quoted on its own terms, so a two-level name is never given three parts and a
+three-part name does not become one quoted segment. A plain core `TableExpression` renders
+as before, at whichever level it was built.
+
+`Column`, `WildcardExpression` and the index expressions still take a `schema_name` and
+nothing above it — a column reference names an object, it does not qualify a database.
 
 ```python
 TableExpression(d, "orders", schema_name="TESTDB.app").to_sql()[0]
@@ -290,14 +305,6 @@ Rendering uses double quotes, one quoted identifier per segment:
 | `TableExpression(d, "orders", schema_name="app")` | `"app"."orders"` |
 | `TableExpression(d, "orders")` | `"orders"` |
 | `TableExpression(d, "orders", schema_name="app", alias="o")` | `"app"."orders" AS "o"` |
-
-`QualifiedIdentifierExpression` renders the same way, and is the expression to
-reach for when a two-part name is needed outside a `FROM`:
-
-```python
-QualifiedIdentifierExpression(d, "app", "orders").to_sql()[0]
-# "app"."orders"
-```
 
 ### Quoting and case
 
@@ -911,11 +918,10 @@ rendered SQL says which. Two connections, two databases, one identical statement
 See
 [Snowflake is the only backend with a schema layer of its own](#snowflake-is-the-only-backend-with-a-schema-layer-of-its-own).
 
-**Expecting a database to be renderable.** `TableExpression`, `Column`,
-`WildcardExpression` and `QualifiedIdentifierExpression` have no database field,
-and a dotted value stays inside one quoted segment. The Snowflake TYPE DDL is the
-only family that accepts both levels. See
-[One level of qualification is what the expression layer carries](#one-level-of-qualification-is-what-the-expression-layer-carries).
+**Reaching for a core expression when you need three levels.** `TableExpression`,
+`Column` and `WildcardExpression` have no database field. A table reference that
+needs `database.schema.table` wants `SnowflakeTableExpression`, which has one; a
+column reference has no equivalent and cannot be qualified that high.
 
 **Creating a schema and expecting it in another database.** `CreateSchemaExpression`
 has no database field, and Snowflake's `CREATE SCHEMA` grammar has no database

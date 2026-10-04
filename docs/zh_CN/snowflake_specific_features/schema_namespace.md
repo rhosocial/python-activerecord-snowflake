@@ -93,12 +93,30 @@ Snowflake 自身的名字解析里有两条规则值得和上面的渲染放在�
 
 ## 表达式层只带一级限定
 
-这是本库的限制，不是 Snowflake 的限制。说清楚：
+核心库的 `TableExpression` 只到 schema 这一层，所以本后端补上了 Snowflake 实际拥有的
+那一级：
 
-> **本后端的表、视图、列、索引表达式只接受 `schema_name`，不接受它上面的任何一级。
-> `TableExpression`、`Column`、`WildcardExpression`、
-> `QualifiedIdentifierExpression` 都没有 `database_name` 字段，也没有可以补上的方言
-> 钩子。schema 一律渲染成恰好一个带引号的段，因此写进去的点号会留在这一段内部。**
+```python
+from rhosocial.activerecord.backend.impl.snowflake.expression import SnowflakeTableExpression
+
+SnowflakeTableExpression(d, "t").to_sql()[0]
+# "t"
+
+SnowflakeTableExpression(d, "t", schema_name="S").to_sql()[0]
+# "S"."t"
+
+SnowflakeTableExpression(d, "t", schema_name="S", database_name="DB").to_sql()[0]
+# "DB"."S"."t"
+```
+
+每一级各自按自己的规则加引号，因此两段的名字不会被凑成三段，三段的名字也不会塌成一个
+带引号的段。核心库原本的 `TableExpression` 行为不变，按它被构造时的层级渲染。
+
+`Column`、`WildcardExpression` 与索引表达式仍然只接受 `schema_name`，不接受它上面的任何
+一级——列引用是在给对象命名，不是在给 database 限定。
+
+顺带一个容易踩的坑：把点号写进 `schema_name` 不会得到三段式，它只会得到一个名字里带点号的
+schema：
 
 ```python
 TableExpression(d, "orders", schema_name="TESTDB.app").to_sql()[0]
@@ -255,14 +273,6 @@ schema。同一个 database 里的两个 schema 是互不相干的命名空间�
 | `TableExpression(d, "orders", schema_name="app")` | `"app"."orders"` |
 | `TableExpression(d, "orders")` | `"orders"` |
 | `TableExpression(d, "orders", schema_name="app", alias="o")` | `"app"."orders" AS "o"` |
-
-`QualifiedIdentifierExpression` 的渲染方式相同；需要在 `FROM` 之外拿到一个两段式名字
-时用它：
-
-```python
-QualifiedIdentifierExpression(d, "app", "orders").to_sql()[0]
-# "app"."orders"
-```
 
 ### 引号与大小写
 
@@ -820,10 +830,9 @@ ValueError: TableExpression.schema_name must be a string or None, not int
 渲染出的 SQL 里没有任何信息说明是哪一个 database。两个连接、两个 database、同一句
 SQL。见 [Snowflake 是唯一有独立 schema 层的后端](#snowflake-是唯一有独立-schema-层的后端)。
 
-**指望能把 database 渲染出来。** `TableExpression`、`Column`、
-`WildcardExpression` 与 `QualifiedIdentifierExpression` 都没有 database 字段，写进去的
-点号会留在同一个带引号的段内。Snowflake 的 TYPE DDL 是唯一同时接受两级的表达式族。见
-[表达式层只带一级限定](#表达式层只带一级限定)。
+**需要三层时却去用核心库的表达式。** `TableExpression`、`Column`、
+`WildcardExpression` 都没有 database 字段。需要 `database.schema.table` 的表引用要用
+`SnowflakeTableExpression`，它有这一层；列引用没有对应物，也无法限定到那么高。
 
 **建了 schema 却指望它在别的 database 里。** `CreateSchemaExpression` 没有 database
 字段，Snowflake 的 `CREATE SCHEMA` 语法也没有 database 限定：schema 会落在会话的当前
