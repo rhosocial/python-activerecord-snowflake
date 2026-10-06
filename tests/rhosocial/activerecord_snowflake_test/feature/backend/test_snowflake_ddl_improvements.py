@@ -4,6 +4,7 @@ import pytest
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression import CreateTableExpression
+from rhosocial.activerecord.backend.expression.objects import Table
 from rhosocial.activerecord.backend.expression.statements import ColumnDefinition
 from rhosocial.activerecord.backend.expression.types import IntegerType
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
@@ -62,7 +63,7 @@ class TestSnowflakeTableDeclarationGating:
         dialect = SnowflakeDialect(version=(8, 0, 0))
         expression = CreateTableExpression(
             dialect,
-            "plain_table_defaults",
+            Table(dialect, "plain_table_defaults"),
             [ColumnDefinition(dialect, "id", IntegerType(dialect))],
         )
         sql, params = expression.to_sql()
@@ -77,7 +78,7 @@ class TestSnowflakeTableDeclarationGating:
         assert dialect.supports_table_inheritance() is False
         expression = CreateTableExpression(
             dialect,
-            "inherited",
+            Table(dialect, "inherited"),
             [ColumnDefinition(dialect, "id", IntegerType(dialect))],
             inherits=["parent_a", "parent_b"],
         )
@@ -90,7 +91,7 @@ class TestSnowflakeTableDeclarationGating:
         assert dialect.supports_table_tablespace() is False
         expression = CreateTableExpression(
             dialect,
-            "tablespaced",
+            Table(dialect, "tablespaced"),
             [ColumnDefinition(dialect, "id", IntegerType(dialect))],
             tablespace="ts_data",
         )

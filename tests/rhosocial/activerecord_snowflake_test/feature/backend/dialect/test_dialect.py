@@ -54,13 +54,13 @@ class TestSnowflakeQualifyClauseAssembly:
             OrderByClause,
             QualifyClause,
             QueryExpression,
-            TableExpression,
         )
+        from rhosocial.activerecord.backend.expression.objects import Table
 
         query = QueryExpression(
             dialect,
             select=[Column(dialect, "id"), Column(dialect, "name")],
-            from_=TableExpression(dialect, "users"),
+            from_=Table(dialect, "users"),
             qualify=QualifyClause(
                 dialect,
                 FunctionCall(dialect, "ROW_NUMBER") <= Literal(dialect, 3),

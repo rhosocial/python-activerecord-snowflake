@@ -11,6 +11,7 @@ undrop, materialized view, table modifiers support.
 from .array import SnowflakeArrayMixin
 from .backend import SnowflakeBackendMixin
 from .clone import SnowflakeCloneMixin
+from .namespace import SnowflakeNamespaceMixin
 from .dml import SnowflakeDMLMixin
 from .file_format import SnowflakeFileFormatMixin
 from .introspection import SnowflakeIntrospectionMixin
@@ -58,6 +59,7 @@ __all__ = [
     "SnowflakeFileFormatMixin",
     "SnowflakeIntrospectionMixin",
     "SnowflakeMaterializedViewMixin",
+    "SnowflakeNamespaceMixin",
     "SnowflakePartitionMixin",
     "SnowflakePipeMixin",
     "SnowflakePivotMixin",

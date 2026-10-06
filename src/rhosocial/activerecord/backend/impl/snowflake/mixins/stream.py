@@ -55,22 +55,12 @@ class SnowflakeStreamMixin:
             parts.append(
                 f"SHOW_INITIAL_ROWS = {str(bool(expr.show_initial_rows)).upper()}"
             )
+        # AT / BEFORE is a clause, not part of the name, so it renders through
+        # the same helper a time-travelled FROM reference uses.
         if expr.at is not None:
-            kind, value = expr.at
-            kind = str(kind).upper()
-            if kind == "OFFSET":
-                parts.append(f"AT(OFFSET => {int(value)})")
-            else:
-                escaped = self._escape_sql_string(str(value))
-                parts.append(f"AT({kind} => '{escaped}')")
+            parts.append(self.format_time_travel_point("AT", expr.at))
         if expr.before is not None:
-            kind, value = expr.before
-            kind = str(kind).upper()
-            if kind == "OFFSET":
-                parts.append(f"BEFORE(OFFSET => {int(value)})")
-            else:
-                escaped = self._escape_sql_string(str(value))
-                parts.append(f"BEFORE({kind} => '{escaped}')")
+            parts.append(self.format_time_travel_point("BEFORE", expr.before))
         if expr.copy_grants is not None:
             parts.append(f"COPY_GRANTS = {str(bool(expr.copy_grants)).upper()}")
         if expr.comment is not None:

@@ -11,10 +11,10 @@
 | backend/ | ✅ 已有 | `test_backend_mock.py`、`test_config.py` | mock 驱动测试；**缺** `test_error_handling.py`(+async)（§6 矩阵 F） |
 | cli/ | 🕳️ 空（README） | — | Tier-2 Fill（无 CLI 工具，暂不适用） |
 | concurrency/ | ❌ 缺失 | — | §6 矩阵标记 F（Tier-2 Fill） |
-| ddl/ | ✅ 已有 | `test_alter_table_if_exists.py`、`test_create_table_expression_diff.py`、`test_table_modifier.py` | |
-| dialect/ | ✅ 已有 | `test_dialect.py`、`test_identifier_dynamic.py` | |
+| ddl/ | ✅ 已有 | `test_alter_table_if_exists.py`、`test_create_table_expression_diff.py`、`test_table_modifier.py`、`test_object_kind_refused.py` | `test_object_kind_refused.py` 断言传错对象种类必须拒绝渲染 |
+| dialect/ | ✅ 已有 | `test_dialect.py`、`test_identifier_dynamic.py`、`test_namespace_rendering.py` | `test_namespace_rendering.py` 钉住「有 database 但不单独使用」的命名空间决定 |
 | dml/ | ✅ 已有 | `test_insert_overwrite.py` | **缺** `test_crud_backend.py`(+`_async`)、`test_execute_many.py`（§6 矩阵 F） |
-| expression/ | 🕳️ 空（README） | — | 预留（核心 expression 契约经 basic/ddl 桥接覆盖） |
+| expression/ | ✅ 已有 | `test_expression_signatures.py`、`test_expression_roundtrip_all.py` | 往返矩阵覆盖 core + snowflake 两个表达式包，无连接依赖 |
 | extensions/ | ✅ 已有 | `test_file_format.py`、`test_routine.py`、`test_stream_task_pipe.py`、`test_undrop_clone_materialized_view.py`、`test_warehouse_stage_copy.py` | Snowflake 专属按 P8 归入 vendor 思路；对应 src `extensions/` |
 | functions/ | 🕳️ 空（README） | — | Tier-2 Fill |
 | introspection/ | ✅ 已有 | `test_introspection.py` | **缺** 规范拆分文件（tables/columns/indexes/…，Tier-2） |

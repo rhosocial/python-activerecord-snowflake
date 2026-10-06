@@ -1,9 +1,10 @@
 """Snowflake schema-level user-defined type DDL capability and SQL formatting."""
 
-from typing import Any, Tuple, Type, cast
+from typing import Tuple, Type, Union, cast
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.dialect.mixins.user_defined_type import UserDefinedTypeMixin
+from rhosocial.activerecord.backend.expression.objects import Type as TypeObject
 from rhosocial.activerecord.backend.expression.statements.ddl_type import (
     AlterTypeExpression,
     CreateTypeExpression,
@@ -110,16 +111,33 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
     def supports_multiple_type_alter_actions(self) -> bool:
         return False
 
-    def _format_type_name(self, expr: Any) -> str:
-        parts = []
-        database_name = getattr(expr, "database_name", None)
-        schema_name = getattr(expr, "schema_name", None)
-        if database_name is not None:
-            parts.append(cast(str, self.format_identifier(database_name)))
-        if schema_name is not None:
-            parts.append(cast(str, self.format_identifier(schema_name)))
-        parts.append(cast(str, self.format_identifier(expr.type_name)))
-        return ".".join(parts)
+    def _format_type_name(
+        self,
+        expr: Union[CreateTypeExpression, AlterTypeExpression, DropTypeExpression],
+    ) -> str:
+        """Render *expr*'s TYPE name as SQL.
+
+        The statement already holds the named object, so this asks it to render
+        itself rather than rebuilding one from the namespace slots. That is the
+        whole of the Snowflake contribution: ``"DB"."APP"."age"`` here and
+        ``"age"`` where no namespaces were given both come from the slots the
+        object carries, decided by the shared renderer.
+
+        All three TYPE formatters reach the object through here, so this is also
+        the one place the object kind is checked. An object carries its own
+        ``format_method``: handed a ``Table``, ``CREATE TYPE`` would render
+        ``CREATE TYPE "users"`` -- well-formed SQL naming a table -- and nothing
+        would distinguish it from the right answer. The check is here rather than
+        in the three callers because a check that has to be repeated three times
+        is a check that will eventually be missing from one of them.
+        """
+        if not isinstance(expr.type, TypeObject):
+            raise TypeError(
+                f"{type(expr).__name__}.type must be a Type, "
+                f"got {type(expr.type).__name__}"
+            )
+        name_sql, _params = expr.type.to_sql()
+        return name_sql
 
     def format_create_type_statement(
         self,

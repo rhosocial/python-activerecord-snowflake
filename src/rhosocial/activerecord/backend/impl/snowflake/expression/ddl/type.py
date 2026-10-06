@@ -5,6 +5,9 @@ from typing import Any, Optional, Sequence, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
+# ``Type`` is the schema object naming a user-defined type; aliased because the
+# TYPE statements name their parameter ``type`` for the core's sake.
+from rhosocial.activerecord.backend.expression.objects import Type as TypeObject
 from rhosocial.activerecord.backend.expression.serialization import ExpressionRegistry
 from rhosocial.activerecord.backend.expression.statements.ddl_type import (
     AlterTypeExpression,
@@ -24,18 +27,13 @@ def _validate_name(value: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must be a non-empty string")
 
 
-def _validate_optional_name(value: Optional[str], field_name: str) -> None:
-    if value is not None:
-        _validate_name(value, field_name)
-
-
-def _validate_database_qualification(
-    database_name: Optional[str],
-    schema_name: Optional[str],
-) -> None:
-    _validate_optional_name(database_name, "database_name")
-    if database_name is not None and schema_name is None:
-        raise ValueError("schema_name is required when database_name is provided")
+# Snowflake TYPE namespace rule: the statements below used to run a module-level
+# ``_validate_database_qualification`` that rejected a blank database and a
+# database given without a schema. Both rules now belong to the object and the
+# dialect: the shared ``Type`` object refuses a blank or empty slot, and
+# ``SnowflakeNamespaceMixin.validate_catalog_name`` rejects a database with no
+# schema while rendering. Validation therefore happens once, at render time,
+# instead of being restated by every expression that carries the slots.
 
 
 class SnowflakeTypeField(BaseExpression):
@@ -157,69 +155,56 @@ class SnowflakeCreateTypeExpression(CreateTypeExpression):
     def __init__(
         self,
         dialect: "SQLDialectBase",
-        type_name: str,
+        type: "TypeObject",
         definition: TypeDefinition,
         *,
-        database_name: Optional[str] = None,
-        schema_name: Optional[str] = None,
         if_not_exists: bool = False,
         or_replace: bool = False,
         comment: Optional[str] = None,
     ) -> None:
-        _validate_database_qualification(database_name, schema_name)
         if comment is not None and not isinstance(comment, str):
             raise TypeError("comment must be a string or None")
         super().__init__(
             dialect,
-            type_name,
+            type,
             definition,
-            schema_name=schema_name,
             if_not_exists=if_not_exists,
             or_replace=or_replace,
         )
-        self.database_name = database_name
         self.comment = comment
 
 
 class SnowflakeAlterTypeExpression(AlterTypeExpression):
-    """ALTER TYPE expression with Snowflake database/schema qualification."""
+    """ALTER TYPE expression over the Snowflake TYPE object."""
 
     def __init__(
         self,
         dialect: "SQLDialectBase",
-        type_name: str,
+        type: "TypeObject",
         actions: Sequence[TypeAlterAction],
         *,
-        database_name: Optional[str] = None,
-        schema_name: Optional[str] = None,
         if_exists: bool = False,
     ) -> None:
-        _validate_database_qualification(database_name, schema_name)
         super().__init__(
             dialect,
-            type_name,
+            type,
             actions,
-            schema_name=schema_name,
             if_exists=if_exists,
         )
-        self.database_name = database_name
 
 
 class SnowflakeDropTypeExpression(DropTypeExpression):
-    """DROP TYPE expression with Snowflake database/schema qualification."""
+    """DROP TYPE expression over the Snowflake TYPE object."""
 
     def __init__(
         self,
         dialect: "SQLDialectBase",
-        type_name: str,
+        type: "TypeObject",
         *,
-        database_name: Optional[str] = None,
-        schema_name: Optional[str] = None,
         if_exists: bool = False,
         cascade: bool = False,
         restrict: bool = False,
     ) -> None:
-        _validate_database_qualification(database_name, schema_name)
         if not isinstance(cascade, bool):
             raise TypeError("cascade must be a bool")
         if not isinstance(restrict, bool):
@@ -238,11 +223,9 @@ class SnowflakeDropTypeExpression(DropTypeExpression):
             )
         super().__init__(
             dialect,
-            type_name,
-            schema_name=schema_name,
+            type,
             if_exists=if_exists,
         )
-        self.database_name = database_name
         self.cascade = False
         self.restrict = False
 

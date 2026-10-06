@@ -53,10 +53,6 @@ class SnowflakeCapabilityMixin:
         """Snowflake supports ARRAY type natively."""
         return True
 
-    def supports_schema(self) -> bool:
-        """Snowflake uses a three-level namespace (database.schema.table)."""
-        return True
-
     def supports_views(self) -> bool:
         """Snowflake supports views."""
         return True

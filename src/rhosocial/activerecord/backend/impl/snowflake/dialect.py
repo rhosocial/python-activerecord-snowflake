@@ -21,35 +21,40 @@ if TYPE_CHECKING:
 from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
 from rhosocial.activerecord.backend.dialect.protocols import (
     AdvancedGroupingSupport,
+    AlterTypeSupport,
     ArraySupport,
     AutoIncrementSupport,
     CollationSupport,
     ConstraintSupport,
+    CreateTypeSupport,
     CTESupport,
     DDLTypeSupport,
+    DropTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
     GeneratedColumnSupport,
     ILIKESupport,
-    IndexSupport,
+    IndexObjectSupport,
     IntrospectionSupport,
     JSONSupport,
     JoinSupport,
     LateralJoinSupport,
+    MaterializedViewObjectSupport,
     MergeSupport,
+    NamespaceSupport,
     OrderedSetAggregationSupport,
     PartitionSupport,
     QualifyClauseSupport,
     ReturningSupport,
-    SchemaSupport,
-    SequenceSupport,
+    SequenceObjectSupport,
     SetOperationSupport,
     SQLFunctionSupport,
+    TableObjectSupport,
     TransactionControlSupport,
     TruncateSupport,
+    TypeObjectSupport,
     UpsertSupport,
-    UserDefinedTypeSupport,
-    ViewSupport,
+    ViewObjectSupport,
     WildcardSupport,
     WindowFunctionSupport,
 )
@@ -65,9 +70,21 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     DateTimeMixin,
     DMLMixin,
     DQLMixin,
+    # The object tree: one ``format_<kind>_object`` per kind, each rendering
+    # through ``NamespaceMixin`` for the namespace levels. Snowflake overrides
+    # none of them; ``db.schema.table`` falls out of the slots they are handed.
+    DatabaseNameMixin,
+    IndexNameMixin,
+    MaterializedViewNameMixin,
+    NamespaceMixin,
+    RelationSourceMixin,
+    SchemaNameMixin,
+    SequenceNameMixin,
+    TableNameMixin,
+    TypeNameMixin,
+    ViewNameMixin,
     ExplainMixin,
     ExpressionMixin,
-
     ILIKEMixin,
     IndexMixin,
     IntrospectionMixin,
@@ -75,9 +92,7 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     JSONMixin,
     LateralJoinMixin,
     MergeMixin,
-
     PredicateMixin,
-
     SchemaMixin,
     SequenceMixin,
     SetOperationMixin,
@@ -88,6 +103,7 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     ViewMixin,
     WindowFunctionMixin,
 )
+
 from .reserved_words import SNOWFLAKE_RESERVED_WORDS
 from .protocols import (
     SnowflakeArraySupport,
@@ -113,6 +129,7 @@ from .protocols import (
 from .mixins import (
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
+    SnowflakeNamespaceMixin,
     SnowflakeDMLMixin,
     SnowflakeFileFormatMixin,
     SnowflakeIntrospectionMixin,
@@ -152,6 +169,37 @@ from .mixins import (
 
 class SnowflakeDialect(
     SQLDialectBase,
+    RelationSourceMixin,
+    # The whole naming side, stated once: which namespace levels a name may
+    # carry, and the rule that a database is never usable without a schema.
+    # Placed before every ``*NameMixin`` below and before NamespaceMixin, so it
+    # overrides the shared defaults; each ``*NameMixin`` in turn precedes
+    # NamespaceMixin so its own ``format_*_object`` wins over the inherited one.
+    SnowflakeNamespaceMixin,
+    # The object tree. Each ``*NameMixin`` renders one object kind. The object
+    # protocols name those ``format_*_object`` methods and inherit
+    # ``NamespaceSupport``, so they come last and lose to both.
+    # The object kinds Snowflake's own statements hold. Trigger, routine,
+    # foreign-table, synonym, domain and property-graph objects are left out on
+    # purpose: the engine either has none of them, or exposes them through a
+    # statement of its own that carries a bare name. Naming one is not a
+    # capability to claim where no statement asks for it.
+    TableNameMixin,
+    ViewNameMixin,
+    MaterializedViewNameMixin,
+    IndexNameMixin,
+    SequenceNameMixin,
+    TypeNameMixin,
+    SchemaNameMixin,
+    DatabaseNameMixin,
+    NamespaceMixin,
+    TableObjectSupport,
+    ViewObjectSupport,
+    MaterializedViewObjectSupport,
+    IndexObjectSupport,
+    SequenceObjectSupport,
+    TypeObjectSupport,
+    NamespaceSupport,
     # New Snowflake-specific mixins (BEFORE generic mixins they override)
     SnowflakeDateTimeMixin,
     SnowflakeCollationMixin,
@@ -231,12 +279,13 @@ class SnowflakeDialect(
     CTESupport,
     ConstraintSupport,
     DDLTypeSupport,
-    UserDefinedTypeSupport,
+    CreateTypeSupport,
+    AlterTypeSupport,
+    DropTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
     GeneratedColumnSupport,
     ILIKESupport,
-    IndexSupport,
     IntrospectionSupport,
     JSONSupport,
     JoinSupport,
@@ -245,14 +294,11 @@ class SnowflakeDialect(
     OrderedSetAggregationSupport,
     QualifyClauseSupport,
     ReturningSupport,
-    SchemaSupport,
-    SequenceSupport,
     SetOperationSupport,
     SQLFunctionSupport,
     TransactionControlSupport,
     TruncateSupport,
     UpsertSupport,
-    ViewSupport,
     WildcardSupport,
     WindowFunctionSupport,
     PartitionSupport,

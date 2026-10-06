@@ -4,6 +4,7 @@
 from typing import Any, Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
+from rhosocial.activerecord.backend.expression.objects import MaterializedView
 
 if TYPE_CHECKING:
     from ..expression.ddl.materialized_view import (
@@ -38,10 +39,21 @@ class SnowflakeMaterializedViewMixin:
             Tuple of (SQL string, empty params tuple).
 
         Raises:
+            TypeError: ``expr.view`` is not a MaterializedView. Any other object
+                kind would have rendered its own name as the view's.
             ValueError: when no defining query is supplied.
             UnsupportedFeatureError: for TABLESPACE / storage parameters, which
                 Snowflake does not have.
         """
+        # Snowflake's own expression coerces a bare name into a MaterializedView
+        # at construction, so both it and the core expression arrive here holding
+        # the right kind. The check stays because the object renders itself:
+        # without it a View would produce ``CREATE MATERIALIZED VIEW "v"``.
+        if not isinstance(expr.view, MaterializedView):
+            raise TypeError(
+                f"{type(expr).__name__}.view must be a MaterializedView, "
+                f"got {type(expr.view).__name__}"
+            )
         if expr.tablespace:
             raise UnsupportedFeatureError(self.name, "MATERIALIZED VIEW TABLESPACE")
         if expr.storage_options:
@@ -59,7 +71,11 @@ class SnowflakeMaterializedViewMixin:
         parts.append("MATERIALIZED VIEW")
         if getattr(expr, "if_not_exists", False):
             parts.append("IF NOT EXISTS")
-        parts.append(self.format_identifier(expr.view_name))
+        # The statement already holds the named view, so it renders itself
+        # through its own format_materialized_view_object rather than through
+        # a name assembled here.
+        view_sql, _view_params = expr.view.to_sql()
+        parts.append(view_sql)
 
         column_aliases = getattr(expr, "column_aliases", None)
         if column_aliases:

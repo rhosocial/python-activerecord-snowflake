@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
+from rhosocial.activerecord.backend.expression.objects import Schema
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.statements.ddl_schema import (
@@ -21,7 +22,20 @@ class SnowflakeSchemaMixin:
     """
 
     def supports_schema(self) -> bool:
-        """Snowflake uses three-level namespace (database.schema.table)."""
+        """Snowflake has schemas, so ``CREATE SCHEMA`` may be offered at all.
+
+        This is the DDL-side switch and it is declared here, next to the
+        granular ``supports_create_schema`` family it umbrellas. Whether a name
+        may be *qualified* with a schema is the naming-side question and lives
+        on :class:`~...mixins.namespace.SnowflakeNamespaceMixin` as
+        ``supports_schema_qualification``; the two are named apart because an
+        engine may answer them differently, though Snowflake answers both
+        ``True``. It used to be declared a second time in
+        :class:`~...mixins.capabilities.SnowflakeCapabilityMixin`, where the
+        earlier MRO position silently won over this one -- so this is the only
+        ``supports_schema`` in the backend, and the naming side states its own
+        answer in exactly one place.
+        """
         return True
 
     def supports_create_schema(self) -> bool:
@@ -78,6 +92,14 @@ class SnowflakeSchemaMixin:
         return True
 
     def format_create_schema_statement(self, expr: CreateSchemaExpression) -> Tuple[str, tuple]:
+        # The object kind is checked here rather than in the constructor: an
+        # object renders itself through its own ``format_method``, so a Table
+        # handed here would produce a well-formed ``CREATE SCHEMA "users"``.
+        if not isinstance(expr.schema, Schema):
+            raise TypeError(
+                f"{type(expr).__name__}.schema must be a Schema, "
+                f"got {type(expr.schema).__name__}"
+            )
         if expr.if_not_exists and not self.supports_schema_if_not_exists():
             raise UnsupportedFeatureError(
                 self.name, "CREATE SCHEMA IF NOT EXISTS",
@@ -91,12 +113,17 @@ class SnowflakeSchemaMixin:
         parts = ["CREATE SCHEMA"]
         if expr.if_not_exists:
             parts.append("IF NOT EXISTS")
-        parts.append(self.format_identifier(expr.schema_name))
+        parts.append(expr.schema.to_sql()[0])
         if expr.authorization:
             parts.append(f"AUTHORIZATION {self.format_identifier(expr.authorization)}")
         return " ".join(parts), ()
 
     def format_drop_schema_statement(self, expr: DropSchemaExpression) -> Tuple[str, tuple]:
+        if not isinstance(expr.schema, Schema):
+            raise TypeError(
+                f"{type(expr).__name__}.schema must be a Schema, "
+                f"got {type(expr.schema).__name__}"
+            )
         if expr.if_exists and not self.supports_schema_if_exists():
             raise UnsupportedFeatureError(
                 self.name, "DROP SCHEMA IF EXISTS",
@@ -110,7 +137,7 @@ class SnowflakeSchemaMixin:
         parts = ["DROP SCHEMA"]
         if expr.if_exists:
             parts.append("IF EXISTS")
-        parts.append(self.format_identifier(expr.schema_name))
+        parts.append(expr.schema.to_sql()[0])
         if expr.cascade:
             parts.append("CASCADE")
         return " ".join(parts), ()
