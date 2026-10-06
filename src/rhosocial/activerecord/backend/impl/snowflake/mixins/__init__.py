@@ -50,6 +50,7 @@ from .ordered_set_aggregation import SnowflakeOrderedSetAggregationMixin
 from .truncate import SnowflakeTruncateMixin
 from .schema import SnowflakeSchemaMixin
 from .ddl_database import SnowflakeDatabaseMixin
+from .sequence import SnowflakeSequenceMixin
 
 __all__ = [
     "SnowflakeArrayMixin",
@@ -91,4 +92,5 @@ __all__ = [
     "SnowflakeTruncateMixin",
     "SnowflakeSchemaMixin",
     "SnowflakeDatabaseMixin",
+    "SnowflakeSequenceMixin",
 ]

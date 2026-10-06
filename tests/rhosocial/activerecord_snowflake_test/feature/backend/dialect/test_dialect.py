@@ -130,8 +130,29 @@ class TestSnowflakeDialectCapabilities:
     def test_supports_constraints(self, dialect):
         assert dialect.supports_constraints() is True
 
-    def test_supports_sequences(self, dialect):
-        assert dialect.supports_sequences() is True
+    def test_supports_sequence(self, dialect):
+        assert dialect.supports_sequence() is True
+
+    def test_sequence_option_probes(self, dialect):
+        """Every sequence option core can ask for has its own answer here.
+
+        The answers are the Snowflake reference's, not core's defaults: START,
+        INCREMENT and ORDER are accepted; MINVALUE, MAXVALUE, CYCLE, CACHE and
+        OWNED BY are not.
+        """
+        assert dialect.supports_create_sequence() is True
+        assert dialect.supports_drop_sequence() is True
+        assert dialect.supports_alter_sequence() is True
+        assert dialect.supports_sequence_if_not_exists() is True
+        assert dialect.supports_sequence_if_exists() is True
+        assert dialect.supports_sequence_start() is True
+        assert dialect.supports_sequence_increment() is True
+        assert dialect.supports_sequence_order() is True
+        assert dialect.supports_sequence_minvalue() is False
+        assert dialect.supports_sequence_maxvalue() is False
+        assert dialect.supports_sequence_cycle() is False
+        assert dialect.supports_sequence_cache() is False
+        assert dialect.supports_sequence_owned_by() is False
 
     def test_supports_explicit_inner_join(self, dialect):
         assert dialect.supports_explicit_inner_join() is True

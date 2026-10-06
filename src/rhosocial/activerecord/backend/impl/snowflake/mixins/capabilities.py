@@ -101,9 +101,80 @@ class SnowflakeCapabilityMixin:
         """Snowflake supports constraints (PK, FK, UNIQUE, NOT NULL, CHECK)."""
         return True
 
-    def supports_sequences(self) -> bool:
-        """Snowflake supports sequences."""
+    def supports_sequence(self) -> bool:
+        """Snowflake supports sequence objects.
+
+        The master switch core's sequence formatters consult first. It is
+        singular: core asks ``supports_sequence()``, and a probe spelled
+        ``supports_sequences`` is never read, so the plural name this dialect
+        used to carry left every sequence statement refusing for a spelling
+        mismatch rather than a decision.
+        """
         return True
+
+    def supports_create_sequence(self) -> bool:
+        """Snowflake supports ``CREATE SEQUENCE``."""
+        return True
+
+    def supports_drop_sequence(self) -> bool:
+        """Snowflake supports ``DROP SEQUENCE``."""
+        return True
+
+    def supports_alter_sequence(self) -> bool:
+        """Snowflake supports ``ALTER SEQUENCE``."""
+        return True
+
+    def supports_sequence_if_not_exists(self) -> bool:
+        """Snowflake supports ``CREATE SEQUENCE IF NOT EXISTS``."""
+        return True
+
+    def supports_sequence_if_exists(self) -> bool:
+        """Snowflake supports ``DROP SEQUENCE IF EXISTS``."""
+        return True
+
+    def supports_sequence_start(self) -> bool:
+        """Snowflake supports the ``START WITH`` sequence option."""
+        return True
+
+    def supports_sequence_increment(self) -> bool:
+        """Snowflake supports the ``INCREMENT BY`` sequence option."""
+        return True
+
+    def supports_sequence_minvalue(self) -> bool:
+        """Snowflake has no ``MINVALUE`` clause.
+
+        Its own ``SEQUENCES`` metadata view reports ``MINIMUM_VALUE`` as "Not
+        applicable for Snowflake".
+        """
+        return False
+
+    def supports_sequence_maxvalue(self) -> bool:
+        """Snowflake has no ``MAXVALUE`` clause.
+
+        Its own ``SEQUENCES`` metadata view reports ``MAXIMUM_VALUE`` as "Not
+        applicable for Snowflake".
+        """
+        return False
+
+    def supports_sequence_cycle(self) -> bool:
+        """Snowflake has no ``CYCLE`` clause.
+
+        Its own ``SEQUENCES`` metadata view reports ``CYCLE_OPTION`` as "Not
+        applicable for Snowflake".
+        """
+        return False
+
+    def supports_sequence_cache(self) -> bool:
+        """Snowflake has no ``CACHE`` clause on sequences."""
+        return False
+
+    def supports_sequence_order(self) -> bool:
+        """Snowflake supports ``ORDER`` / ``NOORDER``."""
+        return True
+
+    def supports_sequence_owned_by(self) -> bool:
+        """Snowflake sequences are not owned by a table column."""
+        return False
 
     def supports_explicit_inner_join(self) -> bool:
         """Snowflake supports explicit INNER JOIN syntax."""

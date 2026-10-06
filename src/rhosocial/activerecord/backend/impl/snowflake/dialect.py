@@ -154,6 +154,7 @@ from .mixins import (
     SnowflakeWarehouseMixin,
     SnowflakeSchemaMixin,
     SnowflakeDatabaseMixin,
+    SnowflakeSequenceMixin,
     # New mixins from dialect.py split
     SnowflakeDateTimeMixin,
     SnowflakeCollationMixin,
@@ -225,6 +226,12 @@ class SnowflakeDialect(
     SnowflakeTypeSupportMixin,
     TransactionControlMixin,
     SetOperationMixin,
+    # Deliberate: Snowflake's own sequence grammar, placed immediately before
+    # the core ``SequenceMixin`` so its three formatters win. Core's emits
+    # MINVALUE / MAXVALUE / CYCLE / CACHE / NO ORDER / OWNED BY, all of which
+    # Snowflake rejects; the probes in SnowflakeCapabilityMixin (above) declare
+    # which options this dialect does accept.
+    SnowflakeSequenceMixin,
     SequenceMixin,
     # Standard SQL mixins
     CollationMixin,
