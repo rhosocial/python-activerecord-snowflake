@@ -193,6 +193,93 @@ class SnowflakeCapabilityMixin:
         """Snowflake sequences are not owned by a table column."""
         return False
 
+    # --- Identity columns -------------------------------------------------
+    #
+    # Snowflake's column property is ``{ AUTOINCREMENT | IDENTITY }`` with an
+    # optional ``( start_num , step_num )`` pair (or the ``START <num>
+    # INCREMENT <num>`` spelling) and an optional ``ORDER | NOORDER`` tail; the
+    # two keywords are synonyms. There is no ``GENERATED { ALWAYS | BY DEFAULT }
+    # AS IDENTITY`` form, and no MINVALUE, MAXVALUE or CYCLE. The reference is
+    # the CREATE TABLE grammar:
+    # https://docs.snowflake.com/en/sql-reference/sql/create-table
+
+    def supports_identity_column(self) -> bool:
+        """Snowflake accepts an ``IDENTITY(seed, step)`` column property.
+
+        The reference grammar spells the property ``{ AUTOINCREMENT | IDENTITY }
+        [ ( start_num , step_num ) | START <num> INCREMENT <num> ]``; this
+        dialect renders the parenthesised ``IDENTITY`` spelling. The bare
+        ``AUTOINCREMENT`` keyword is the same mechanism and is deliberately not
+        answered by :meth:`supports_auto_increment_column`, which answers for
+        core's separate parameterless marker.
+        """
+        return True
+
+    def supports_identity_generation_always(self) -> bool:
+        """Snowflake cannot express ``GENERATED ALWAYS``.
+
+        Its column property is ``IDENTITY``, which permits manually inserted
+        values -- the reference warns that a manual insert can collide with a
+        generated value, which is ``BY DEFAULT`` semantics. ``ALWAYS``, where
+        the server refuses user-supplied values, has no spelling at all, so the
+        formatter refuses it rather than rendering a downgraded clause.
+        """
+        return False
+
+    def supports_identity_start(self) -> bool:
+        """Snowflake's ``IDENTITY`` accepts the start value.
+
+        Both reference spellings carry it: ``IDENTITY( <start_num> , <step_num>
+        )`` and ``IDENTITY START <num> INCREMENT <num>``. This dialect renders
+        the parenthesised form.
+        """
+        return True
+
+    def supports_identity_increment(self) -> bool:
+        """Snowflake's ``IDENTITY`` accepts the step/increment value.
+
+        See :meth:`supports_identity_start` for the two reference spellings.
+        """
+        return True
+
+    def supports_identity_minvalue(self) -> bool:
+        """Snowflake's ``IDENTITY`` has no ``MINVALUE`` option.
+
+        The reference grammar gives the property exactly two parameter
+        spellings -- the ``( start_num , step_num )`` pair and ``START <num>
+        INCREMENT <num>`` -- plus ``ORDER | NOORDER``. There is no minimum-value
+        clause to render, so a request is refused rather than dropped.
+        """
+        return False
+
+    def supports_identity_maxvalue(self) -> bool:
+        """Snowflake's ``IDENTITY`` has no ``MAXVALUE`` option.
+
+        See :meth:`supports_identity_minvalue` for the reference grammar.
+        """
+        return False
+
+    def supports_identity_cycle(self) -> bool:
+        """Snowflake's ``IDENTITY`` has no ``CYCLE`` option.
+
+        See :meth:`supports_identity_minvalue` for the reference grammar.
+        """
+        return False
+
+    def supports_auto_increment_column(self) -> bool:
+        """Snowflake has no bare ``AUTO_INCREMENT`` marker.
+
+        Snowflake's keyword is ``AUTOINCREMENT`` -- one word, no underscore --
+        and it is a *synonym of* ``IDENTITY``, so like ``IDENTITY`` it carries
+        the ``( start_num , step_num )`` / ``START ... INCREMENT ...`` /
+        ``ORDER`` tail. Core's parameterless ``AutoIncrementClause`` renders the
+        two-word ``AUTO_INCREMENT`` spelling, which is not in Snowflake's
+        grammar, so the probe answers ``False`` and the marker is refused.
+        Parameterised key generation is carried by ``IdentityClause`` and
+        rendered as ``IDENTITY(seed, step)``.
+        """
+        return False
+
     def supports_explicit_inner_join(self) -> bool:
         """Snowflake supports explicit INNER JOIN syntax."""
         return True

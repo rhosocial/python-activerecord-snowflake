@@ -21,7 +21,7 @@ def test_identity_uses_identity_start_step():
 
 def test_identity_defaults_to_start_step_one():
     dialect = SnowflakeDialect((8, 0, 0))
-    col = _column(dialect, [IdentityAttribute(generation="ALWAYS")])
+    col = _column(dialect, [IdentityAttribute()])
     assert col.to_sql()[0] == '"id" INTEGER IDENTITY(1, 1)'
 
 

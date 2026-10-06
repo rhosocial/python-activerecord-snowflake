@@ -32,7 +32,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     AlterTableSupport,
     AlterTypeSupport,
     ArraySupport as GenericArraySupport,
-    AutoIncrementSupport,
+    AutoIncrementColumnSupport,
     CollationSupport,
     ColumnAttributeSupport,
     CommentSupport,
@@ -63,6 +63,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     FilterClauseSupport,
     FulltextIndexSupport,
     GeneratedColumnSupport,
+    IdentityColumnSupport,
     ILIKESupport,
     IndexObjectSupport,
     IntrospectionSupport,
@@ -97,7 +98,14 @@ from rhosocial.activerecord.backend.dialect.protocols import (
 SNOWFLAKE_PROTOCOLS = [
     # Generic protocols
     AdvancedGroupingSupport,
-    AutoIncrementSupport,
+    # The identity protocol and the parameterless AUTO_INCREMENT protocol are
+    # separate mechanisms. Snowflake implements both interfaces: the
+    # parameterised IDENTITY clause renders, while the bare AUTO_INCREMENT
+    # marker is refused by its probe (Snowflake's keyword is AUTOINCREMENT,
+    # one word, and it is parameterised). A protocol's presence records that
+    # the dialect can answer the question, not that every answer is "yes".
+    AutoIncrementColumnSupport,
+    IdentityColumnSupport,
     CollationSupport,
     CTESupport,
     ColumnAttributeSupport,
