@@ -146,6 +146,7 @@ class TestSnowflakeDialectCapabilities:
         assert dialect.supports_sequence_if_not_exists() is True
         assert dialect.supports_sequence_if_exists() is True
         assert dialect.supports_sequence_start() is True
+        assert dialect.supports_alter_sequence_start() is False
         assert dialect.supports_sequence_increment() is True
         assert dialect.supports_sequence_order() is True
         assert dialect.supports_sequence_minvalue() is False

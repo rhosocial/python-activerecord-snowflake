@@ -154,6 +154,26 @@ class TestUnsupportedOptionsAreRefused:
             AlterSequenceExpression(dialect, _seq(dialect), **alter_kwargs).to_sql()
 
 
+class TestAlterSequenceStartProbe:
+    """The ALTER-side START refusal is answered by its own probe.
+
+    ``supports_sequence_start`` is True here -- ``CREATE SEQUENCE`` accepts
+    ``START`` -- while ``supports_alter_sequence_start`` is False, because the
+    initial value cannot be changed after creation. The ALTER formatter consults
+    the latter, so the two statements disagree without the formatter hard-coding
+    the refusal.
+    """
+
+    def test_probes_disagree(self, dialect):
+        assert dialect.supports_sequence_start() is True
+        assert dialect.supports_alter_sequence_start() is False
+
+    def test_alter_start_is_refused_by_the_probe(self, dialect):
+        with pytest.raises(UnsupportedFeatureError) as exc_info:
+            AlterSequenceExpression(dialect, _seq(dialect), start=5).to_sql()
+        assert "ALTER SEQUENCE START" in str(exc_info.value)
+
+
 class TestWrongObjectKindIsRefused:
     """A table in the sequence slot is refused before any SQL exists."""
 

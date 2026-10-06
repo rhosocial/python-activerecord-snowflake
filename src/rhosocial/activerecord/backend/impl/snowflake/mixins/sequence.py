@@ -199,7 +199,13 @@ class SnowflakeSequenceMixin:
         ``ALTER SEQUENCE`` cannot change the initial value: the reference's
         usage notes say the first value cannot be changed after creation, and
         the command has no ``START`` or ``RESTART`` clause. An expression asking
-        for either is refused rather than rendered.
+        for either is refused rather than rendered. The ``start`` refusal is
+        answered by :meth:`supports_alter_sequence_start` -- the ALTER-side
+        question, kept apart from the CREATE-side
+        :meth:`supports_sequence_start` -- so the decision lives with the
+        capability declaration rather than being hard-coded here. ``restart`` has
+        no such probe and is refused directly, because no dialect in the tree
+        varies it.
 
         ``cycle=False`` asks for the SQL default, and ``NO CYCLE`` is the words
         Snowflake rejects, so neither ``CYCLE`` nor ``NO CYCLE`` is emitted for
@@ -223,6 +229,8 @@ class SnowflakeSequenceMixin:
                 f"got {type(expr.sequence).__name__}"
             )
 
+        parts = [f"ALTER SEQUENCE {expr.sequence.to_sql()[0]}"]
+
         if expr.restart is not None:
             raise UnsupportedFeatureError(
                 self.name,
@@ -234,14 +242,16 @@ class SnowflakeSequenceMixin:
                 ),
             )
         if expr.start is not None:
-            raise UnsupportedFeatureError(
-                self.name,
-                "ALTER SEQUENCE START",
-                suggestion=(
-                    "Snowflake cannot change a sequence's initial value after "
-                    "creation; there is no START clause on ALTER SEQUENCE."
-                ),
-            )
+            if not self.supports_alter_sequence_start():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "ALTER SEQUENCE START",
+                    suggestion=(
+                        "Snowflake cannot change a sequence's initial value after "
+                        "creation; there is no START clause on ALTER SEQUENCE."
+                    ),
+                )
+            parts.append(f"START WITH {expr.start}")
         if expr.minvalue is not None:
             raise UnsupportedFeatureError(
                 self.name,
@@ -282,7 +292,6 @@ class SnowflakeSequenceMixin:
                 suggestion="Snowflake sequences are not owned by a table column.",
             )
 
-        parts = [f"ALTER SEQUENCE {expr.sequence.to_sql()[0]}"]
         if expr.increment is not None:
             parts.append(f"INCREMENT BY {expr.increment}")
         if expr.order is not None:

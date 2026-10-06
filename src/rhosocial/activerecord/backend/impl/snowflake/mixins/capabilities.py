@@ -136,6 +136,23 @@ class SnowflakeCapabilityMixin:
         """Snowflake supports the ``START WITH`` sequence option."""
         return True
 
+    def supports_alter_sequence_start(self) -> bool:
+        """Whether ``ALTER SEQUENCE`` accepts the ``START`` option.
+
+        Snowflake does not. ``ALTER SEQUENCE`` cannot change a sequence's
+        initial value after creation -- the reference's usage notes say so, and
+        the command has neither a ``START`` nor a ``RESTART`` clause. The
+        CREATE-side ``START`` is legal, so :meth:`supports_sequence_start`
+        answers a different question and cannot stand in for this one.
+
+        Stated explicitly rather than left to the shared default, because the
+        direction of that default is what keeps the dialect honest: a probe
+        answering ``True`` by default would let a formatter emit ``START`` on
+        ``ALTER SEQUENCE`` and hand the server SQL it rejects. ``False`` fails
+        closed.
+        """
+        return False
+
     def supports_sequence_increment(self) -> bool:
         """Snowflake supports the ``INCREMENT BY`` sequence option."""
         return True
