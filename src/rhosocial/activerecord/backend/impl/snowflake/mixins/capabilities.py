@@ -199,8 +199,8 @@ class SnowflakeCapabilityMixin:
     # optional ``( start_num , step_num )`` pair (or the ``START <num>
     # INCREMENT <num>`` spelling) and an optional ``ORDER | NOORDER`` tail; the
     # two keywords are synonyms. There is no ``GENERATED { ALWAYS | BY DEFAULT }
-    # AS IDENTITY`` form, and no MINVALUE, MAXVALUE or CYCLE. The reference is
-    # the CREATE TABLE grammar:
+    # AS IDENTITY`` form, and no MINVALUE, MAXVALUE, CYCLE or CACHE. The
+    # reference is the CREATE TABLE grammar:
     # https://docs.snowflake.com/en/sql-reference/sql/create-table
 
     def supports_identity_column(self) -> bool:
@@ -263,6 +263,40 @@ class SnowflakeCapabilityMixin:
         """Snowflake's ``IDENTITY`` has no ``CYCLE`` option.
 
         See :meth:`supports_identity_minvalue` for the reference grammar.
+        """
+        return False
+
+    def supports_identity_order(self) -> bool:
+        """Snowflake's ``IDENTITY`` accepts the ``ORDER`` / ``NOORDER`` tail.
+
+        The column property's reference grammar ends with ``[ { ORDER | NOORDER
+        } ]`` -- *after* the ``( start_num , step_num )`` / ``START <num>
+        INCREMENT <num>`` group, not inside it -- and the negative spelling is
+        one word:
+
+            { AUTOINCREMENT | IDENTITY }
+              [ { ( <start_num> , <step_num> ) | START <num> INCREMENT <num> } ]
+              [ { ORDER | NOORDER } ]
+
+        Two independent reference pages carry the tail: the column definition
+        on the ``CREATE TABLE`` page, and ``tableColumnAction`` on the
+        ``ALTER TABLE`` page. The renderer spells the negative form through
+        :meth:`identity_order_keyword`, which this dialect overrides to
+        ``NOORDER``; the keyword belongs after the parenthesis group.
+
+        https://docs.snowflake.com/en/sql-reference/sql/create-table
+        https://docs.snowflake.com/en/sql-reference/sql/alter-table
+        """
+        return True
+
+    def supports_identity_cache(self) -> bool:
+        """Snowflake's ``IDENTITY`` has no ``CACHE`` option.
+
+        The reference grammar gives the property exactly two parameter
+        spellings -- the ``( start_num , step_num )`` pair and ``START <num>
+        INCREMENT <num>`` -- plus ``ORDER | NOORDER``. There is no cache clause
+        to render, so a request is refused rather than dropped. See
+        :meth:`supports_identity_order` for the two reference pages.
         """
         return False
 

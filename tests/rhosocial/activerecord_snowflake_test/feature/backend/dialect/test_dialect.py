@@ -159,10 +159,11 @@ class TestSnowflakeDialectCapabilities:
         """Every identity probe core can ask for has its own answer here.
 
         The answers are the Snowflake reference's: ``IDENTITY`` accepts a start
-        value and an increment; ``GENERATED ALWAYS``, MINVALUE, MAXVALUE and
-        CYCLE have no spelling in its column property; and the bare
-        ``AUTO_INCREMENT`` marker is not Snowflake's word -- its keyword is
-        ``AUTOINCREMENT``, one word, and it is parameterised like ``IDENTITY``.
+        value, an increment and the ``ORDER`` / ``NOORDER`` tail; ``GENERATED
+        ALWAYS``, MINVALUE, MAXVALUE, CYCLE and CACHE have no spelling in its
+        column property; and the bare ``AUTO_INCREMENT`` marker is not
+        Snowflake's word -- its keyword is ``AUTOINCREMENT``, one word, and it
+        is parameterised like ``IDENTITY``.
         """
         assert dialect.supports_identity_column() is True
         assert dialect.supports_identity_generation_always() is False
@@ -171,6 +172,8 @@ class TestSnowflakeDialectCapabilities:
         assert dialect.supports_identity_minvalue() is False
         assert dialect.supports_identity_maxvalue() is False
         assert dialect.supports_identity_cycle() is False
+        assert dialect.supports_identity_order() is True
+        assert dialect.supports_identity_cache() is False
         assert dialect.supports_auto_increment_column() is False
 
     def test_supports_explicit_inner_join(self, dialect):
