@@ -193,15 +193,65 @@ class TestWrongObjectKindIsRefused:
         assert "must be a Sequence, got Table" in str(exc_info.value)
 
 
-#: ``(option, probe, kwargs)`` for every sequence option whose decision must
-#: come from the capability probes. The kwargs request the option; the probe
-#: answers whether the dialect can express it.
+#: ``(option, kwargs, create_probe, alter_probe)`` for every sequence option
+#: whose decision must come from the capability probes. The kwargs request the
+#: option; the probe named for the formatter answers whether the dialect can
+#: express it.
+#:
+#: ``start`` is the one option whose two formatters ask different questions:
+#: CREATE's ``START WITH`` sets the initial value and is answered by
+#: ``supports_sequence_start``, while ALTER's clause of the same spelling
+#: cannot change it and is answered by ``supports_alter_sequence_start``. Core
+#: keeps the two probes apart, so the table does too.
 SEQUENCE_OPTION_PROBES = [
-    ("minvalue", "supports_sequence_minvalue", {"minvalue": 0}),
-    ("maxvalue", "supports_sequence_maxvalue", {"maxvalue": 99}),
-    ("cycle", "supports_sequence_cycle", {"cycle": True}),
-    ("cache", "supports_sequence_cache", {"cache": 10}),
-    ("order", "supports_sequence_order", {"order": True}),
+    (
+        "start",
+        {"start": 1},
+        "supports_sequence_start",
+        "supports_alter_sequence_start",
+    ),
+    (
+        "increment",
+        {"increment": 1},
+        "supports_sequence_increment",
+        "supports_sequence_increment",
+    ),
+    (
+        "minvalue",
+        {"minvalue": 0},
+        "supports_sequence_minvalue",
+        "supports_sequence_minvalue",
+    ),
+    (
+        "maxvalue",
+        {"maxvalue": 99},
+        "supports_sequence_maxvalue",
+        "supports_sequence_maxvalue",
+    ),
+    (
+        "cycle",
+        {"cycle": True},
+        "supports_sequence_cycle",
+        "supports_sequence_cycle",
+    ),
+    (
+        "cache",
+        {"cache": 10},
+        "supports_sequence_cache",
+        "supports_sequence_cache",
+    ),
+    (
+        "order",
+        {"order": True},
+        "supports_sequence_order",
+        "supports_sequence_order",
+    ),
+    (
+        "owned_by",
+        {"owned_by": "t.c"},
+        "supports_sequence_owned_by",
+        "supports_sequence_owned_by",
+    ),
 ]
 
 
@@ -239,21 +289,24 @@ class TestEverySequenceOptionProbeIsLoadBearing:
     A capability probe is load-bearing when the formatter's decision follows
     it: flip the probe's answer and the rendered statement (or the refusal)
     flips with it. A probe whose answer can change while the behaviour does not
-    is decorative -- a capability nobody consults. Before this guard the
-    sequence formatters hard-coded all five answers, so flipping a probe
-    changed nothing; reverting any one gate in ``mixins/sequence.py`` turns the
-    matching case below red.
+    is decorative -- a capability nobody consults. The first round gated five
+    options but left five answers hard-coded -- CREATE's start, increment and
+    owned_by, and ALTER's increment and owned_by -- so flipping those probes
+    changed nothing; this walk named exactly those five red before the second
+    round gated them, and reverting any one gate in ``mixins/sequence.py``
+    turns the matching case below red.
 
     Each case subclasses the stock dialect with exactly one probe flipped and
     renders the same expression through the CREATE and the ALTER formatter.
-    The stock dialect answers ``False`` for minvalue, maxvalue, cycle and
-    cache, so those cases must refuse on the stock dialect and render on the
-    flipped one; it answers ``True`` for order, so that case must render on the
-    stock dialect and refuse on the flipped one.
+    The stock dialect answers ``True`` for CREATE's start, increment and order,
+    so those cases must render on the stock dialect and refuse on the flipped
+    one; it answers ``False`` for minvalue, maxvalue, cycle, cache, owned_by
+    and ALTER's start, so those cases must refuse on the stock dialect and
+    render on the flipped one.
     """
 
     @pytest.mark.parametrize(
-        "option,probe_name,kwargs",
+        "option,kwargs,create_probe,alter_probe",
         SEQUENCE_OPTION_PROBES,
         ids=[case[0] for case in SEQUENCE_OPTION_PROBES],
     )
@@ -266,8 +319,16 @@ class TestEverySequenceOptionProbeIsLoadBearing:
         ids=["create", "alter"],
     )
     def test_every_sequence_option_probe_is_load_bearing(
-        self, dialect, statement, expression_cls, option, probe_name, kwargs
+        self,
+        dialect,
+        statement,
+        expression_cls,
+        option,
+        kwargs,
+        create_probe,
+        alter_probe,
     ):
+        probe_name = create_probe if statement == "CREATE" else alter_probe
         stock_probe = getattr(dialect, probe_name)()
         flipped_dialect = _flipped_dialect(probe_name)
 

@@ -70,25 +70,26 @@ class SnowflakeSequenceMixin:
         ``CreateSequenceExpression`` and so are never emitted here; the class
         docstring above says where ``COMMENT`` belongs when core grows one.
 
-        Each of the five options is answered by its own capability probe --
-        :meth:`supports_sequence_minvalue`, :meth:`supports_sequence_maxvalue`,
-        :meth:`supports_sequence_cycle`, :meth:`supports_sequence_cache` and
-        :meth:`supports_sequence_order` -- so the decision lives with the
-        capability declaration rather than being hard-coded here. ``ORDER`` is
-        emitted only where its probe accepts it; the other four are refused by
-        name where their probe does not.
+        Every option is answered by its own capability probe: ``start`` by
+        :meth:`supports_sequence_start`, ``increment`` by
+        :meth:`supports_sequence_increment`, ``order`` by
+        :meth:`supports_sequence_order`, and ``minvalue``, ``maxvalue``,
+        ``cycle``, ``cache`` and ``owned_by`` by the probes named after them.
+        The decision therefore lives with the capability declaration rather
+        than being hard-coded here: an option is emitted only where its probe
+        accepts it, and refused by name where it does not.
 
         Raises:
             TypeError: ``expr.sequence`` is not a
                 :class:`~rhosocial.activerecord.backend.expression.objects.Sequence`.
                 A table would render its own name, producing a well-formed
                 ``CREATE SEQUENCE`` over that table's name.
-            UnsupportedFeatureError: an option Snowflake has no clause for was
-                requested -- ``minvalue``, ``maxvalue``, ``cycle``, ``cache`` or
-                ``owned_by`` -- or ``ORDER`` was requested and
-                :meth:`supports_sequence_order` refuses it. The clause is
-                refused rather than dropped, because dropping it would change
-                the statement's meaning.
+            UnsupportedFeatureError: an option the dialect cannot express was
+                requested -- any of ``start``, ``increment``, ``minvalue``,
+                ``maxvalue``, ``cycle``, ``cache``, ``order`` or ``owned_by``
+                whose probe answers ``False``. The clause is refused rather
+                than dropped, because dropping it would change the statement's
+                meaning.
         """
         from rhosocial.activerecord.backend.expression.objects import Sequence
 
@@ -104,8 +105,22 @@ class SnowflakeSequenceMixin:
         parts.append(expr.sequence.to_sql()[0])
 
         if expr.start is not None:
+            if not self.supports_sequence_start():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "SEQUENCE START",
+                    suggestion="This dialect has no START clause on sequences.",
+                )
             parts.append(f"START WITH {expr.start}")
         if expr.increment is not None:
+            if not self.supports_sequence_increment():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "SEQUENCE INCREMENT",
+                    suggestion=(
+                        "This dialect has no INCREMENT BY clause on sequences."
+                    ),
+                )
             parts.append(f"INCREMENT BY {expr.increment}")
         if expr.minvalue is not None:
             if not self.supports_sequence_minvalue():
@@ -153,11 +168,14 @@ class SnowflakeSequenceMixin:
                 )
             parts.append("ORDER")
         if expr.owned_by is not None:
-            raise UnsupportedFeatureError(
-                self.name,
-                "SEQUENCE OWNED BY",
-                suggestion="Snowflake sequences are not owned by a table column.",
-            )
+            if not self.supports_sequence_owned_by():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "SEQUENCE OWNED BY",
+                    suggestion="Snowflake sequences are not owned by a table column.",
+                )
+            if expr.owned_by:
+                parts.append(f"OWNED BY {expr.owned_by}")
 
         return " ".join(parts), ()
 
@@ -225,11 +243,11 @@ class SnowflakeSequenceMixin:
         :meth:`supports_sequence_start` -- so the decision lives with the
         capability declaration rather than being hard-coded here. ``restart`` has
         no such probe and is refused directly, because no dialect in the tree
-        varies it. The five options are likewise answered by their probes:
-        :meth:`supports_sequence_minvalue`, :meth:`supports_sequence_maxvalue`,
-        :meth:`supports_sequence_cycle`, :meth:`supports_sequence_cache` and
-        :meth:`supports_sequence_order` decide whether each is refused or
-        rendered.
+        varies it. Every other option is likewise answered by its probe:
+        ``increment`` by :meth:`supports_sequence_increment`, ``order`` by
+        :meth:`supports_sequence_order`, and ``minvalue``, ``maxvalue``,
+        ``cycle``, ``cache`` and ``owned_by`` by the probes named after them,
+        each deciding whether the option is refused or rendered.
 
         ``cycle=False`` asks for the SQL default, and ``NO CYCLE`` is the words
         Snowflake rejects, so neither ``CYCLE`` nor ``NO CYCLE`` is emitted for
@@ -240,11 +258,13 @@ class SnowflakeSequenceMixin:
                 :class:`~rhosocial.activerecord.backend.expression.objects.Sequence`.
                 A table would render its own name, producing a well-formed
                 ``ALTER SEQUENCE`` over that table's name.
-            UnsupportedFeatureError: ``restart`` or ``start`` was requested --
-                Snowflake cannot change the initial value -- or an option
-                Snowflake has no clause for (``minvalue``, ``maxvalue``,
-                ``cycle``, ``cache``, ``owned_by``) was requested, or ``order``
-                was requested and :meth:`supports_sequence_order` refuses it.
+            UnsupportedFeatureError: ``restart`` was requested -- Snowflake
+                cannot change the initial value -- or ``start`` was requested
+                and :meth:`supports_alter_sequence_start` refuses it, or an
+                option the dialect cannot express was requested -- any of
+                ``increment``, ``minvalue``, ``maxvalue``, ``cycle``,
+                ``cache``, ``order`` or ``owned_by`` whose probe answers
+                ``False``.
         """
         from rhosocial.activerecord.backend.expression.objects import Sequence
 
@@ -315,13 +335,26 @@ class SnowflakeSequenceMixin:
                     suggestion="Snowflake has no CACHE clause on sequences.",
                 )
         if expr.owned_by is not None:
-            raise UnsupportedFeatureError(
-                self.name,
-                "ALTER SEQUENCE OWNED BY",
-                suggestion="Snowflake sequences are not owned by a table column.",
-            )
+            if not self.supports_sequence_owned_by():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "ALTER SEQUENCE OWNED BY",
+                    suggestion="Snowflake sequences are not owned by a table column.",
+                )
+            if expr.owned_by:
+                parts.append(f"OWNED BY {expr.owned_by}")
+            else:
+                parts.append("OWNED BY NONE")
 
         if expr.increment is not None:
+            if not self.supports_sequence_increment():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "ALTER SEQUENCE INCREMENT",
+                    suggestion=(
+                        "This dialect has no INCREMENT BY clause on sequences."
+                    ),
+                )
             parts.append(f"INCREMENT BY {expr.increment}")
         if expr.order is not None:
             if not self.supports_sequence_order():
