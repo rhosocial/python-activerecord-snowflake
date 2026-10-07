@@ -79,6 +79,14 @@ class SnowflakeSequenceMixin:
         than being hard-coded here: an option is emitted only where its probe
         accepts it, and refused by name where it does not.
 
+        The two-spelling options each carry one parameter per spelling
+        (``cycle`` / ``no_cycle``, ``cache`` / ``no_cache``, ``order`` /
+        ``no_order``). The parameter selects the spelling; the probe answers
+        whether the dialect can express the option at all. An unset pair
+        renders nothing, and an explicit spelling whose probe answers ``False``
+        raises -- ``no_cycle=True`` and ``no_cache=True`` are refused by name
+        exactly like their positive counterparts, never dropped.
+
         Raises:
             TypeError: ``expr.sequence`` is not a
                 :class:`~rhosocial.activerecord.backend.expression.objects.Sequence`.
@@ -86,10 +94,10 @@ class SnowflakeSequenceMixin:
                 ``CREATE SEQUENCE`` over that table's name.
             UnsupportedFeatureError: an option the dialect cannot express was
                 requested -- any of ``start``, ``increment``, ``minvalue``,
-                ``maxvalue``, ``cycle``, ``cache``, ``order`` or ``owned_by``
-                whose probe answers ``False``. The clause is refused rather
-                than dropped, because dropping it would change the statement's
-                meaning.
+                ``maxvalue``, ``cycle``/``no_cycle``, ``cache``/``no_cache``,
+                ``order``/``no_order`` or ``owned_by`` whose probe answers
+                ``False``. The clause is refused rather than dropped, because
+                dropping it would change the statement's meaning.
         """
         from rhosocial.activerecord.backend.expression.objects import Sequence
 
@@ -142,31 +150,32 @@ class SnowflakeSequenceMixin:
                         "reports MAXIMUM_VALUE as not applicable."
                     ),
                 )
-        if expr.cycle:
+        if expr.cycle or expr.no_cycle:
             if not self.supports_sequence_cycle():
                 raise UnsupportedFeatureError(
                     self.name,
                     "SEQUENCE CYCLE",
                     suggestion=(
                         "Snowflake has no CYCLE clause; its SEQUENCES view reports "
-                        "CYCLE_OPTION as not applicable."
+                        "CYCLE_OPTION as not applicable. Neither CYCLE nor NO CYCLE "
+                        "can be spelled."
                     ),
                 )
-        if expr.cache is not None:
+        if expr.cache is not None or expr.no_cache:
             if not self.supports_sequence_cache():
                 raise UnsupportedFeatureError(
                     self.name,
                     "SEQUENCE CACHE",
                     suggestion="Snowflake has no CACHE clause on sequences.",
                 )
-        if expr.order:
+        if expr.order or expr.no_order:
             if not self.supports_sequence_order():
                 raise UnsupportedFeatureError(
                     self.name,
                     "SEQUENCE ORDER",
                     suggestion="This dialect has no ORDER clause on sequences.",
                 )
-            parts.append("ORDER")
+            parts.append("ORDER" if expr.order else "NOORDER")
         if expr.owned_by is not None:
             if not self.supports_sequence_owned_by():
                 raise UnsupportedFeatureError(
@@ -249,9 +258,13 @@ class SnowflakeSequenceMixin:
         ``cycle``, ``cache`` and ``owned_by`` by the probes named after them,
         each deciding whether the option is refused or rendered.
 
-        ``cycle=False`` asks for the SQL default, and ``NO CYCLE`` is the words
-        Snowflake rejects, so neither ``CYCLE`` nor ``NO CYCLE`` is emitted for
-        it; only an explicit ``cycle=True`` is refused.
+        The two-spelling options carry one parameter per spelling (``cycle`` /
+        ``no_cycle``, ``cache`` / ``no_cache``, ``order`` / ``no_order``); an
+        unset pair renders nothing, and an explicit spelling whose probe
+        answers ``False`` is refused by name. Snowflake has no ``CYCLE`` and no
+        ``NO CYCLE`` and no ``CACHE`` and no ``NO CACHE``, so every spelling of
+        those two pairs raises; ``ORDER`` and ``NOORDER`` are both accepted by
+        the reference grammar and are rendered as written.
 
         Raises:
             TypeError: ``expr.sequence`` is not a
@@ -262,9 +275,9 @@ class SnowflakeSequenceMixin:
                 cannot change the initial value -- or ``start`` was requested
                 and :meth:`supports_alter_sequence_start` refuses it, or an
                 option the dialect cannot express was requested -- any of
-                ``increment``, ``minvalue``, ``maxvalue``, ``cycle``,
-                ``cache``, ``order`` or ``owned_by`` whose probe answers
-                ``False``.
+                ``increment``, ``minvalue``, ``maxvalue``, ``cycle``/``no_cycle``,
+                ``cache``/``no_cache``, ``order``/``no_order`` or ``owned_by``
+                whose probe answers ``False``.
         """
         from rhosocial.activerecord.backend.expression.objects import Sequence
 
@@ -317,17 +330,18 @@ class SnowflakeSequenceMixin:
                         "reports MAXIMUM_VALUE as not applicable."
                     ),
                 )
-        if expr.cycle:
+        if expr.cycle or expr.no_cycle:
             if not self.supports_sequence_cycle():
                 raise UnsupportedFeatureError(
                     self.name,
                     "ALTER SEQUENCE CYCLE",
                     suggestion=(
                         "Snowflake has no CYCLE clause; its SEQUENCES view reports "
-                        "CYCLE_OPTION as not applicable."
+                        "CYCLE_OPTION as not applicable. Neither CYCLE nor NO CYCLE "
+                        "can be spelled."
                     ),
                 )
-        if expr.cache is not None:
+        if expr.cache is not None or expr.no_cache:
             if not self.supports_sequence_cache():
                 raise UnsupportedFeatureError(
                     self.name,
@@ -356,7 +370,7 @@ class SnowflakeSequenceMixin:
                     ),
                 )
             parts.append(f"INCREMENT BY {expr.increment}")
-        if expr.order is not None:
+        if expr.order or expr.no_order:
             if not self.supports_sequence_order():
                 raise UnsupportedFeatureError(
                     self.name,

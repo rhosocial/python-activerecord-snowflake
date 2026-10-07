@@ -15,8 +15,8 @@ Snowflake divergence from the generic expression
 ------------------------------------------------
 * ``OR REPLACE`` and ``IF NOT EXISTS`` are mutually exclusive.
 * There is no ``WITH [NO] DATA`` clause: Snowflake always creates the view
-  empty and fills it in the background, so the inherited ``with_data`` flag is
-  accepted but not rendered.
+  empty and fills it in the background, so an explicit ``with_data`` /
+  ``no_data`` request is refused by name rather than silently dropped.
 * ``TABLESPACE`` and ``WITH (storage_parameter)`` do not exist; passing them
   raises ``UnsupportedFeatureError`` rather than silently dropping them.
 

@@ -14,8 +14,12 @@ if TYPE_CHECKING:
 class SnowflakeTruncateMixin:
     """Snowflake TRUNCATE TABLE support.
 
-    Snowflake's TRUNCATE has neither a RESTART IDENTITY nor a
-    CASCADE option.
+    Snowflake's TRUNCATE has neither an identity clause (``RESTART`` /
+    ``CONTINUE IDENTITY``) nor a dependency behaviour (``CASCADE`` /
+    ``RESTRICT``): the reference grammar is
+    ``TRUNCATE [ TABLE ] [ IF EXISTS ] <name>``. Each spelling of each pair is
+    refused by name rather than silently dropped.
+    https://docs.snowflake.com/en/sql-reference/sql/truncate-table
     """
 
     def format_truncate_statement(self, expr: "TruncateExpression") -> Tuple[str, tuple]:
@@ -25,25 +29,39 @@ class SnowflakeTruncateMixin:
             TypeError: ``expr.table`` is not a Table. Any other object kind would
                 have rendered its own name after TRUNCATE, which reads as valid
                 SQL and silently deletes from -- or names -- the wrong thing.
-            UnsupportedFeatureError: Snowflake TRUNCATE has neither RESTART
-                IDENTITY nor CASCADE.
+            UnsupportedFeatureError: Snowflake TRUNCATE has no identity clause
+                (``RESTART`` or ``CONTINUE IDENTITY``) and no dependency
+                behaviour (``CASCADE`` or ``RESTRICT``). Every requested
+                spelling raises, naming itself, so a parameter added to the
+                expression can never be dropped silently.
         """
         if not isinstance(expr.table, Table):
             raise TypeError(
                 f"{type(expr).__name__}.table must be a Table, "
                 f"got {type(expr.table).__name__}"
             )
-        if expr.restart_identity:
-            raise UnsupportedFeatureError(
-                self.name,
-                "TRUNCATE ... RESTART IDENTITY",
-                suggestion="Snowflake TRUNCATE has no RESTART IDENTITY option.",
+        if expr.restart_identity or expr.continue_identity:
+            feature = (
+                "TRUNCATE ... RESTART IDENTITY"
+                if expr.restart_identity
+                else "TRUNCATE ... CONTINUE IDENTITY"
             )
-        if expr.cascade:
             raise UnsupportedFeatureError(
                 self.name,
-                "TRUNCATE ... CASCADE",
-                suggestion="Snowflake TRUNCATE has no CASCADE option.",
+                feature,
+                suggestion=(
+                    "Snowflake TRUNCATE has no RESTART IDENTITY / "
+                    "CONTINUE IDENTITY option."
+                ),
+            )
+        if expr.cascade or expr.restrict:
+            feature = (
+                "TRUNCATE ... CASCADE" if expr.cascade else "TRUNCATE ... RESTRICT"
+            )
+            raise UnsupportedFeatureError(
+                self.name,
+                feature,
+                suggestion="Snowflake TRUNCATE has no CASCADE / RESTRICT option.",
             )
         return f"TRUNCATE TABLE {expr.table.to_sql()[0]}", ()
 

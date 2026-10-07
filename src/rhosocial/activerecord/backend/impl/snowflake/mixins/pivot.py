@@ -51,6 +51,13 @@ class SnowflakePivotMixin:
     ) -> Tuple[str, tuple]:
         """Format an UNPIVOT clause.
 
+        The null-handling clause is optional in Snowflake's grammar:
+        ``UNPIVOT [ { INCLUDE | EXCLUDE } NULLS ] (...)``. ``include_nulls``
+        renders ``INCLUDE NULLS``, ``exclude_nulls`` renders the explicit
+        ``EXCLUDE NULLS``, and neither renders no clause at all -- the server
+        then applies its ``EXCLUDE NULLS`` default. The two parameters are
+        mutually exclusive at construction, so the states cannot collide.
+
         Args:
             expr: :class:`SnowflakeUnpivotExpression`.
 
@@ -58,12 +65,17 @@ class SnowflakePivotMixin:
             Tuple of (SQL string, empty params tuple).
 
         """
-        nulls = "INCLUDE NULLS" if expr.include_nulls else "EXCLUDE NULLS"
+        if expr.include_nulls:
+            nulls = "INCLUDE NULLS "
+        elif expr.exclude_nulls:
+            nulls = "EXCLUDE NULLS "
+        else:
+            nulls = ""
         columns_sql = ", ".join(
             self.format_identifier(column) for column in expr.columns
         )
         sql = (
-            f"UNPIVOT {nulls} "
+            f"UNPIVOT {nulls}"
             f"({self.format_identifier(expr.value_column)} "
             f"FOR {self.format_identifier(expr.pivot_column)} "
             f"IN ({columns_sql}))"

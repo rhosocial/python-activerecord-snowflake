@@ -90,17 +90,17 @@ class TestIdentityRendering:
 
     def test_noorder(self, dialect):
         """The negative spelling is Snowflake's one word, ``NOORDER``."""
-        sql, _ = _identity(dialect, order=False).to_sql()
+        sql, _ = _identity(dialect, no_order=True).to_sql()
         assert sql == " IDENTITY(1, 1) NOORDER"
 
     def test_order_with_parameters(self, dialect):
         """The tail stays outside the parentheses when they carry values."""
-        sql, _ = _identity(dialect, start=100, increment=5, order=False).to_sql()
+        sql, _ = _identity(dialect, start=100, increment=5, no_order=True).to_sql()
         assert sql == " IDENTITY(100, 5) NOORDER"
 
     def test_order_keyword_is_outside_the_parentheses(self, dialect):
         """``IDENTITY(1, 1) NOORDER``, never ``IDENTITY(1, 1, NOORDER)``."""
-        sql, _ = _identity(dialect, order=False).to_sql()
+        sql, _ = _identity(dialect, no_order=True).to_sql()
         assert sql.index("NOORDER") > sql.index(")")
 
     def test_by_default_renders_the_same_as_bare(self, dialect):
@@ -126,23 +126,37 @@ class TestRefusedOptions:
             ({"minvalue": 0}, "IDENTITY MINVALUE"),
             ({"maxvalue": 99}, "IDENTITY MAXVALUE"),
             ({"cycle": True}, "IDENTITY CYCLE"),
-            ({"cycle": False}, "IDENTITY CYCLE"),
+            ({"no_cycle": True}, "IDENTITY CYCLE"),
             ({"cache": 10}, "IDENTITY CACHE"),
-            ({"cache": 0}, "IDENTITY CACHE"),
+            ({"no_cache": True}, "IDENTITY CACHE"),
         ],
         ids=[
             "minvalue",
             "maxvalue",
             "cycle-true",
-            "cycle-false",
+            "no-cycle",
             "cache-count",
-            "cache-zero",
+            "no-cache",
         ],
     )
     def test_option_is_refused(self, dialect, kwargs, feature):
         with pytest.raises(UnsupportedFeatureError) as exc_info:
             _identity(dialect, **kwargs).to_sql()
         assert exc_info.value.feature_name == feature
+
+    def test_cache_zero_is_refused_at_construction(self, dialect):
+        """``cache=0`` is no longer a sentinel spelling; ``no_cache`` is."""
+        with pytest.raises(ValueError, match="cache must be a positive integer"):
+            _identity(dialect, cache=0)
+
+    def test_cycle_false_is_unspecified(self, dialect):
+        """``cycle=False`` is no longer a spelling: the unset pair emits nothing."""
+        sql, _ = _identity(dialect, cycle=False).to_sql()
+        assert sql == " IDENTITY(1, 1)"
+
+    def test_order_pair_is_mutually_exclusive(self, dialect):
+        with pytest.raises(ValueError, match="order and no_order are mutually exclusive"):
+            _identity(dialect, order=True, no_order=True)
 
     def test_always_is_refused(self, dialect):
         """``ALWAYS`` used to render byte-identical to ``BY DEFAULT``."""
@@ -223,7 +237,7 @@ class TestOrderDeclarationMatchesRender:
 
     def test_noorder_declaration_matches_render(self, dialect):
         declared = dialect.supports_identity_order()
-        sql = _identity(dialect, order=False).to_sql()[0]
+        sql = _identity(dialect, no_order=True).to_sql()[0]
         assert declared is True, (
             f"SnowflakeDialect answers supports_identity_order() with "
             f"{declared!r} yet rendered {sql!r}; a declared capability needs "
@@ -268,7 +282,7 @@ class TestSentinels:
 
     def test_wrong_order_spelling_is_rejected(self, dialect):
         """The spelling channel: ``NOORDER`` is one word, not ``NO ORDER``."""
-        sql, _ = _identity(dialect, order=False).to_sql()
+        sql, _ = _identity(dialect, no_order=True).to_sql()
         with pytest.raises(AssertionError):
             assert sql == " IDENTITY(1, 1) NO ORDER"
 

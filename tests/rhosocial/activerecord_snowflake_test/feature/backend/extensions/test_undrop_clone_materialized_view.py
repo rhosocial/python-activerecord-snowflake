@@ -235,14 +235,48 @@ class TestSnowflakeGenericMaterializedViewInterop:
         with pytest.raises(UnsupportedFeatureError):
             expr.to_sql()
 
-    def test_with_data_is_not_rendered(self, dialect):
-        """Snowflake has no WITH [NO] DATA; the inherited flag must not leak out."""
+    def test_with_data_is_refused_by_name(self, dialect):
+        """Snowflake has no WITH [NO] DATA; the inherited pair must not leak out."""
         expr = CreateMaterializedViewExpression(
             dialect=dialect,
             view=MaterializedView(dialect, "mv"),
             query=self._query(dialect),
-            with_data=False,
+            with_data=True,
+        )
+        with pytest.raises(UnsupportedFeatureError) as exc_info:
+            expr.to_sql()
+        assert exc_info.value.feature_name == "MATERIALIZED VIEW WITH [NO] DATA"
+
+    def test_no_data_is_refused_by_name(self, dialect):
+        expr = CreateMaterializedViewExpression(
+            dialect=dialect,
+            view=MaterializedView(dialect, "mv"),
+            query=self._query(dialect),
+            no_data=True,
+        )
+        with pytest.raises(UnsupportedFeatureError) as exc_info:
+            expr.to_sql()
+        assert exc_info.value.feature_name == "MATERIALIZED VIEW WITH [NO] DATA"
+
+    def test_unspecified_renders_without_the_clause(self, dialect):
+        """Neither parameter set: Snowflake creates the view without either word."""
+        expr = CreateMaterializedViewExpression(
+            dialect=dialect,
+            view=MaterializedView(dialect, "mv"),
+            query=self._query(dialect),
         )
         sql, _ = expr.to_sql()
         assert "WITH DATA" not in sql
         assert "WITH NO DATA" not in sql
+
+    def test_with_data_pair_is_mutually_exclusive(self, dialect):
+        with pytest.raises(
+            ValueError, match="with_data and no_data are mutually exclusive"
+        ):
+            CreateMaterializedViewExpression(
+                dialect=dialect,
+                view=MaterializedView(dialect, "mv"),
+                query=self._query(dialect),
+                with_data=True,
+                no_data=True,
+            )

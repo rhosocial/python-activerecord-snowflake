@@ -114,10 +114,15 @@ class SnowflakeCreateFunctionExpression(BaseExpression):
         args: Argument list of ``(name, type)`` tuples; ``name`` may be None.
         returns: ``RETURNS`` result type.
         language: :class:`SnowflakeRoutineLanguage`.
-        immutable: ``IMMUTABLE`` / ``VOLATILE`` when not None.
+        immutable: Emit ``IMMUTABLE``.
+        volatile: Emit ``VOLATILE`` (the server default).
         execute_as: :class:`SnowflakeRoutineExecuteAs`.
         body: Function body emitted as ``AS $$ ... $$``.
         comment: ``COMMENT`` string literal.
+
+    ``immutable`` / ``volatile`` are the two spellings of the function's
+    volatility; leaving both unset omits the clause (the server then applies
+    its ``VOLATILE`` default), and setting both raises ``ValueError``.
     """
 
     def __init__(
@@ -129,18 +134,24 @@ class SnowflakeCreateFunctionExpression(BaseExpression):
         args: Optional[List[Tuple[Optional[str], str]]] = None,
         returns: Optional[str] = None,
         language: SnowflakeRoutineLanguage = SnowflakeRoutineLanguage.SQL,
-        immutable: Optional[bool] = None,
+        immutable: bool = False,
+        volatile: bool = False,
         execute_as: Optional[SnowflakeRoutineExecuteAs] = None,
         body: Optional[str] = None,
         comment: Optional[str] = None,
     ):
         super().__init__(dialect)
+        if immutable and volatile:
+            raise ValueError(
+                "immutable and volatile are mutually exclusive options"
+            )
         self.name = name
         self.or_replace = or_replace
         self.args = args or []
         self.returns = returns
         self.language = language
         self.immutable = immutable
+        self.volatile = volatile
         self.execute_as = execute_as
         self.body = body
         self.comment = comment

@@ -71,14 +71,19 @@ class SnowflakeUnpivotExpression(BaseExpression):
 
     UNPIVOT rotates columns to rows, the inverse of PIVOT:
 
-        UNPIVOT (val FOR col IN (a, b)) u
+        UNPIVOT [ { INCLUDE | EXCLUDE } NULLS ] (val FOR col IN (a, b)) u
 
     Attributes:
         value_column: Output column name holding the unpivoted values.
         pivot_column: Output column name holding the source column names.
         columns: List of columns to unpivot.
-        include_nulls: Include NULL values (default: exclude them).
+        include_nulls: Emit ``INCLUDE NULLS``.
+        exclude_nulls: Emit ``EXCLUDE NULLS`` (the server default).
         alias: Optional alias for the unpivoted result.
+
+    ``include_nulls`` / ``exclude_nulls`` are the two spellings of the null
+    handling; leaving both unset omits the clause (the server then applies its
+    ``EXCLUDE NULLS`` default), and setting both raises ``ValueError``.
     """
 
     def __init__(
@@ -89,13 +94,19 @@ class SnowflakeUnpivotExpression(BaseExpression):
         pivot_column: str,
         columns: Optional[List[str]] = None,
         include_nulls: bool = False,
+        exclude_nulls: bool = False,
         alias: Optional[str] = None,
     ):
         super().__init__(dialect)
+        if include_nulls and exclude_nulls:
+            raise ValueError(
+                "include_nulls and exclude_nulls are mutually exclusive options"
+            )
         self.value_column = value_column
         self.pivot_column = pivot_column
         self.columns = columns or []
         self.include_nulls = include_nulls
+        self.exclude_nulls = exclude_nulls
         self.alias = alias
 
     def to_sql(self) -> "Tuple[str, tuple]":

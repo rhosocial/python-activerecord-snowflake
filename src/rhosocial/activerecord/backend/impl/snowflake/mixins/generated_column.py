@@ -23,6 +23,14 @@ class SnowflakeGeneratedColumnMixin:
         :meth:`identity_order_keyword` -- this dialect spells the negative form
         ``NOORDER``, one word -- and :meth:`supports_identity_order` gates it.
 
+        Each two-spelling option carries one parameter per spelling --
+        ``cycle`` / ``no_cycle``, ``cache`` / ``no_cache``, ``order`` /
+        ``no_order``. An unset pair renders nothing; a requested spelling whose
+        probe answers ``False`` is refused by name, and the two negative
+        parameters are checked exactly like the positive ones, so
+        ``no_cycle=True`` / ``no_cache=True`` / ``no_order=True`` are never
+        silently dropped.
+
         The clause is gated option by option, exactly like core's SQL-standard
         formatter, so an option this dialect cannot express is refused by name
         rather than silently dropped:
@@ -82,19 +90,19 @@ class SnowflakeGeneratedColumnMixin:
                 "IDENTITY MAXVALUE",
                 f"{self.name} does not support the MAXVALUE identity option.",
             )
-        if expr.cycle is not None and not self.supports_identity_cycle():
+        if (expr.cycle or expr.no_cycle) and not self.supports_identity_cycle():
             raise UnsupportedFeatureError(
                 self.name,
                 "IDENTITY CYCLE",
                 f"{self.name} does not support the CYCLE identity option.",
             )
-        if expr.cache is not None and not self.supports_identity_cache():
+        if (expr.cache is not None or expr.no_cache) and not self.supports_identity_cache():
             raise UnsupportedFeatureError(
                 self.name,
                 "IDENTITY CACHE",
                 f"{self.name} does not support the CACHE identity option.",
             )
-        if expr.order is not None and not self.supports_identity_order():
+        if (expr.order or expr.no_order) and not self.supports_identity_order():
             raise UnsupportedFeatureError(
                 self.name,
                 "IDENTITY ORDER",
@@ -103,7 +111,7 @@ class SnowflakeGeneratedColumnMixin:
         start = expr.start if expr.start is not None else 1
         increment = expr.increment if expr.increment is not None else 1
         sql = f" IDENTITY({start}, {increment})"
-        if expr.order is not None:
+        if expr.order or expr.no_order:
             # Snowflake's tail follows the parenthesis group:
             # IDENTITY [ ( start , step ) ] [ ORDER | NOORDER ].
             sql += f" {self.identity_order_keyword(expr.order)}"
@@ -119,6 +127,13 @@ class SnowflakeGeneratedColumnMixin:
         clause's Snowflake grammar; ``SnowflakeGeneratedColumnMixin`` precedes
         ``IdentityColumnMixin`` in the dialect's base list, so this override
         wins.
+
+        Core's cache spelling hook was split (``identity_cache_keyword`` now
+        spells positive counts only and ``identity_no_cache_keyword`` carries
+        the negative); this dialect overrides neither, because it declares no
+        cache support at all and refuses both spellings before any hook is
+        consulted. The order hook's signature is unchanged, so this override
+        still attaches where the formatter calls it.
 
         https://docs.snowflake.com/en/sql-reference/sql/create-table
         """

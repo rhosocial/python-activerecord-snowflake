@@ -42,8 +42,8 @@ class SnowflakeMaterializedViewMixin:
             TypeError: ``expr.view`` is not a MaterializedView. Any other object
                 kind would have rendered its own name as the view's.
             ValueError: when no defining query is supplied.
-            UnsupportedFeatureError: for TABLESPACE / storage parameters, which
-                Snowflake does not have.
+            UnsupportedFeatureError: for TABLESPACE / storage parameters and for
+                ``WITH DATA`` / ``WITH NO DATA``, none of which Snowflake has.
         """
         # Snowflake's own expression coerces a bare name into a MaterializedView
         # at construction, so both it and the core expression arrive here holding
@@ -59,6 +59,18 @@ class SnowflakeMaterializedViewMixin:
         if expr.storage_options:
             raise UnsupportedFeatureError(
                 self.name, "MATERIALIZED VIEW STORAGE PARAMETERS"
+            )
+        if getattr(expr, "with_data", False) or getattr(expr, "no_data", False):
+            # The clause is absent from Snowflake's grammar entirely: the view
+            # is created empty and filled in the background. An explicitly
+            # requested spelling is refused by name rather than dropped.
+            raise UnsupportedFeatureError(
+                self.name,
+                "MATERIALIZED VIEW WITH [NO] DATA",
+                suggestion=(
+                    "Snowflake creates the materialized view empty and fills it "
+                    "in the background; it has no WITH DATA / WITH NO DATA clause."
+                ),
             )
 
         query_sql = self._materialized_view_query_sql(expr)
@@ -92,7 +104,8 @@ class SnowflakeMaterializedViewMixin:
             parts.append(f"COMMENT = '{self._escape_sql_string(comment)}'")
 
         # Snowflake has no WITH [NO] DATA: the view is created empty and filled
-        # in the background, so the inherited ``with_data`` flag is not rendered.
+        # in the background. An explicit request for either spelling was refused
+        # above, so the inherited flag cannot leak out here.
         parts.extend(["AS", query_sql])
         return " ".join(parts), ()
 

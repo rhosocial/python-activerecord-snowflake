@@ -58,6 +58,17 @@ class SnowflakeSchemaMixin:
         """Snowflake supports DROP SCHEMA CASCADE."""
         return True
 
+    def supports_schema_restrict(self) -> bool:
+        """Snowflake supports DROP SCHEMA RESTRICT.
+
+        The reference grammar is ``DROP SCHEMA [ IF EXISTS ] <name>
+        [ CASCADE | RESTRICT ]``; RESTRICT returns a warning about existing
+        foreign-key references and does not drop the schema. Core's probe
+        defaults to ``False`` (fail closed), so this dialect declares it.
+        https://docs.snowflake.com/en/sql-reference/sql/drop-schema
+        """
+        return True
+
     def supports_schema_authorization(self) -> bool:
         """Snowflake does not support AUTHORIZATION clause."""
         return False
@@ -134,12 +145,19 @@ class SnowflakeSchemaMixin:
                 self.name, "DROP SCHEMA CASCADE",
                 f"{self.name} does not support DROP SCHEMA CASCADE."
             )
+        if expr.restrict and not self.supports_schema_restrict():
+            raise UnsupportedFeatureError(
+                self.name, "DROP SCHEMA RESTRICT",
+                f"{self.name} does not support DROP SCHEMA RESTRICT."
+            )
         parts = ["DROP SCHEMA"]
         if expr.if_exists:
             parts.append("IF EXISTS")
         parts.append(expr.schema.to_sql()[0])
         if expr.cascade:
             parts.append("CASCADE")
+        elif expr.restrict:
+            parts.append("RESTRICT")
         return " ".join(parts), ()
 
 

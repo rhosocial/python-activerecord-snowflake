@@ -15,6 +15,7 @@ from typing import Any, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.transaction import (
+        BeginTransactionExpression,
         SetTransactionExpression,
     )
 
@@ -378,6 +379,38 @@ class SnowflakeDialect(
         """Format an IDENTIFIER(placeholder) dynamic object reference."""
         placeholder = self.get_parameter_placeholder()
         return f"IDENTIFIER({placeholder})"
+
+    def format_begin_transaction(self, expr: "BeginTransactionExpression") -> Tuple[str, tuple]:
+        """Format BEGIN TRANSACTION for Snowflake, consuming its mode pair.
+
+        Snowflake's BEGIN takes no transaction characteristics; in particular
+        it has no ``DEFERRABLE`` / ``NOT DEFERRABLE`` mode, which
+        :meth:`supports_deferrable_transaction` already answers ``False`` for.
+        The shared formatter renders a bare ``BEGIN`` and ignores the pair, so
+        each requested spelling is refused by name here instead of being
+        silently dropped. With neither parameter set the base rendering is
+        unchanged.
+
+        https://docs.snowflake.com/en/sql-reference/sql/begin
+        """
+        from rhosocial.activerecord.backend.dialect.exceptions import (
+            UnsupportedFeatureError,
+        )
+
+        params = expr.get_params()
+        if params.get("deferrable"):
+            raise UnsupportedFeatureError(
+                self.name,
+                "BEGIN TRANSACTION DEFERRABLE",
+                suggestion="Snowflake does not support DEFERRABLE transactions.",
+            )
+        if params.get("not_deferrable"):
+            raise UnsupportedFeatureError(
+                self.name,
+                "BEGIN TRANSACTION NOT DEFERRABLE",
+                suggestion="Snowflake does not support DEFERRABLE transactions.",
+            )
+        return super().format_begin_transaction(expr)
 
     def format_set_transaction(self, expr: "SetTransactionExpression") -> Tuple[str, tuple]:
         """Format SET TRANSACTION statement for Snowflake.

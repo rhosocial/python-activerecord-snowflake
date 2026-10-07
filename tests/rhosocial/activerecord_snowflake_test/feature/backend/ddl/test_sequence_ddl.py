@@ -64,6 +64,15 @@ class TestCreateSequenceRendering:
         assert sql == 'CREATE SEQUENCE IF NOT EXISTS "s" START WITH 1000 INCREMENT BY 5 ORDER'
         assert params == ()
 
+    def test_no_order_renders_noorder(self, dialect):
+        """``no_order`` is the parameter that spells Snowflake's ``NOORDER``."""
+        sql, _ = CreateSequenceExpression(dialect, _seq(dialect), no_order=True).to_sql()
+        assert sql == 'CREATE SEQUENCE "s" NOORDER'
+
+    def test_order_pair_is_mutually_exclusive(self, dialect):
+        with pytest.raises(ValueError, match="order and no_order are mutually exclusive"):
+            CreateSequenceExpression(dialect, _seq(dialect), order=True, no_order=True)
+
     def test_namespaced_name(self, dialect):
         """The sequence object renders its own namespace; the formatter does not."""
         sql, _ = CreateSequenceExpression(
@@ -99,29 +108,49 @@ class TestAlterSequenceRendering:
 
     def test_noorder_is_one_word(self, dialect):
         """Snowflake spells it ``NOORDER``; core's shared renderer writes ``NO ORDER``."""
-        sql, _ = AlterSequenceExpression(dialect, _seq(dialect), order=False).to_sql()
+        sql, _ = AlterSequenceExpression(dialect, _seq(dialect), no_order=True).to_sql()
         assert sql == 'ALTER SEQUENCE "s" NOORDER'
         assert "NO ORDER" not in sql
 
     def test_increment_and_order(self, dialect):
         sql, _ = AlterSequenceExpression(
-            dialect, _seq(dialect), increment=2, order=False
+            dialect, _seq(dialect), increment=2, no_order=True
         ).to_sql()
         assert sql == 'ALTER SEQUENCE "s" INCREMENT BY 2 NOORDER'
 
-    def test_cycle_false_is_the_default_and_emits_nothing(self, dialect):
-        """``NO CYCLE`` is the words Snowflake rejects, so it is never emitted."""
+    def test_cycle_false_is_unspecified_and_emits_nothing(self, dialect):
+        """``cycle=False`` is no longer a spelling: the unset pair emits nothing."""
         sql, _ = AlterSequenceExpression(dialect, _seq(dialect), cycle=False).to_sql()
         assert sql == 'ALTER SEQUENCE "s"'
+
+    def test_no_cycle_is_refused_by_name(self, dialect):
+        """``NO CYCLE`` is the words Snowflake rejects, so its parameter raises."""
+        with pytest.raises(UnsupportedFeatureError) as exc_info:
+            AlterSequenceExpression(dialect, _seq(dialect), no_cycle=True).to_sql()
+        assert exc_info.value.feature_name == "ALTER SEQUENCE CYCLE"
+
+    def test_no_cache_is_refused_by_name(self, dialect):
+        with pytest.raises(UnsupportedFeatureError) as exc_info:
+            AlterSequenceExpression(dialect, _seq(dialect), no_cache=True).to_sql()
+        assert exc_info.value.feature_name == "ALTER SEQUENCE CACHE"
+
+    def test_order_pair_is_mutually_exclusive(self, dialect):
+        with pytest.raises(ValueError, match="order and no_order are mutually exclusive"):
+            AlterSequenceExpression(dialect, _seq(dialect), order=True, no_order=True)
 
 
 #: ``(label, create_kwargs, alter_kwargs)`` for each clause Snowflake lacks.
 #: Both statements are checked, because both core formatters emit these shapes.
+#: The two-spelling options contribute one row per spelling: the negative
+#: parameters are separate requests and must be refused by name exactly like
+#: the positive ones.
 UNSUPPORTED_OPTIONS = [
     ("minvalue", {"minvalue": 0}, {"minvalue": 0}),
     ("maxvalue", {"maxvalue": 99}, {"maxvalue": 99}),
     ("cycle", {"cycle": True}, {"cycle": True}),
+    ("no_cycle", {"no_cycle": True}, {"no_cycle": True}),
     ("cache", {"cache": 10}, {"cache": 10}),
+    ("no_cache", {"no_cache": True}, {"no_cache": True}),
     ("owned_by", {"owned_by": "t.c"}, {"owned_by": "t.c"}),
     # The initial value cannot be changed after creation, so ALTER has no
     # START or RESTART clause at all. CREATE has no RESTART field.
@@ -243,6 +272,12 @@ SEQUENCE_OPTION_PROBES = [
     (
         "order",
         {"order": True},
+        "supports_sequence_order",
+        "supports_sequence_order",
+    ),
+    (
+        "no_order",
+        {"no_order": True},
         "supports_sequence_order",
         "supports_sequence_order",
     ),
