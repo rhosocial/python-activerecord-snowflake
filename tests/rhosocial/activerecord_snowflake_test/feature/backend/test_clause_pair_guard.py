@@ -51,8 +51,10 @@ There is no Snowflake instance on this machine and CI has none. Every
 expectation here is render-only: the SQL strings and feature names are
 compared with the Snowflake reference pages cited in the sibling test files
 (``test_sequence_ddl.py``, ``test_identity_column.py``, ``test_pivot_unpivot.py``,
-``test_routine.py``, ``test_undrop_clone_materialized_view.py``), not with a
-server's answer.
+``test_routine.py``, ``test_undrop_clone_materialized_view.py``) and, for the
+newly-gated master probes, the ``WITH`` construct page, ``CREATE TABLE``,
+``CREATE MATERIALIZED VIEW``, ``TRUNCATE TABLE`` and ``BEGIN`` command pages,
+not with a server's answer.
 """
 
 from __future__ import annotations
@@ -72,6 +74,7 @@ from rhosocial.activerecord.backend.expression.objects import (
     Table,
     View,
 )
+from rhosocial.activerecord.backend.expression.query_sources import CTEExpression
 from rhosocial.activerecord.backend.expression.statements.ddl_alter import (
     AlterConstraint,
 )
@@ -83,6 +86,7 @@ from rhosocial.activerecord.backend.expression.statements.ddl_sequence import (
     CreateSequenceExpression,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_table import (
+    CreateTableAsExpression,
     DropTableExpression,
     IdentityClause,
     TableConstraintType,
@@ -94,10 +98,12 @@ from rhosocial.activerecord.backend.expression.statements.ddl_view import (
     CreateMaterializedViewExpression,
     DropMaterializedViewExpression,
     DropViewExpression,
+    RefreshMaterializedViewExpression,
 )
 from rhosocial.activerecord.backend.expression.statements.dql import QueryExpression
 from rhosocial.activerecord.backend.expression.transaction import (
     BeginTransactionExpression,
+    SetTransactionExpression,
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.routine import (
@@ -105,6 +111,12 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.routine import
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.pivot import (
     SnowflakeUnpivotExpression,
+)
+from rhosocial.activerecord.backend.impl.snowflake.mixins import (
+    SnowflakeCapabilityMixin,
+    SnowflakeMaterializedViewMixin,
+    SnowflakeTransactionMixin,
+    SnowflakeTruncateMixin,
 )
 
 DIALECT_VERSION = (8, 0, 0)
@@ -351,6 +363,44 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         ("refused", "TRUNCATE ... CONTINUE IDENTITY"),
         note="The TRUNCATE reference has no identity clause; both are refused by name.",
     ),
+    # ------------------------------------------ newly-gated master probes --
+    # Core made three previously-decorative probes load-bearing and added a
+    # fourth for the transaction wait pair. This dialect declares all four, so
+    # the pairs they gate are in scope here: each spelling is answered, never
+    # dropped, and the answers are pinned to the reference grammar.
+    PairCase(
+        "CreateTableAsExpression.with_data",
+        lambda d, **kw: CreateTableAsExpression(d, _table(d), _query(d), **kw),
+        "with_data",
+        "no_data",
+        ("rendered", 'CREATE TABLE "t" AS SELECT "id" FROM "t"'),
+        ("refused", "WITH DATA"),
+        ("refused", "WITH NO DATA"),
+        a_pattern=r"WITH DATA\b",
+        b_pattern=r"WITH NO DATA\b",
+        note=(
+            "Snowflake's CTAS grammar ends at AS <query>; "
+            "supports_with_data_clause() answers False and both spellings are "
+            "refused by name. "
+            "https://docs.snowflake.com/en/sql-reference/sql/create-table"
+        ),
+    ),
+    PairCase(
+        "CTEExpression.materialized",
+        lambda d, **kw: CTEExpression(d, "c", _query(d), **kw),
+        "materialized",
+        "not_materialized",
+        ("rendered", '"c" AS (SELECT "id" FROM "t")'),
+        ("refused", "MATERIALIZED CTE"),
+        ("refused", "NOT MATERIALIZED CTE"),
+        a_pattern=r"(?<!NOT )MATERIALIZED\b",
+        b_pattern=r"NOT MATERIALIZED\b",
+        note=(
+            "The WITH grammar is <cte_name> AS (SELECT ...), plus RECURSIVE "
+            "for the recursive form; there is no [NOT] MATERIALIZED hint. "
+            "https://docs.snowflake.com/en/sql-reference/constructs/with"
+        ),
+    ),
     # ---------------------------------------------- dialect-owned clauses --
     PairCase(
         "SnowflakeUnpivotExpression.include_nulls",
@@ -412,6 +462,40 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         ("refused", "BEGIN TRANSACTION DEFERRABLE"),
         ("refused", "BEGIN TRANSACTION NOT DEFERRABLE"),
         note="Snowflake declares supports_deferrable_transaction() False; both spellings refuse.",
+    ),
+    # Snowflake's BEGIN has no WAIT / NO WAIT clause, and there is no SET
+    # TRANSACTION statement at all. The pair must refuse by name through
+    # supports_transaction_wait() rather than be silently dropped.
+    PairCase(
+        "BeginTransactionExpression.wait",
+        lambda d, **kw: BeginTransactionExpression(d, **kw),
+        "wait",
+        "no_wait",
+        ("rendered", "BEGIN"),
+        ("refused", "BEGIN TRANSACTION WAIT"),
+        ("refused", "BEGIN TRANSACTION NO WAIT"),
+        a_pattern=r"(?<!NO )WAIT\b",
+        b_pattern=r"NO WAIT\b",
+        note=(
+            "BEGIN [ { WORK | TRANSACTION } ] [ NAME <name> ]; no lock-wait "
+            "clause. https://docs.snowflake.com/en/sql-reference/sql/begin"
+        ),
+    ),
+    PairCase(
+        "SetTransactionExpression.wait",
+        lambda d, **kw: SetTransactionExpression(d, **kw),
+        "wait",
+        "no_wait",
+        ("rendered", ""),
+        ("refused", "SET TRANSACTION WAIT"),
+        ("refused", "SET TRANSACTION NO WAIT"),
+        a_pattern=r"(?<!NO )WAIT\b",
+        b_pattern=r"NO WAIT\b",
+        note=(
+            "Snowflake has no SET TRANSACTION statement; the empty rendering "
+            "is the dialect's one answer for the statement itself, and the "
+            "wait pair is still refused by name."
+        ),
     ),
 )
 
@@ -555,6 +639,127 @@ class TestMandatoryPairs:
         )
 
 
+class TestNewlyGatedMasterProbes:
+    """The four master probes core's new gates consult, and Snowflake's answers.
+
+    Core commit c4d6adc made three previously-decorative probes load-bearing --
+    ``supports_materialized_cte`` on ``format_cte_expression``,
+    ``supports_truncate`` on ``format_truncate_statement``, and the new
+    ``supports_with_data_clause`` on CTAS / CREATE MATERIALIZED VIEW / REFRESH
+    MATERIALIZED VIEW -- and added ``supports_transaction_wait`` for the new
+    ``wait`` / ``no_wait`` pair on the two transaction expressions.
+
+    An answer inherited from a shared default is not a decision, so each probe
+    is declared by a Snowflake mixin here and pinned. Not server-verified:
+    there is no Snowflake instance; every expectation is render-only and
+    follows the reference pages cited on each declaration.
+    """
+
+    def test_the_declarations_live_on_the_snowflake_mixins(self):
+        """A probe inherited from a core default is not a declaration."""
+        for mixin, name in (
+            (SnowflakeCapabilityMixin, "supports_materialized_cte"),
+            (SnowflakeMaterializedViewMixin, "supports_with_data_clause"),
+            (SnowflakeTruncateMixin, "supports_truncate"),
+            (SnowflakeTransactionMixin, "supports_transaction_wait"),
+        ):
+            assert name in mixin.__dict__, (
+                f"{mixin.__name__}.{name} is inherited, not declared"
+            )
+
+    def test_probe_answers(self):
+        d = _dialect()
+        assert d.supports_materialized_cte() is False
+        assert d.supports_with_data_clause() is False
+        assert d.supports_truncate() is True
+        assert d.supports_transaction_wait() is False
+
+    def test_materialized_cte_is_refused_by_name(self):
+        d = _dialect()
+        for kw, feature in (
+            ({"materialized": True}, "MATERIALIZED CTE"),
+            ({"not_materialized": True}, "NOT MATERIALIZED CTE"),
+        ):
+            with pytest.raises(UnsupportedFeatureError) as exc_info:
+                CTEExpression(d, "c", _query(d), **kw).to_sql()
+            assert exc_info.value.feature_name == feature
+            assert exc_info.value.dialect_name == "Snowflake"
+        # Neither spelling requested: the probe is not consulted, nothing refused.
+        sql, _params = CTEExpression(d, "c", _query(d)).to_sql()
+        assert "MATERIALIZED" not in sql
+
+    def test_with_data_is_refused_by_name_on_every_consumer(self):
+        d = _dialect()
+        for kw, feature in (
+            ({"with_data": True}, "WITH DATA"),
+            ({"no_data": True}, "WITH NO DATA"),
+        ):
+            with pytest.raises(UnsupportedFeatureError) as exc_info:
+                CreateTableAsExpression(d, _table(d), _query(d), **kw).to_sql()
+            assert exc_info.value.feature_name == feature
+            assert exc_info.value.dialect_name == "Snowflake"
+        # CREATE MATERIALIZED VIEW refuses through Snowflake's own formatter,
+        # with the dialect's own feature name (the view is filled in the
+        # background; the page's WITH DATA token belongs to the unrelated
+        # WITH DATA METRIC FUNCTION clause).
+        for kw in ({"with_data": True}, {"no_data": True}):
+            with pytest.raises(UnsupportedFeatureError) as exc_info:
+                CreateMaterializedViewExpression(
+                    d, MaterializedView(d, "mv"), _query(d), **kw
+                ).to_sql()
+            assert exc_info.value.feature_name == "MATERIALIZED VIEW WITH [NO] DATA"
+            assert exc_info.value.dialect_name == "Snowflake"
+        # REFRESH MATERIALIZED VIEW does not exist in Snowflake; the statement
+        # is refused before the clause is read.
+        for kw in ({}, {"with_data": True}, {"no_data": True}):
+            with pytest.raises(UnsupportedFeatureError) as exc_info:
+                RefreshMaterializedViewExpression(
+                    d, MaterializedView(d, "mv"), **kw
+                ).to_sql()
+            assert exc_info.value.feature_name == "REFRESH MATERIALIZED VIEW"
+            assert exc_info.value.dialect_name == "Snowflake"
+
+    def test_truncate_renders_and_its_probe_gates_its_own_formatter(self):
+        d = _dialect()
+        assert d.supports_truncate() is True
+        sql, _params = TruncateExpression(d, _table(d)).to_sql()
+        assert sql == 'TRUNCATE TABLE "t"'
+
+        class _NoTruncate(SnowflakeDialect):
+            def supports_truncate(self) -> bool:
+                return False
+
+        nd = _NoTruncate()
+        with pytest.raises(UnsupportedFeatureError) as exc_info:
+            TruncateExpression(nd, _table(nd)).to_sql()
+        assert exc_info.value.feature_name == "TRUNCATE"
+
+    def test_wait_pair_refuses_by_name_on_every_transaction_statement(self):
+        d = _dialect()
+        for build, feature in (
+            (
+                lambda: BeginTransactionExpression(d, wait=True),
+                "BEGIN TRANSACTION WAIT",
+            ),
+            (
+                lambda: BeginTransactionExpression(d, no_wait=True),
+                "BEGIN TRANSACTION NO WAIT",
+            ),
+            (
+                lambda: SetTransactionExpression(d, wait=True),
+                "SET TRANSACTION WAIT",
+            ),
+            (
+                lambda: SetTransactionExpression(d, no_wait=True),
+                "SET TRANSACTION NO WAIT",
+            ),
+        ):
+            with pytest.raises(UnsupportedFeatureError) as exc_info:
+                build().to_sql()
+            assert exc_info.value.feature_name == feature
+            assert exc_info.value.dialect_name == "Snowflake"
+
+
 class TestGuardIsNotVacuous:
     """The guard's own lists and channels cannot pass by accident."""
 
@@ -571,11 +776,10 @@ class TestGuardIsNotVacuous:
 
         The set is stated so a pair cannot leave the guard silently. Pairs
         consumed only by core's shared formatters with no Snowflake probe
-        override (SetOperation ``all_``/``distinct``, CTE
-        ``materialized``/``not_materialized``, CreateTableAs ``with_data``/
-        ``no_data``, the constraint classes' deferral/enforcement) are covered
-        by core's ``test_clause_pair_guard.py`` and are deliberately not
-        duplicated here; the report lists them as inherited.
+        override (SetOperation ``all_``/``distinct`` and the constraint
+        classes' deferral/enforcement) are covered by core's
+        ``test_clause_pair_guard.py`` and are deliberately not duplicated
+        here; the report lists them as inherited.
         """
         expected = {
             "CreateSequenceExpression.cycle",
@@ -593,10 +797,14 @@ class TestGuardIsNotVacuous:
             "DropMaterializedViewExpression.cascade",
             "TruncateExpression.cascade",
             "TruncateExpression.restart_identity",
+            "CreateTableAsExpression.with_data",
+            "CTEExpression.materialized",
             "SnowflakeUnpivotExpression.include_nulls",
             "SnowflakeCreateFunctionExpression.immutable",
             "CreateMaterializedViewExpression.with_data",
             "BeginTransactionExpression.deferrable",
+            "BeginTransactionExpression.wait",
+            "SetTransactionExpression.wait",
         }
         covered = {case.case_id for case in PAIR_CASES}
         assert expected == covered, (
@@ -643,3 +851,19 @@ class TestSentinels:
         ).to_sql()[0]
         with pytest.raises(AssertionError):
             assert sql == 'UNPIVOT EXCLUDE NULLS ("v" FOR "k" IN ("a", "b"))'
+
+    def test_wrong_probe_claim_is_rejected(self):
+        """The master probes answer with a bool; a wrong claim fails."""
+        with pytest.raises(AssertionError):
+            assert _dialect().supports_transaction_wait() is True
+
+    def test_wrong_declaring_mixin_claim_is_rejected(self):
+        """A probe declared on another mixin than its own is rejected."""
+        with pytest.raises(AssertionError):
+            assert "supports_truncate" in SnowflakeCapabilityMixin.__dict__
+
+    def test_wrong_wait_drop_claim_is_rejected(self):
+        """The measured defect: WAIT must not be silently dropped to BEGIN."""
+        outcome = _render(lambda: BeginTransactionExpression(_dialect(), wait=True))
+        with pytest.raises(AssertionError):
+            assert outcome == ("rendered", "BEGIN")

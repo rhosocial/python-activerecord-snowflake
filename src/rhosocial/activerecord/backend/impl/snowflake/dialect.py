@@ -381,15 +381,16 @@ class SnowflakeDialect(
         return f"IDENTIFIER({placeholder})"
 
     def format_begin_transaction(self, expr: "BeginTransactionExpression") -> Tuple[str, tuple]:
-        """Format BEGIN TRANSACTION for Snowflake, consuming its mode pair.
+        """Format BEGIN TRANSACTION for Snowflake, consuming its mode pairs.
 
         Snowflake's BEGIN takes no transaction characteristics; in particular
         it has no ``DEFERRABLE`` / ``NOT DEFERRABLE`` mode, which
-        :meth:`supports_deferrable_transaction` already answers ``False`` for.
-        The shared formatter renders a bare ``BEGIN`` and ignores the pair, so
-        each requested spelling is refused by name here instead of being
-        silently dropped. With neither parameter set the base rendering is
-        unchanged.
+        :meth:`supports_deferrable_transaction` already answers ``False`` for,
+        and no ``WAIT`` / ``NO WAIT`` clause, which
+        :meth:`supports_transaction_wait` answers ``False`` for. The shared
+        formatter renders a bare ``BEGIN`` and ignores these pairs, so each
+        requested spelling is refused by name here instead of being silently
+        dropped. With neither pair set the base rendering is unchanged.
 
         https://docs.snowflake.com/en/sql-reference/sql/begin
         """
@@ -398,6 +399,7 @@ class SnowflakeDialect(
         )
 
         params = expr.get_params()
+        self._refuse_transaction_wait(params, "BEGIN TRANSACTION")
         if params.get("deferrable"):
             raise UnsupportedFeatureError(
                 self.name,
@@ -416,8 +418,14 @@ class SnowflakeDialect(
         """Format SET TRANSACTION statement for Snowflake.
 
         Snowflake only supports READ COMMITTED isolation level, so
-        no SET TRANSACTION is needed.
+        no SET TRANSACTION is needed and the statement renders as nothing.
+        Its grammar has no ``WAIT`` / ``NO WAIT`` clause (and no SET
+        TRANSACTION statement at all), so a requested spelling is refused by
+        name rather than dropped along with the rest of the statement.
+
+        https://docs.snowflake.com/en/sql-reference/sql/begin
         """
+        self._refuse_transaction_wait(expr.get_params(), "SET TRANSACTION")
         return ("", ())
 
     # ========== DDLType Support ==========

@@ -22,6 +22,15 @@ class SnowflakeTruncateMixin:
     https://docs.snowflake.com/en/sql-reference/sql/truncate-table
     """
 
+    def supports_truncate(self) -> bool:
+        """Snowflake renders ``TRUNCATE [ TABLE ] [ IF EXISTS ] <name>``.
+
+        The statement itself is in the reference synopsis; the options are
+        what this dialect declines (see the refusals below).
+        https://docs.snowflake.com/en/sql-reference/sql/truncate-table
+        """
+        return True
+
     def format_truncate_statement(self, expr: "TruncateExpression") -> Tuple[str, tuple]:
         """Format Snowflake TRUNCATE TABLE <name>.
 
@@ -29,7 +38,9 @@ class SnowflakeTruncateMixin:
             TypeError: ``expr.table`` is not a Table. Any other object kind would
                 have rendered its own name after TRUNCATE, which reads as valid
                 SQL and silently deletes from -- or names -- the wrong thing.
-            UnsupportedFeatureError: Snowflake TRUNCATE has no identity clause
+            UnsupportedFeatureError: If TRUNCATE itself is declined (the probe
+                answers ``True``; the guard is the fail-closed shape every
+                formatter carries), or Snowflake TRUNCATE has no identity clause
                 (``RESTART`` or ``CONTINUE IDENTITY``) and no dependency
                 behaviour (``CASCADE`` or ``RESTRICT``). Every requested
                 spelling raises, naming itself, so a parameter added to the
@@ -39,6 +50,15 @@ class SnowflakeTruncateMixin:
             raise TypeError(
                 f"{type(expr).__name__}.table must be a Table, "
                 f"got {type(expr.table).__name__}"
+            )
+        if not self.supports_truncate():
+            raise UnsupportedFeatureError(
+                self.name,
+                "TRUNCATE",
+                suggestion=(
+                    "This dialect does not render TRUNCATE; Snowflake's "
+                    "grammar is TRUNCATE [ TABLE ] [ IF EXISTS ] <name>."
+                ),
             )
         if expr.restart_identity or expr.continue_identity:
             feature = (

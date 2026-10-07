@@ -23,6 +23,31 @@ class SnowflakeMaterializedViewMixin:
         """Snowflake supports native materialized views."""
         return True
 
+    def supports_with_data_clause(self) -> bool:
+        """Snowflake has no ``WITH [NO] DATA`` population clause.
+
+        All three consumers core declares the probe for lack it here:
+
+        * ``CREATE TABLE ... AS <query>`` -- the CTAS grammar ends at the
+          query;
+        * ``CREATE MATERIALIZED VIEW ... AS <select_statement>`` -- the view
+          is created empty and filled in the background; the ``WITH DATA``
+          token on that page belongs to ``WITH DATA METRIC FUNCTION``, a
+          data-quality binding, not to a population clause;
+        * ``REFRESH MATERIALIZED VIEW`` -- Snowflake has no such statement
+          (the command reference has no page for it); maintenance is
+          automatic.
+
+        Core's three consumers (CTAS, CREATE MATERIALIZED VIEW, REFRESH
+        MATERIALIZED VIEW) read this probe and refuse either spelling by
+        name; this dialect's own materialized view formatter refuses it
+        before the shared gate is reached.
+
+        https://docs.snowflake.com/en/sql-reference/sql/create-table
+        https://docs.snowflake.com/en/sql-reference/sql/create-materialized-view
+        """
+        return False
+
     def format_create_materialized_view_statement(
         self, expr: "SnowflakeCreateMaterializedViewExpression"
     ) -> Tuple[str, tuple]:

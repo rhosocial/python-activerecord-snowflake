@@ -17,6 +17,20 @@ class SnowflakeCapabilityMixin:
         """Snowflake supports recursive CTEs."""
         return True
 
+    def supports_materialized_cte(self) -> bool:
+        """Snowflake has no ``MATERIALIZED`` / ``NOT MATERIALIZED`` CTE hint.
+
+        The reference grammar for the WITH clause is
+        ``<cte_name> [ ( <cte_column_list> ) ] AS ( SELECT ... )``, and the
+        recursive form adds only ``[ RECURSIVE ]``; whether a CTE is
+        materialised is the optimizer's decision, with no user-level hint.
+        Core's shared CTE formatter reads this probe and refuses either
+        spelling by name instead of rendering a hint the server rejects.
+
+        https://docs.snowflake.com/en/sql-reference/constructs/with
+        """
+        return False
+
     def supports_window_functions(self) -> bool:
         """Snowflake supports window functions."""
         return True
