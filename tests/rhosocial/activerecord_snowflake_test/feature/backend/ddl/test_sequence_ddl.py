@@ -191,3 +191,101 @@ class TestWrongObjectKindIsRefused:
         with pytest.raises(TypeError) as exc_info:
             expression.to_sql()
         assert "must be a Sequence, got Table" in str(exc_info.value)
+
+
+#: ``(option, probe, kwargs)`` for every sequence option whose decision must
+#: come from the capability probes. The kwargs request the option; the probe
+#: answers whether the dialect can express it.
+SEQUENCE_OPTION_PROBES = [
+    ("minvalue", "supports_sequence_minvalue", {"minvalue": 0}),
+    ("maxvalue", "supports_sequence_maxvalue", {"maxvalue": 99}),
+    ("cycle", "supports_sequence_cycle", {"cycle": True}),
+    ("cache", "supports_sequence_cache", {"cache": 10}),
+    ("order", "supports_sequence_order", {"order": True}),
+]
+
+
+def _flipped_dialect(probe_name):
+    """A stock Snowflake dialect with exactly one capability probe flipped.
+
+    The flip is the only difference from the stock dialect, so any behaviour
+    change between the two is attributable to that probe alone.
+    """
+    stock_value = getattr(SnowflakeDialect(version=(8, 0, 0)), probe_name)()
+    flipped = type(
+        f"SnowflakeDialectFlipped{probe_name}",
+        (SnowflakeDialect,),
+        {probe_name: lambda self: not stock_value},
+    )
+    return flipped(version=(8, 0, 0))
+
+
+def _render_outcome(expression_cls, dialect, kwargs):
+    """Render one statement; a refusal is an outcome, not an error.
+
+    Returns ``("rendered", (sql, params))`` or ``("refused", message)`` so the
+    guard can compare the two dialects' behaviour without ``pytest.raises``.
+    """
+    try:
+        sql, params = expression_cls(dialect, _seq(dialect), **kwargs).to_sql()
+    except UnsupportedFeatureError as exc:
+        return "refused", str(exc)
+    return "rendered", (sql, params)
+
+
+class TestEverySequenceOptionProbeIsLoadBearing:
+    """Flipping any one sequence-option probe must change the formatter's answer.
+
+    A capability probe is load-bearing when the formatter's decision follows
+    it: flip the probe's answer and the rendered statement (or the refusal)
+    flips with it. A probe whose answer can change while the behaviour does not
+    is decorative -- a capability nobody consults. Before this guard the
+    sequence formatters hard-coded all five answers, so flipping a probe
+    changed nothing; reverting any one gate in ``mixins/sequence.py`` turns the
+    matching case below red.
+
+    Each case subclasses the stock dialect with exactly one probe flipped and
+    renders the same expression through the CREATE and the ALTER formatter.
+    The stock dialect answers ``False`` for minvalue, maxvalue, cycle and
+    cache, so those cases must refuse on the stock dialect and render on the
+    flipped one; it answers ``True`` for order, so that case must render on the
+    stock dialect and refuse on the flipped one.
+    """
+
+    @pytest.mark.parametrize(
+        "option,probe_name,kwargs",
+        SEQUENCE_OPTION_PROBES,
+        ids=[case[0] for case in SEQUENCE_OPTION_PROBES],
+    )
+    @pytest.mark.parametrize(
+        "statement,expression_cls",
+        [
+            ("CREATE", CreateSequenceExpression),
+            ("ALTER", AlterSequenceExpression),
+        ],
+        ids=["create", "alter"],
+    )
+    def test_every_sequence_option_probe_is_load_bearing(
+        self, dialect, statement, expression_cls, option, probe_name, kwargs
+    ):
+        stock_probe = getattr(dialect, probe_name)()
+        flipped_dialect = _flipped_dialect(probe_name)
+
+        stock_kind, stock_detail = _render_outcome(expression_cls, dialect, kwargs)
+        flipped_kind, flipped_detail = _render_outcome(
+            expression_cls, flipped_dialect, kwargs
+        )
+
+        expected_stock = "rendered" if stock_probe else "refused"
+        expected_flipped = "refused" if stock_probe else "rendered"
+        assert stock_kind == expected_stock, (
+            f"{statement} SEQUENCE {option}: the stock dialect answers "
+            f"{probe_name}()={stock_probe}, so the option must be "
+            f"{expected_stock}; got {stock_kind}: {stock_detail!r}"
+        )
+        assert flipped_kind == expected_flipped, (
+            f"{statement} SEQUENCE {option}: with {probe_name}() flipped to "
+            f"{not stock_probe}, the option must be {expected_flipped}; got "
+            f"{flipped_kind}: {flipped_detail!r}. The probe is decorative: "
+            f"the formatter ignores its answer."
+        )

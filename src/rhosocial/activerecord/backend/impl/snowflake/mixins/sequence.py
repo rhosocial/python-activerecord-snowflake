@@ -70,6 +70,14 @@ class SnowflakeSequenceMixin:
         ``CreateSequenceExpression`` and so are never emitted here; the class
         docstring above says where ``COMMENT`` belongs when core grows one.
 
+        Each of the five options is answered by its own capability probe --
+        :meth:`supports_sequence_minvalue`, :meth:`supports_sequence_maxvalue`,
+        :meth:`supports_sequence_cycle`, :meth:`supports_sequence_cache` and
+        :meth:`supports_sequence_order` -- so the decision lives with the
+        capability declaration rather than being hard-coded here. ``ORDER`` is
+        emitted only where its probe accepts it; the other four are refused by
+        name where their probe does not.
+
         Raises:
             TypeError: ``expr.sequence`` is not a
                 :class:`~rhosocial.activerecord.backend.expression.objects.Sequence`.
@@ -77,8 +85,10 @@ class SnowflakeSequenceMixin:
                 ``CREATE SEQUENCE`` over that table's name.
             UnsupportedFeatureError: an option Snowflake has no clause for was
                 requested -- ``minvalue``, ``maxvalue``, ``cycle``, ``cache`` or
-                ``owned_by``. The clause is refused rather than dropped, because
-                dropping it would change the statement's meaning.
+                ``owned_by`` -- or ``ORDER`` was requested and
+                :meth:`supports_sequence_order` refuses it. The clause is
+                refused rather than dropped, because dropping it would change
+                the statement's meaning.
         """
         from rhosocial.activerecord.backend.expression.objects import Sequence
 
@@ -98,39 +108,49 @@ class SnowflakeSequenceMixin:
         if expr.increment is not None:
             parts.append(f"INCREMENT BY {expr.increment}")
         if expr.minvalue is not None:
-            raise UnsupportedFeatureError(
-                self.name,
-                "SEQUENCE MINVALUE",
-                suggestion=(
-                    "Snowflake has no MINVALUE clause; its SEQUENCES view "
-                    "reports MINIMUM_VALUE as not applicable."
-                ),
-            )
+            if not self.supports_sequence_minvalue():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "SEQUENCE MINVALUE",
+                    suggestion=(
+                        "Snowflake has no MINVALUE clause; its SEQUENCES view "
+                        "reports MINIMUM_VALUE as not applicable."
+                    ),
+                )
         if expr.maxvalue is not None:
-            raise UnsupportedFeatureError(
-                self.name,
-                "SEQUENCE MAXVALUE",
-                suggestion=(
-                    "Snowflake has no MAXVALUE clause; its SEQUENCES view "
-                    "reports MAXIMUM_VALUE as not applicable."
-                ),
-            )
+            if not self.supports_sequence_maxvalue():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "SEQUENCE MAXVALUE",
+                    suggestion=(
+                        "Snowflake has no MAXVALUE clause; its SEQUENCES view "
+                        "reports MAXIMUM_VALUE as not applicable."
+                    ),
+                )
         if expr.cycle:
-            raise UnsupportedFeatureError(
-                self.name,
-                "SEQUENCE CYCLE",
-                suggestion=(
-                    "Snowflake has no CYCLE clause; its SEQUENCES view reports "
-                    "CYCLE_OPTION as not applicable."
-                ),
-            )
+            if not self.supports_sequence_cycle():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "SEQUENCE CYCLE",
+                    suggestion=(
+                        "Snowflake has no CYCLE clause; its SEQUENCES view reports "
+                        "CYCLE_OPTION as not applicable."
+                    ),
+                )
         if expr.cache is not None:
-            raise UnsupportedFeatureError(
-                self.name,
-                "SEQUENCE CACHE",
-                suggestion="Snowflake has no CACHE clause on sequences.",
-            )
+            if not self.supports_sequence_cache():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "SEQUENCE CACHE",
+                    suggestion="Snowflake has no CACHE clause on sequences.",
+                )
         if expr.order:
+            if not self.supports_sequence_order():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "SEQUENCE ORDER",
+                    suggestion="This dialect has no ORDER clause on sequences.",
+                )
             parts.append("ORDER")
         if expr.owned_by is not None:
             raise UnsupportedFeatureError(
@@ -205,7 +225,11 @@ class SnowflakeSequenceMixin:
         :meth:`supports_sequence_start` -- so the decision lives with the
         capability declaration rather than being hard-coded here. ``restart`` has
         no such probe and is refused directly, because no dialect in the tree
-        varies it.
+        varies it. The five options are likewise answered by their probes:
+        :meth:`supports_sequence_minvalue`, :meth:`supports_sequence_maxvalue`,
+        :meth:`supports_sequence_cycle`, :meth:`supports_sequence_cache` and
+        :meth:`supports_sequence_order` decide whether each is refused or
+        rendered.
 
         ``cycle=False`` asks for the SQL default, and ``NO CYCLE`` is the words
         Snowflake rejects, so neither ``CYCLE`` nor ``NO CYCLE`` is emitted for
@@ -219,7 +243,8 @@ class SnowflakeSequenceMixin:
             UnsupportedFeatureError: ``restart`` or ``start`` was requested --
                 Snowflake cannot change the initial value -- or an option
                 Snowflake has no clause for (``minvalue``, ``maxvalue``,
-                ``cycle``, ``cache``, ``owned_by``) was requested.
+                ``cycle``, ``cache``, ``owned_by``) was requested, or ``order``
+                was requested and :meth:`supports_sequence_order` refuses it.
         """
         from rhosocial.activerecord.backend.expression.objects import Sequence
 
@@ -253,38 +278,42 @@ class SnowflakeSequenceMixin:
                 )
             parts.append(f"START WITH {expr.start}")
         if expr.minvalue is not None:
-            raise UnsupportedFeatureError(
-                self.name,
-                "ALTER SEQUENCE MINVALUE",
-                suggestion=(
-                    "Snowflake has no MINVALUE clause; its SEQUENCES view "
-                    "reports MINIMUM_VALUE as not applicable."
-                ),
-            )
+            if not self.supports_sequence_minvalue():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "ALTER SEQUENCE MINVALUE",
+                    suggestion=(
+                        "Snowflake has no MINVALUE clause; its SEQUENCES view "
+                        "reports MINIMUM_VALUE as not applicable."
+                    ),
+                )
         if expr.maxvalue is not None:
-            raise UnsupportedFeatureError(
-                self.name,
-                "ALTER SEQUENCE MAXVALUE",
-                suggestion=(
-                    "Snowflake has no MAXVALUE clause; its SEQUENCES view "
-                    "reports MAXIMUM_VALUE as not applicable."
-                ),
-            )
+            if not self.supports_sequence_maxvalue():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "ALTER SEQUENCE MAXVALUE",
+                    suggestion=(
+                        "Snowflake has no MAXVALUE clause; its SEQUENCES view "
+                        "reports MAXIMUM_VALUE as not applicable."
+                    ),
+                )
         if expr.cycle:
-            raise UnsupportedFeatureError(
-                self.name,
-                "ALTER SEQUENCE CYCLE",
-                suggestion=(
-                    "Snowflake has no CYCLE clause; its SEQUENCES view reports "
-                    "CYCLE_OPTION as not applicable."
-                ),
-            )
+            if not self.supports_sequence_cycle():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "ALTER SEQUENCE CYCLE",
+                    suggestion=(
+                        "Snowflake has no CYCLE clause; its SEQUENCES view reports "
+                        "CYCLE_OPTION as not applicable."
+                    ),
+                )
         if expr.cache is not None:
-            raise UnsupportedFeatureError(
-                self.name,
-                "ALTER SEQUENCE CACHE",
-                suggestion="Snowflake has no CACHE clause on sequences.",
-            )
+            if not self.supports_sequence_cache():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "ALTER SEQUENCE CACHE",
+                    suggestion="Snowflake has no CACHE clause on sequences.",
+                )
         if expr.owned_by is not None:
             raise UnsupportedFeatureError(
                 self.name,
@@ -295,6 +324,12 @@ class SnowflakeSequenceMixin:
         if expr.increment is not None:
             parts.append(f"INCREMENT BY {expr.increment}")
         if expr.order is not None:
+            if not self.supports_sequence_order():
+                raise UnsupportedFeatureError(
+                    self.name,
+                    "ALTER SEQUENCE ORDER",
+                    suggestion="This dialect has no ORDER clause on sequences.",
+                )
             parts.append("ORDER" if expr.order else "NOORDER")
         return " ".join(parts), ()
 
