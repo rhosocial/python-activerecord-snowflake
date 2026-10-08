@@ -12,6 +12,9 @@ from typing import Tuple
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.dialect.mixins.ddl_type import DDLTypeMixin
 from rhosocial.activerecord.backend.dialect.protocols import DDLTypeSupport
+# Aliased because this module also uses ``Type[DataType]``-style annotations
+# from ``typing``; ``TypeObject`` names the schema object a UDT reference is.
+from rhosocial.activerecord.backend.expression.objects import Type as TypeObject
 from rhosocial.activerecord.backend.expression.types import (
     BigIntType,
     BooleanType,
@@ -256,13 +259,16 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
                 "user-defined type references",
                 suggestion="Snowflake user-defined types require server version 10.8 or newer.",
             )
-        parts = []
-        if expr.database_name is not None:
-            parts.append(self.format_identifier(expr.database_name))
-        if expr.schema_name is not None:
-            parts.append(self.format_identifier(expr.schema_name))
-        parts.append(self.format_identifier(expr.type_name))
-        return ".".join(parts), ()
+        # A UDT reference names the same kind of object the TYPE DDL creates,
+        # so it goes through the shared renderer as a ``Type`` rather than
+        # being joined by hand here.
+        type_sql, _params = TypeObject(
+            self,
+            expr.type_name,
+            catalog_name=expr.database_name,
+            schema_name=expr.schema_name,
+        ).to_sql()
+        return type_sql, ()
 
     def format_data_type_snowflake_geography(self, expr: SnowflakeGeographyType) -> Tuple[str, tuple]:
         return "GEOGRAPHY", ()

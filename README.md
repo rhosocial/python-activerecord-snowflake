@@ -48,6 +48,7 @@ from rhosocial.activerecord.base import FieldProxy
 from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
 from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
 from rhosocial.activerecord.backend.expression import CreateTableExpression
+from rhosocial.activerecord.backend.expression.objects import Table
 from rhosocial.activerecord.backend.expression.statements import (
     ColumnConstraint,
     ColumnConstraintType,
@@ -83,7 +84,7 @@ User.configure(
 dialect = User.__backend__.dialect
 User.__backend__.execute(*CreateTableExpression(
     dialect,
-    "users",
+    Table(dialect, "users"),
     columns=[
         ColumnDefinition(
             dialect, "id", VarCharType(dialect, 36),

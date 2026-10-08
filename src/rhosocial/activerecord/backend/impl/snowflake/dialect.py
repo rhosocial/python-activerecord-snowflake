@@ -15,41 +15,48 @@ from typing import Any, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.transaction import (
+        BeginTransactionExpression,
         SetTransactionExpression,
     )
 
 from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
 from rhosocial.activerecord.backend.dialect.protocols import (
     AdvancedGroupingSupport,
+    AlterTypeSupport,
     ArraySupport,
-    AutoIncrementSupport,
+    AutoIncrementColumnSupport,
     CollationSupport,
     ConstraintSupport,
+    CreateTypeSupport,
     CTESupport,
     DDLTypeSupport,
+    DropTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
     GeneratedColumnSupport,
     ILIKESupport,
-    IndexSupport,
+    IdentityColumnSupport,
+    IndexObjectSupport,
     IntrospectionSupport,
     JSONSupport,
     JoinSupport,
     LateralJoinSupport,
+    MaterializedViewObjectSupport,
     MergeSupport,
+    NamespaceSupport,
     OrderedSetAggregationSupport,
     PartitionSupport,
     QualifyClauseSupport,
     ReturningSupport,
-    SchemaSupport,
-    SequenceSupport,
+    SequenceObjectSupport,
     SetOperationSupport,
     SQLFunctionSupport,
+    TableObjectSupport,
     TransactionControlSupport,
     TruncateSupport,
+    TypeObjectSupport,
     UpsertSupport,
-    UserDefinedTypeSupport,
-    ViewSupport,
+    ViewObjectSupport,
     WildcardSupport,
     WindowFunctionSupport,
 )
@@ -65,9 +72,22 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     DateTimeMixin,
     DMLMixin,
     DQLMixin,
+    # The object tree: one ``format_<kind>_object`` per kind, each rendering
+    # through ``NamespaceMixin`` for the namespace levels. Snowflake overrides
+    # none of them; ``db.schema.table`` falls out of the slots they are handed.
+    DatabaseNameMixin,
+    IndexNameMixin,
+    MaterializedViewNameMixin,
+    NamespaceMixin,
+    RelationSourceMixin,
+    SchemaNameMixin,
+    SequenceNameMixin,
+    TableNameMixin,
+    TypeNameMixin,
+    ViewNameMixin,
     ExplainMixin,
     ExpressionMixin,
-
+    IdentityColumnMixin,
     ILIKEMixin,
     IndexMixin,
     IntrospectionMixin,
@@ -75,9 +95,7 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     JSONMixin,
     LateralJoinMixin,
     MergeMixin,
-
     PredicateMixin,
-
     SchemaMixin,
     SequenceMixin,
     SetOperationMixin,
@@ -88,6 +106,7 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     ViewMixin,
     WindowFunctionMixin,
 )
+
 from .reserved_words import SNOWFLAKE_RESERVED_WORDS
 from .protocols import (
     SnowflakeArraySupport,
@@ -113,6 +132,7 @@ from .protocols import (
 from .mixins import (
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
+    SnowflakeNamespaceMixin,
     SnowflakeDMLMixin,
     SnowflakeFileFormatMixin,
     SnowflakeIntrospectionMixin,
@@ -137,6 +157,7 @@ from .mixins import (
     SnowflakeWarehouseMixin,
     SnowflakeSchemaMixin,
     SnowflakeDatabaseMixin,
+    SnowflakeSequenceMixin,
     # New mixins from dialect.py split
     SnowflakeDateTimeMixin,
     SnowflakeCollationMixin,
@@ -152,6 +173,37 @@ from .mixins import (
 
 class SnowflakeDialect(
     SQLDialectBase,
+    RelationSourceMixin,
+    # The whole naming side, stated once: which namespace levels a name may
+    # carry, and the rule that a database is never usable without a schema.
+    # Placed before every ``*NameMixin`` below and before NamespaceMixin, so it
+    # overrides the shared defaults; each ``*NameMixin`` in turn precedes
+    # NamespaceMixin so its own ``format_*_object`` wins over the inherited one.
+    SnowflakeNamespaceMixin,
+    # The object tree. Each ``*NameMixin`` renders one object kind. The object
+    # protocols name those ``format_*_object`` methods and inherit
+    # ``NamespaceSupport``, so they come last and lose to both.
+    # The object kinds Snowflake's own statements hold. Trigger, routine,
+    # foreign-table, synonym, domain and property-graph objects are left out on
+    # purpose: the engine either has none of them, or exposes them through a
+    # statement of its own that carries a bare name. Naming one is not a
+    # capability to claim where no statement asks for it.
+    TableNameMixin,
+    ViewNameMixin,
+    MaterializedViewNameMixin,
+    IndexNameMixin,
+    SequenceNameMixin,
+    TypeNameMixin,
+    SchemaNameMixin,
+    DatabaseNameMixin,
+    NamespaceMixin,
+    TableObjectSupport,
+    ViewObjectSupport,
+    MaterializedViewObjectSupport,
+    IndexObjectSupport,
+    SequenceObjectSupport,
+    TypeObjectSupport,
+    NamespaceSupport,
     # New Snowflake-specific mixins (BEFORE generic mixins they override)
     SnowflakeDateTimeMixin,
     SnowflakeCollationMixin,
@@ -173,10 +225,17 @@ class SnowflakeDialect(
     SnowflakeAlterColumnModifierMixin,  # Before DDLColumnMixin to override format_*_action
     DDLColumnMixin,
     AutoIncrementMixin,
+    IdentityColumnMixin,
     SnowflakeTypeDDLMixin,
     SnowflakeTypeSupportMixin,
     TransactionControlMixin,
     SetOperationMixin,
+    # Deliberate: Snowflake's own sequence grammar, placed immediately before
+    # the core ``SequenceMixin`` so its three formatters win. Core's emits
+    # MINVALUE / MAXVALUE / CYCLE / CACHE / NO ORDER / OWNED BY, all of which
+    # Snowflake rejects; the probes in SnowflakeCapabilityMixin (above) declare
+    # which options this dialect does accept.
+    SnowflakeSequenceMixin,
     SequenceMixin,
     # Standard SQL mixins
     CollationMixin,
@@ -226,17 +285,19 @@ class SnowflakeDialect(
     # Protocol supports (for isinstance checks)
     AdvancedGroupingSupport,
     ArraySupport,
-    AutoIncrementSupport,
+    AutoIncrementColumnSupport,
     CollationSupport,
     CTESupport,
     ConstraintSupport,
     DDLTypeSupport,
-    UserDefinedTypeSupport,
+    CreateTypeSupport,
+    AlterTypeSupport,
+    DropTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
     GeneratedColumnSupport,
     ILIKESupport,
-    IndexSupport,
+    IdentityColumnSupport,
     IntrospectionSupport,
     JSONSupport,
     JoinSupport,
@@ -245,14 +306,11 @@ class SnowflakeDialect(
     OrderedSetAggregationSupport,
     QualifyClauseSupport,
     ReturningSupport,
-    SchemaSupport,
-    SequenceSupport,
     SetOperationSupport,
     SQLFunctionSupport,
     TransactionControlSupport,
     TruncateSupport,
     UpsertSupport,
-    ViewSupport,
     WildcardSupport,
     WindowFunctionSupport,
     PartitionSupport,
@@ -322,12 +380,52 @@ class SnowflakeDialect(
         placeholder = self.get_parameter_placeholder()
         return f"IDENTIFIER({placeholder})"
 
+    def format_begin_transaction(self, expr: "BeginTransactionExpression") -> Tuple[str, tuple]:
+        """Format BEGIN TRANSACTION for Snowflake, consuming its mode pairs.
+
+        Snowflake's BEGIN takes no transaction characteristics; in particular
+        it has no ``DEFERRABLE`` / ``NOT DEFERRABLE`` mode, which
+        :meth:`supports_deferrable_transaction` already answers ``False`` for,
+        and no ``WAIT`` / ``NO WAIT`` clause, which
+        :meth:`supports_transaction_wait` answers ``False`` for. The shared
+        formatter renders a bare ``BEGIN`` and ignores these pairs, so each
+        requested spelling is refused by name here instead of being silently
+        dropped. With neither pair set the base rendering is unchanged.
+
+        https://docs.snowflake.com/en/sql-reference/sql/begin
+        """
+        from rhosocial.activerecord.backend.dialect.exceptions import (
+            UnsupportedFeatureError,
+        )
+
+        params = expr.get_params()
+        self._refuse_transaction_wait(params, "BEGIN TRANSACTION")
+        if params.get("deferrable"):
+            raise UnsupportedFeatureError(
+                self.name,
+                "BEGIN TRANSACTION DEFERRABLE",
+                suggestion="Snowflake does not support DEFERRABLE transactions.",
+            )
+        if params.get("not_deferrable"):
+            raise UnsupportedFeatureError(
+                self.name,
+                "BEGIN TRANSACTION NOT DEFERRABLE",
+                suggestion="Snowflake does not support DEFERRABLE transactions.",
+            )
+        return super().format_begin_transaction(expr)
+
     def format_set_transaction(self, expr: "SetTransactionExpression") -> Tuple[str, tuple]:
         """Format SET TRANSACTION statement for Snowflake.
 
         Snowflake only supports READ COMMITTED isolation level, so
-        no SET TRANSACTION is needed.
+        no SET TRANSACTION is needed and the statement renders as nothing.
+        Its grammar has no ``WAIT`` / ``NO WAIT`` clause (and no SET
+        TRANSACTION statement at all), so a requested spelling is refused by
+        name rather than dropped along with the rest of the statement.
+
+        https://docs.snowflake.com/en/sql-reference/sql/begin
         """
+        self._refuse_transaction_wait(expr.get_params(), "SET TRANSACTION")
         return ("", ())
 
     # ========== DDLType Support ==========

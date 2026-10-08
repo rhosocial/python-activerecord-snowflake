@@ -12,9 +12,9 @@ from rhosocial.activerecord.backend.expression import (
     Literal,
     QueryExpression,
     SelectSource,
-    TableExpression,
     ValuesSource,
 )
+from rhosocial.activerecord.backend.expression.objects import Table
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
     SnowflakeInsertExpression,
@@ -34,7 +34,7 @@ def select_source(dialect):
     query = QueryExpression(
         dialect,
         select=[Column(dialect, "id"), Column(dialect, "name")],
-        from_=TableExpression(dialect, "src"),
+        from_=Table(dialect, "src"),
     )
     return SelectSource(dialect, query)
 
@@ -55,7 +55,7 @@ class TestSnowflakeInsertOverwrite:
     def test_insert_overwrite_via_dialect_option(self, dialect, select_source):
         expr = SnowflakeInsertExpression(
             dialect,
-            into="t",
+            into=Table(dialect, "t"),
             source=select_source,
             columns=["id", "name"],
             overwrite=True,
@@ -69,14 +69,14 @@ class TestSnowflakeInsertOverwrite:
 
     def test_insert_overwrite_standalone(self, dialect, select_source):
         expr = InsertExpression(
-            dialect, into="t", source=select_source, columns=["id", "name"]
+            dialect, into=Table(dialect, "t"), source=select_source, columns=["id", "name"]
         )
         sql, _ = dialect.format_insert_overwrite_statement(expr)
         assert sql.startswith("INSERT OVERWRITE INTO ")
 
     def test_plain_insert_unchanged(self, dialect, select_source):
         expr = InsertExpression(
-            dialect, into="t", source=select_source, columns=["id", "name"]
+            dialect, into=Table(dialect, "t"), source=select_source, columns=["id", "name"]
         )
         sql, _ = expr.to_sql()
         assert sql.startswith("INSERT INTO ")
@@ -94,7 +94,7 @@ class TestSnowflakeInsertOverwrite:
         ]
         expr = SnowflakeInsertExpression(
             dialect,
-            into="t",
+            into=Table(dialect, "t"),
             source=ValuesSource(dialect, values),
             overwrite=True,
         )

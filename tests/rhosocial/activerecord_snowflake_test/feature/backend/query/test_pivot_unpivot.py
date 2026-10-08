@@ -87,7 +87,8 @@ class TestSnowflakePivot:
 class TestSnowflakeUnpivot:
     """UNPIVOT clause generation."""
 
-    def test_unpivot_exclude_nulls(self, dialect):
+    def test_unpivot_unspecified_omits_the_nulls_clause(self, dialect):
+        """Neither parameter set: the optional clause is absent (server default)."""
         expr = SnowflakeUnpivotExpression(
             dialect,
             value_column="val",
@@ -95,8 +96,20 @@ class TestSnowflakeUnpivot:
             columns=["a", "b"],
         )
         sql, params = expr.to_sql()
-        assert sql == 'UNPIVOT EXCLUDE NULLS ("val" FOR "col" IN ("a", "b"))'
+        assert sql == 'UNPIVOT ("val" FOR "col" IN ("a", "b"))'
         assert params == ()
+
+    def test_unpivot_exclude_nulls(self, dialect):
+        """``exclude_nulls`` spells the explicit ``EXCLUDE NULLS``."""
+        expr = SnowflakeUnpivotExpression(
+            dialect,
+            value_column="val",
+            pivot_column="col",
+            columns=["a", "b"],
+            exclude_nulls=True,
+        )
+        sql, _ = expr.to_sql()
+        assert sql == 'UNPIVOT EXCLUDE NULLS ("val" FOR "col" IN ("a", "b"))'
 
     def test_unpivot_include_nulls(self, dialect):
         expr = SnowflakeUnpivotExpression(
@@ -109,6 +122,19 @@ class TestSnowflakeUnpivot:
         sql, _ = expr.to_sql()
         assert sql == 'UNPIVOT INCLUDE NULLS ("val" FOR "col" IN ("a", "b"))'
 
+    def test_unpivot_null_pair_is_mutually_exclusive(self, dialect):
+        with pytest.raises(
+            ValueError, match="include_nulls and exclude_nulls are mutually exclusive"
+        ):
+            SnowflakeUnpivotExpression(
+                dialect,
+                value_column="val",
+                pivot_column="col",
+                columns=["a", "b"],
+                include_nulls=True,
+                exclude_nulls=True,
+            )
+
     def test_unpivot_with_alias(self, dialect):
         expr = SnowflakeUnpivotExpression(
             dialect,
@@ -118,7 +144,7 @@ class TestSnowflakeUnpivot:
             alias="u",
         )
         sql, _ = expr.to_sql()
-        assert sql == 'UNPIVOT EXCLUDE NULLS ("val" FOR "col" IN ("a", "b")) "u"'
+        assert sql == 'UNPIVOT ("val" FOR "col" IN ("a", "b")) "u"'
 
 
 class TestSnowflakePivotClauseUsage:
@@ -145,4 +171,4 @@ class TestSnowflakePivotClauseUsage:
             alias="u",
         )
         sql = f"SELECT * FROM t {expr.to_sql()[0]}"
-        assert sql == "SELECT * FROM t UNPIVOT EXCLUDE NULLS (\"val\" FOR \"col\" IN (\"a\", \"b\")) \"u\""
+        assert sql == "SELECT * FROM t UNPIVOT (\"val\" FOR \"col\" IN (\"a\", \"b\")) \"u\""

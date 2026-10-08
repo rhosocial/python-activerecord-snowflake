@@ -54,13 +54,13 @@ class TestSnowflakeQualifyClauseAssembly:
             OrderByClause,
             QualifyClause,
             QueryExpression,
-            TableExpression,
         )
+        from rhosocial.activerecord.backend.expression.objects import Table
 
         query = QueryExpression(
             dialect,
             select=[Column(dialect, "id"), Column(dialect, "name")],
-            from_=TableExpression(dialect, "users"),
+            from_=Table(dialect, "users"),
             qualify=QualifyClause(
                 dialect,
                 FunctionCall(dialect, "ROW_NUMBER") <= Literal(dialect, 3),
@@ -130,8 +130,51 @@ class TestSnowflakeDialectCapabilities:
     def test_supports_constraints(self, dialect):
         assert dialect.supports_constraints() is True
 
-    def test_supports_sequences(self, dialect):
-        assert dialect.supports_sequences() is True
+    def test_supports_sequence(self, dialect):
+        assert dialect.supports_sequence() is True
+
+    def test_sequence_option_probes(self, dialect):
+        """Every sequence option core can ask for has its own answer here.
+
+        The answers are the Snowflake reference's, not core's defaults: START,
+        INCREMENT and ORDER are accepted; MINVALUE, MAXVALUE, CYCLE, CACHE and
+        OWNED BY are not.
+        """
+        assert dialect.supports_create_sequence() is True
+        assert dialect.supports_drop_sequence() is True
+        assert dialect.supports_alter_sequence() is True
+        assert dialect.supports_sequence_if_not_exists() is True
+        assert dialect.supports_sequence_if_exists() is True
+        assert dialect.supports_sequence_start() is True
+        assert dialect.supports_alter_sequence_start() is False
+        assert dialect.supports_sequence_increment() is True
+        assert dialect.supports_sequence_order() is True
+        assert dialect.supports_sequence_minvalue() is False
+        assert dialect.supports_sequence_maxvalue() is False
+        assert dialect.supports_sequence_cycle() is False
+        assert dialect.supports_sequence_cache() is False
+        assert dialect.supports_sequence_owned_by() is False
+
+    def test_identity_probes(self, dialect):
+        """Every identity probe core can ask for has its own answer here.
+
+        The answers are the Snowflake reference's: ``IDENTITY`` accepts a start
+        value, an increment and the ``ORDER`` / ``NOORDER`` tail; ``GENERATED
+        ALWAYS``, MINVALUE, MAXVALUE, CYCLE and CACHE have no spelling in its
+        column property; and the bare ``AUTO_INCREMENT`` marker is not
+        Snowflake's word -- its keyword is ``AUTOINCREMENT``, one word, and it
+        is parameterised like ``IDENTITY``.
+        """
+        assert dialect.supports_identity_column() is True
+        assert dialect.supports_identity_generation_always() is False
+        assert dialect.supports_identity_start() is True
+        assert dialect.supports_identity_increment() is True
+        assert dialect.supports_identity_minvalue() is False
+        assert dialect.supports_identity_maxvalue() is False
+        assert dialect.supports_identity_cycle() is False
+        assert dialect.supports_identity_order() is True
+        assert dialect.supports_identity_cache() is False
+        assert dialect.supports_auto_increment_column() is False
 
     def test_supports_explicit_inner_join(self, dialect):
         assert dialect.supports_explicit_inner_join() is True

@@ -137,7 +137,7 @@ class TestSnowflakeCreateFunction:
             dialect,
             "f",
             returns="NUMBER",
-            immutable=False,
+            volatile=True,
             body="SELECT 1",
         )
         sql, _ = expr.to_sql()
@@ -145,6 +145,32 @@ class TestSnowflakeCreateFunction:
             'CREATE FUNCTION "f" () RETURNS NUMBER LANGUAGE SQL VOLATILE '
             "AS $$ SELECT 1 $$"
         )
+
+    def test_create_function_unspecified_volatility_omits_the_clause(self, dialect):
+        """Neither parameter set: the optional clause is absent (server default)."""
+        expr = SnowflakeCreateFunctionExpression(
+            dialect,
+            "f",
+            returns="NUMBER",
+            body="SELECT 1",
+        )
+        sql, _ = expr.to_sql()
+        assert sql == (
+            'CREATE FUNCTION "f" () RETURNS NUMBER LANGUAGE SQL AS $$ SELECT 1 $$'
+        )
+
+    def test_create_function_volatility_pair_is_mutually_exclusive(self, dialect):
+        with pytest.raises(
+            ValueError, match="immutable and volatile are mutually exclusive"
+        ):
+            SnowflakeCreateFunctionExpression(
+                dialect,
+                "f",
+                returns="NUMBER",
+                immutable=True,
+                volatile=True,
+                body="SELECT 1",
+            )
 
     def test_create_function_execute_as_owner(self, dialect):
         expr = SnowflakeCreateFunctionExpression(

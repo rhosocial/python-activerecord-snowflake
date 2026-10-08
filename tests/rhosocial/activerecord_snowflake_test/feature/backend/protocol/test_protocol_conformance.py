@@ -26,43 +26,71 @@ from rhosocial.activerecord.backend.impl.snowflake.mixins import (
 from rhosocial.activerecord.backend.dialect import protocols as dialect_protocols
 from rhosocial.activerecord.backend.dialect.protocols import (
     AdvancedGroupingSupport,
-    AutoIncrementSupport,
+    AlterDatabaseSupport,
+    AlterSequenceSupport,
+    AlterTableModifierSupport,
+    AlterTableSupport,
+    AlterTypeSupport,
+    ArraySupport as GenericArraySupport,
+    AutoIncrementColumnSupport,
     CollationSupport,
     ColumnAttributeSupport,
     CommentSupport,
     ConstraintSupport,
+    CreateDatabaseSupport,
+    CreateIndexSupport,
+    CreateSchemaSupport,
+    CreateSequenceSupport,
+    CreateTableAsSupport,
+    CreateTableCloneSupport,
+    CreateTableLikeSupport,
+    CreateTableSupport,
+    CreateTableUsingTemplateSupport,
+    CreateTypeSupport,
+    CreateViewSupport,
     CTESupport,
     DDLTypeSupport,
+    DateTimeSupport,
+    DqlOrderSupport,
+    DropDatabaseSupport,
+    DropIndexSupport,
+    DropSchemaSupport,
+    DropSequenceSupport,
+    DropTableSupport,
+    DropTypeSupport,
+    DropViewSupport,
     ExplainSupport,
     FilterClauseSupport,
+    FulltextIndexSupport,
     GeneratedColumnSupport,
+    IdentityColumnSupport,
     ILIKESupport,
-    IndexSupport,
+    IndexObjectSupport,
     IntrospectionSupport,
     JSONSupport,
     JoinSupport,
     LateralJoinSupport,
     LockingSupport,
+    MaterializedViewObjectSupport,
+    MaterializedViewSupport,
     MergeSupport,
+    NamespaceSupport,
     OrderedSetAggregationSupport,
+    PartitionSupport,
+    PivotSupport,
     QualifyClauseSupport,
     ReturningSupport,
-    SchemaSupport,
-    SequenceSupport,
+    SequenceObjectSupport,
     SetOperationSupport,
     SQLFunctionSupport,
+    TableObjectSupport,
     TransactionControlSupport,
     TruncateSupport,
+    TypeObjectSupport,
     UpsertSupport,
-    UserDefinedTypeSupport,
-    ViewSupport,
+    ViewObjectSupport,
     WildcardSupport,
     WindowFunctionSupport,
-    ArraySupport as GenericArraySupport,
-
-    AlterTableModifierSupport,
-    PartitionSupport,
-    TableSupport,
 )
 
 
@@ -70,18 +98,23 @@ from rhosocial.activerecord.backend.dialect.protocols import (
 SNOWFLAKE_PROTOCOLS = [
     # Generic protocols
     AdvancedGroupingSupport,
-    AutoIncrementSupport,
+    # The identity protocol and the parameterless AUTO_INCREMENT protocol are
+    # separate mechanisms. Snowflake implements both interfaces: the
+    # parameterised IDENTITY clause renders, while the bare AUTO_INCREMENT
+    # marker is refused by its probe (Snowflake's keyword is AUTOINCREMENT,
+    # one word, and it is parameterised). A protocol's presence records that
+    # the dialect can answer the question, not that every answer is "yes".
+    AutoIncrementColumnSupport,
+    IdentityColumnSupport,
     CollationSupport,
     CTESupport,
     ColumnAttributeSupport,
     CommentSupport,
     DDLTypeSupport,
-    UserDefinedTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
     GeneratedColumnSupport,
     ILIKESupport,
-    IndexSupport,
     IntrospectionSupport,
     JSONSupport,
     JoinSupport,
@@ -90,23 +123,57 @@ SNOWFLAKE_PROTOCOLS = [
     OrderedSetAggregationSupport,
     QualifyClauseSupport,
     ReturningSupport,
-    SchemaSupport,
-    SequenceSupport,
     SetOperationSupport,
     SQLFunctionSupport,
     TransactionControlSupport,
     TruncateSupport,
     UpsertSupport,
-    ViewSupport,
     WildcardSupport,
     WindowFunctionSupport,
     GenericArraySupport,
     ConstraintSupport,
+    # Named-object protocols: Snowflake renders each of these kinds, and the
+    # database above the schema is the catalog namespace -- ``db.schema.table``
+    # is the ordinary spelling, so both namespace levels are rendered.
+    TableObjectSupport,
+    ViewObjectSupport,
+    MaterializedViewObjectSupport,
+    IndexObjectSupport,
+    SequenceObjectSupport,
+    TypeObjectSupport,
+    NamespaceSupport,
     # Generic protocols Snowflake also satisfies (previously omitted from this list).
     AlterTableModifierSupport,
     LockingSupport,
     PartitionSupport,
-    TableSupport,
+    # One protocol per DDL statement expression Snowflake actually renders.
+    AlterDatabaseSupport,
+    AlterSequenceSupport,
+    AlterTableSupport,
+    AlterTypeSupport,
+    CreateDatabaseSupport,
+    CreateIndexSupport,
+    CreateSchemaSupport,
+    CreateSequenceSupport,
+    CreateTableAsSupport,
+    CreateTableCloneSupport,
+    CreateTableLikeSupport,
+    CreateTableSupport,
+    CreateTableUsingTemplateSupport,
+    CreateTypeSupport,
+    CreateViewSupport,
+    DateTimeSupport,
+    DqlOrderSupport,
+    DropDatabaseSupport,
+    DropIndexSupport,
+    DropSchemaSupport,
+    DropSequenceSupport,
+    DropTableSupport,
+    DropTypeSupport,
+    DropViewSupport,
+    FulltextIndexSupport,
+    MaterializedViewSupport,
+    PivotSupport,
     # Snowflake-specific protocols
     SnowflakeTimeTravelSupport,
     SnowflakeVariantSupport,
@@ -178,9 +245,33 @@ class TestSnowflakeDialectProtocolConformance:
 # decision (move to SNOWFLAKE_PROTOCOLS or revert).
 SNOWFLAKE_NOT_IMPLEMENTED = [
     # --- Intentional non-support ---
-    # Snowflake dialect does not compose the generic DatabaseMixin.
-    dialect_protocols.DatabaseSupport,
-    dialect_protocols.DomainSupport,
+    # Snowflake has no SQL/PGQ property-graph tables.
+    dialect_protocols.GraphTableSupport,
+    # Snowflake has no Cypher/property-graph query support.
+    dialect_protocols.GraphSupport,
+    # Snowflake has no triggers, so it neither names one nor creates one.
+    dialect_protocols.TriggerObjectSupport,
+    dialect_protocols.CreateTriggerSupport,
+    dialect_protocols.DropTriggerSupport,
+    # Snowflake exposes routine DDL through SnowflakeRoutineSupport (SQL,
+    # JavaScript, Java, Python and Scala bodies) rather than the generic
+    # SQL/PSM statement shape. The Snowflake routine expressions carry a bare
+    # name and their formatters spell the clause themselves, so the dialect
+    # names no ``Function`` object either.
+    dialect_protocols.RoutineObjectSupport,
+    dialect_protocols.CreateRoutineSupport,
+    dialect_protocols.DropRoutineSupport,
+    # Snowflake has no FOREIGN TABLE and no SYNONYM.
+    dialect_protocols.ForeignTableObjectSupport,
+    dialect_protocols.SynonymObjectSupport,
+    # Snowflake has no DOMAIN.
+    dialect_protocols.CreateDomainSupport,
+    dialect_protocols.AlterDomainSupport,
+    dialect_protocols.DropDomainSupport,
+    # Snowflake time travel uses AT(TIMESTAMP => ...) / AT(OFFSET => ...) /
+    # BEFORE(...) rather than the SQL-standard FOR SYSTEM_TIME AS OF rendered
+    # by TemporalTableSupport; it is exposed via SnowflakeTimeTravelSupport.
+    dialect_protocols.TemporalTableSupport,
     # Snowflake has no SQL/XML support.
     dialect_protocols.SQLXMLSupport,
     dialect_protocols.SQLXMLParsingSupport,
@@ -188,20 +279,6 @@ SNOWFLAKE_NOT_IMPLEMENTED = [
     dialect_protocols.SQLXMLConstructionSupport,
     dialect_protocols.SQLXMLAggregationSupport,
     dialect_protocols.SQLXMLQueryingSupport,
-    # Snowflake has no SQL/PGQ property-graph tables.
-    dialect_protocols.GraphTableSupport,
-    # Snowflake has no Cypher/property-graph query support.
-    dialect_protocols.GraphSupport,
-    # Snowflake does not support triggers.
-    dialect_protocols.TriggerSupport,
-    # Snowflake exposes routine DDL through SnowflakeRoutineSupport (SQL,
-    # JavaScript, Java, Python and Scala bodies) rather than the generic
-    # SQL/PSM FunctionSupport, whose statement shape does not match Snowflake.
-    dialect_protocols.FunctionSupport,
-    # Snowflake time travel uses AT(TIMESTAMP => ...) / AT(OFFSET => ...) /
-    # BEFORE(...) rather than the SQL-standard FOR SYSTEM_TIME AS OF rendered
-    # by TemporalTableSupport; it is exposed via SnowflakeTimeTravelSupport.
-    dialect_protocols.TemporalTableSupport,
 ]
 
 
@@ -253,10 +330,9 @@ class TestProtocolNonOverlap:
     """Verify no method name overlap between the protocols Snowflake claims support."""
 
     def test_no_overlap_between_snowflake_protocols(self):
-        method_map = {}
-        for proto in SNOWFLAKE_PROTOCOLS:
-            for method in get_all_protocol_methods(proto):
-                method_map.setdefault(proto.__name__, set()).add(method)
+        # Own members only: every named-object protocol inherits
+        # NamespaceSupport by design, and a shared base is not a collision.
+        method_map = {proto.__name__: get_own_protocol_methods(proto) for proto in SNOWFLAKE_PROTOCOLS}
 
         for name, members in method_map.items():
             assert len(members) > 0, f"Protocol {name} has no members defined"

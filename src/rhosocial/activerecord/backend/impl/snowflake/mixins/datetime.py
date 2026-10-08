@@ -3,7 +3,14 @@
 
 Snowflake uses DATEADD/DATEDIFF for datetime arithmetic.
 """
-from typing import Any, Tuple, TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover
+    from rhosocial.activerecord.backend.expression.datetime import (
+        DateTimeAddExpression,
+        DateTimeDiffExpression,
+        DateTimeSubtractExpression,
+    )
 
 
 class SnowflakeDateTimeMixin:
@@ -11,9 +18,17 @@ class SnowflakeDateTimeMixin:
 
     Provides Snowflake-specific datetime add/subtract and diff
     expressions using DATEADD and DATEDIFF.
+
+    Each formatter names the expression it is handed rather than ``Any``.
+    ``format_method`` dispatches on the node's own class, so the parameter has
+    one possible type and naming it turns a wrong attribute read into a type
+    error a reader can see, instead of an ``AttributeError`` raised later from
+    inside the body.
     """
 
-    def format_datetime_add_expression(self, expr: "Any") -> Tuple[str, tuple]:
+    def format_datetime_add_expression(
+        self, expr: "DateTimeAddExpression"
+    ) -> Tuple[str, tuple]:
         source_sql, source_params = expr.source.to_sql()
         unit = expr.interval.unit.value.upper()
         sql = f"DATEADD({unit}, {self.p()}, {source_sql})"
@@ -21,7 +36,9 @@ class SnowflakeDateTimeMixin:
             sql, (expr.interval.value,) + source_params, expr
         )
 
-    def format_datetime_subtract_expression(self, expr: "Any") -> Tuple[str, tuple]:
+    def format_datetime_subtract_expression(
+        self, expr: "DateTimeSubtractExpression"
+    ) -> Tuple[str, tuple]:
         source_sql, source_params = expr.source.to_sql()
         unit = expr.interval.unit.value.upper()
         sql = f"DATEADD({unit}, {self.p()}, {source_sql})"
@@ -29,7 +46,9 @@ class SnowflakeDateTimeMixin:
             sql, (-expr.interval.value,) + source_params, expr
         )
 
-    def format_datetime_diff_expression(self, expr: "Any") -> Tuple[str, tuple]:
+    def format_datetime_diff_expression(
+        self, expr: "DateTimeDiffExpression"
+    ) -> Tuple[str, tuple]:
         start_sql, start_params = expr.start.to_sql()
         end_sql, end_params = expr.end.to_sql()
         sql = f"DATEDIFF({expr.unit.value.upper()}, {start_sql}, {end_sql})"

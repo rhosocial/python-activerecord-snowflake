@@ -317,7 +317,15 @@ class SnowflakeGeometryType(SnowflakeDataTypeMixin, DataType):
 
 
 class SnowflakeUserDefinedType(DataType):
-    """Reference to a Snowflake schema-level user-defined type."""
+    """Reference to a Snowflake schema-level user-defined type.
+
+    A UDT reference names a schema-level object, so its namespace is the
+    shared one: *database_name* is the catalog slot and *schema_name* the
+    schema slot. The slots are validated while rendering rather than here --
+    building the shared :class:`~rhosocial.activerecord.backend.expression.
+    objects.Type` rejects a blank slot, and the dialect rejects a database with
+    no schema -- so this class only records what the caller asked for.
+    """
 
     name = "snowflake_user_defined"
 
@@ -330,15 +338,6 @@ class SnowflakeUserDefinedType(DataType):
         database_name: Optional[str] = None,
     ) -> None:
         super().__init__(dialect)
-        for field_name, value in (
-            ("type_name", type_name),
-            ("schema_name", schema_name),
-            ("database_name", database_name),
-        ):
-            if value is not None and (not isinstance(value, str) or not value.strip()):
-                raise ValueError(f"{field_name} must be a non-empty string")
-        if database_name is not None and schema_name is None:
-            raise ValueError("schema_name is required when database_name is provided")
         self.type_name = type_name
         self.schema_name = schema_name
         self.database_name = database_name

@@ -3,7 +3,13 @@
 import pytest
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
-from rhosocial.activerecord.backend.dialect.protocols import UserDefinedTypeSupport
+from rhosocial.activerecord.backend.dialect.protocols import (
+    AlterTypeSupport,
+    CreateTypeSupport,
+    DropTypeSupport,
+    TypeObjectSupport,
+)
+from rhosocial.activerecord.backend.expression.objects import Type
 from rhosocial.activerecord.backend.expression.serialization import (
     ExpressionRegistry,
     deserialize,
@@ -100,11 +106,15 @@ def test_capabilities_protocol_and_mro():
         SnowflakeScalarTypeDefinition,
         SnowflakeObjectTypeDefinition,
     )
-    assert isinstance(dialect, UserDefinedTypeSupport)
+    # Naming the type is one protocol; declaring it is one per statement.
+    assert isinstance(dialect, TypeObjectSupport)
+    assert isinstance(dialect, CreateTypeSupport)
+    assert isinstance(dialect, AlterTypeSupport)
+    assert isinstance(dialect, DropTypeSupport)
     assert SnowflakeDialect.format_type_definition is SnowflakeTypeDDLMixin.format_type_definition
 
     mro = SnowflakeDialect.__mro__
-    assert mro.index(SnowflakeTypeDDLMixin) < mro.index(UserDefinedTypeSupport)
+    assert mro.index(SnowflakeTypeDDLMixin) < mro.index(CreateTypeSupport)
 
 
 def test_version_boundary_and_low_version_fail_fast():
@@ -125,9 +135,9 @@ def test_version_boundary_and_low_version_fail_fast():
     set_action = SnowflakeSetTypeCommentAction(dialect, "comment")
     reference = SnowflakeUserDefinedType(dialect, type_name="age")
     statements = [
-        CreateTypeExpression(dialect, "age", scalar),
-        AlterTypeExpression(dialect, "age", [set_action]),
-        DropTypeExpression(dialect, "age"),
+        CreateTypeExpression(dialect, Type(dialect, "age"), scalar),
+        AlterTypeExpression(dialect, Type(dialect, "age"), [set_action]),
+        DropTypeExpression(dialect, Type(dialect, "age")),
     ]
 
     assert dialect.supports_type_objects() is False
@@ -158,9 +168,8 @@ def test_scalar_create_type_renders_schema_qualification():
 
     expression = CreateTypeExpression(
         dialect,
-        "age",
+        Type(dialect, "age", schema_name="app"),
         definition,
-        schema_name="app",
     )
 
     assert definition.to_sql() == ("AS NUMBER(3, 0)", ())
@@ -179,13 +188,13 @@ def test_create_options_are_rendered_in_snowflake_order():
 
     replace = SnowflakeCreateTypeExpression(
         dialect,
-        "label",
+        Type(dialect, "label"),
         definition,
         or_replace=True,
     )
     create_if_missing = SnowflakeCreateTypeExpression(
         dialect,
-        "label",
+        Type(dialect, "label"),
         definition,
         if_not_exists=True,
     )
@@ -201,7 +210,7 @@ def test_create_options_are_rendered_in_snowflake_order():
     with pytest.raises(ValueError, match="mutually exclusive"):
         SnowflakeCreateTypeExpression(
             dialect,
-            "label",
+            Type(dialect, "label"),
             definition,
             if_not_exists=True,
             or_replace=True,
@@ -216,10 +225,13 @@ def test_create_type_qualification_and_comment_are_safely_quoted():
     )
     expression = SnowflakeCreateTypeExpression(
         dialect,
-        "age type",
+        Type(
+            dialect,
+            "age type",
+            catalog_name='DB"name',
+            schema_name='S"chema',
+        ),
         definition,
-        database_name='DB"name',
-        schema_name='S"chema',
         comment="owner's type",
     )
 
@@ -240,10 +252,8 @@ def test_object_type_definition_renders_typed_object_fields():
     )
     expression = SnowflakeCreateTypeExpression(
         dialect,
-        "address",
+        Type(dialect, "address", catalog_name="DB", schema_name="APP"),
         definition,
-        database_name="DB",
-        schema_name="APP",
     )
 
     assert definition.to_sql() == (
@@ -298,17 +308,14 @@ def test_alter_type_set_and_unset_comment_actions():
     set_action = SnowflakeSetTypeCommentAction(dialect, "owner's type")
     set_expression = SnowflakeAlterTypeExpression(
         dialect,
-        "age",
+        Type(dialect, "age", catalog_name="DB", schema_name="APP"),
         [set_action],
-        database_name="DB",
-        schema_name="APP",
         if_exists=True,
     )
     unset_expression = AlterTypeExpression(
         dialect,
-        "age",
+        Type(dialect, "age", schema_name="APP"),
         [SnowflakeUnsetTypeCommentAction(dialect)],
-        schema_name="APP",
     )
 
     assert set_expression.to_sql() == (
@@ -326,7 +333,7 @@ def test_alter_type_rejects_multiple_or_unknown_actions():
 
     expression = AlterTypeExpression(
         dialect,
-        "age",
+        Type(dialect, "age"),
         [
             SnowflakeSetTypeCommentAction(dialect, "first"),
             SnowflakeUnsetTypeCommentAction(dialect),
@@ -342,9 +349,7 @@ def test_drop_type_has_no_if_exists_cascade_or_restrict():
     dialect = _dialect()
     expression = SnowflakeDropTypeExpression(
         dialect,
-        "age",
-        database_name="DB",
-        schema_name="APP",
+        Type(dialect, "age", catalog_name="DB", schema_name="APP"),
     )
 
     assert expression.to_sql() == (
@@ -353,11 +358,15 @@ def test_drop_type_has_no_if_exists_cascade_or_restrict():
     )
 
     with pytest.raises(UnsupportedFeatureError, match="IF EXISTS"):
-        DropTypeExpression(dialect, "age", if_exists=True).to_sql()
+        DropTypeExpression(dialect, Type(dialect, "age"), if_exists=True).to_sql()
     with pytest.raises(UnsupportedFeatureError, match="CASCADE"):
-        SnowflakeDropTypeExpression(dialect, "age", cascade=True)
+        SnowflakeDropTypeExpression(
+            dialect, Type(dialect, "age"), cascade=True
+        )
     with pytest.raises(UnsupportedFeatureError, match="RESTRICT"):
-        SnowflakeDropTypeExpression(dialect, "age", restrict=True)
+        SnowflakeDropTypeExpression(
+            dialect, Type(dialect, "age"), restrict=True
+        )
 
     expression.cascade = True
     with pytest.raises(UnsupportedFeatureError, match="CASCADE"):
@@ -405,10 +414,8 @@ def test_udt_expression_dict_json_and_xml_round_trips():
     )
     expression = SnowflakeCreateTypeExpression(
         dialect,
-        "label_type",
+        Type(dialect, "label_type", catalog_name="DB", schema_name="APP"),
         definition,
-        database_name="DB",
-        schema_name="APP",
         comment="round trip",
     )
     expected = expression.to_sql()

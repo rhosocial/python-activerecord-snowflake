@@ -4,6 +4,7 @@
 from typing import Any, Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
+from rhosocial.activerecord.backend.expression.objects import MaterializedView
 
 if TYPE_CHECKING:
     from ..expression.ddl.materialized_view import (
@@ -22,6 +23,31 @@ class SnowflakeMaterializedViewMixin:
         """Snowflake supports native materialized views."""
         return True
 
+    def supports_with_data_clause(self) -> bool:
+        """Snowflake has no ``WITH [NO] DATA`` population clause.
+
+        All three consumers core declares the probe for lack it here:
+
+        * ``CREATE TABLE ... AS <query>`` -- the CTAS grammar ends at the
+          query;
+        * ``CREATE MATERIALIZED VIEW ... AS <select_statement>`` -- the view
+          is created empty and filled in the background; the ``WITH DATA``
+          token on that page belongs to ``WITH DATA METRIC FUNCTION``, a
+          data-quality binding, not to a population clause;
+        * ``REFRESH MATERIALIZED VIEW`` -- Snowflake has no such statement
+          (the command reference has no page for it); maintenance is
+          automatic.
+
+        Core's three consumers (CTAS, CREATE MATERIALIZED VIEW, REFRESH
+        MATERIALIZED VIEW) read this probe and refuse either spelling by
+        name; this dialect's own materialized view formatter refuses it
+        before the shared gate is reached.
+
+        https://docs.snowflake.com/en/sql-reference/sql/create-table
+        https://docs.snowflake.com/en/sql-reference/sql/create-materialized-view
+        """
+        return False
+
     def format_create_materialized_view_statement(
         self, expr: "SnowflakeCreateMaterializedViewExpression"
     ) -> Tuple[str, tuple]:
@@ -38,15 +64,38 @@ class SnowflakeMaterializedViewMixin:
             Tuple of (SQL string, empty params tuple).
 
         Raises:
+            TypeError: ``expr.view`` is not a MaterializedView. Any other object
+                kind would have rendered its own name as the view's.
             ValueError: when no defining query is supplied.
-            UnsupportedFeatureError: for TABLESPACE / storage parameters, which
-                Snowflake does not have.
+            UnsupportedFeatureError: for TABLESPACE / storage parameters and for
+                ``WITH DATA`` / ``WITH NO DATA``, none of which Snowflake has.
         """
+        # Snowflake's own expression coerces a bare name into a MaterializedView
+        # at construction, so both it and the core expression arrive here holding
+        # the right kind. The check stays because the object renders itself:
+        # without it a View would produce ``CREATE MATERIALIZED VIEW "v"``.
+        if not isinstance(expr.view, MaterializedView):
+            raise TypeError(
+                f"{type(expr).__name__}.view must be a MaterializedView, "
+                f"got {type(expr.view).__name__}"
+            )
         if expr.tablespace:
             raise UnsupportedFeatureError(self.name, "MATERIALIZED VIEW TABLESPACE")
         if expr.storage_options:
             raise UnsupportedFeatureError(
                 self.name, "MATERIALIZED VIEW STORAGE PARAMETERS"
+            )
+        if getattr(expr, "with_data", False) or getattr(expr, "no_data", False):
+            # The clause is absent from Snowflake's grammar entirely: the view
+            # is created empty and filled in the background. An explicitly
+            # requested spelling is refused by name rather than dropped.
+            raise UnsupportedFeatureError(
+                self.name,
+                "MATERIALIZED VIEW WITH [NO] DATA",
+                suggestion=(
+                    "Snowflake creates the materialized view empty and fills it "
+                    "in the background; it has no WITH DATA / WITH NO DATA clause."
+                ),
             )
 
         query_sql = self._materialized_view_query_sql(expr)
@@ -59,7 +108,11 @@ class SnowflakeMaterializedViewMixin:
         parts.append("MATERIALIZED VIEW")
         if getattr(expr, "if_not_exists", False):
             parts.append("IF NOT EXISTS")
-        parts.append(self.format_identifier(expr.view_name))
+        # The statement already holds the named view, so it renders itself
+        # through its own format_materialized_view_object rather than through
+        # a name assembled here.
+        view_sql, _view_params = expr.view.to_sql()
+        parts.append(view_sql)
 
         column_aliases = getattr(expr, "column_aliases", None)
         if column_aliases:
@@ -76,7 +129,8 @@ class SnowflakeMaterializedViewMixin:
             parts.append(f"COMMENT = '{self._escape_sql_string(comment)}'")
 
         # Snowflake has no WITH [NO] DATA: the view is created empty and filled
-        # in the background, so the inherited ``with_data`` flag is not rendered.
+        # in the background. An explicit request for either spelling was refused
+        # above, so the inherited flag cannot leak out here.
         parts.extend(["AS", query_sql])
         return " ".join(parts), ()
 

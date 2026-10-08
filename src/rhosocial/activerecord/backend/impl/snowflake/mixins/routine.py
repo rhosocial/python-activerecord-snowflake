@@ -101,8 +101,10 @@ class SnowflakeRoutineMixin:
             parts.append("(" + ", ".join(rendered) + ")")
         parts.append(f"RETURNS {expr.returns}")
         parts.append(f"LANGUAGE {expr.language.value}")
-        if expr.immutable is not None:
-            parts.append("IMMUTABLE" if expr.immutable else "VOLATILE")
+        if expr.immutable:
+            parts.append("IMMUTABLE")
+        elif expr.volatile:
+            parts.append("VOLATILE")
         if expr.execute_as is not None:
             parts.append(f"EXECUTE AS {expr.execute_as.value}")
         if expr.body is not None:

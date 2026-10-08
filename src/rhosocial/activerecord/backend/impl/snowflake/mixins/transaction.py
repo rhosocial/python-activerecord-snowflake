@@ -3,8 +3,9 @@
 
 Snowflake supports READ COMMITTED isolation level only.
 """
-from typing import Tuple
+from typing import Any, Dict, Tuple
 
+from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.protocols import ConcurrencyHint
 from rhosocial.activerecord.backend.transaction import IsolationLevel
 
@@ -36,6 +37,39 @@ class SnowflakeTransactionMixin:
     def supports_deferrable_transaction(self) -> bool:
         """Snowflake does not support DEFERRABLE transactions."""
         return False
+
+    def supports_transaction_wait(self) -> bool:
+        """Snowflake has no ``WAIT`` / ``NO WAIT`` transaction clause.
+
+        The reference grammar for BEGIN is
+        ``BEGIN [ { WORK | TRANSACTION } ] [ NAME <name> ]``; there is no
+        lock-wait clause, and Snowflake has no SET TRANSACTION statement at
+        all. The pair is refused by name rather than dropped.
+        https://docs.snowflake.com/en/sql-reference/sql/begin
+        """
+        return False
+
+    def _refuse_transaction_wait(
+        self, params: Dict[str, Any], statement: str
+    ) -> None:
+        """Refuse the WAIT / NO WAIT pair by name when the probe declines it.
+
+        The pair has no Snowflake spelling, so a request must fail closed --
+        the same shape as every other probe-gated clause -- instead of being
+        silently dropped from the rendered statement.
+        """
+        wait = params.get("wait")
+        no_wait = params.get("no_wait")
+        if (wait or no_wait) and not self.supports_transaction_wait():
+            feature = f"{statement} {'WAIT' if wait else 'NO WAIT'}"
+            raise UnsupportedFeatureError(
+                self.name,
+                feature,
+                suggestion=(
+                    "Snowflake's BEGIN takes no WAIT / NO WAIT clause, and "
+                    "there is no SET TRANSACTION statement."
+                ),
+            )
 
     def supports_savepoint(self) -> bool:
         """Snowflake supports savepoints."""

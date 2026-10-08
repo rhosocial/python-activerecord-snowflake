@@ -273,31 +273,63 @@ Every dialect inherits from:
 |----------|-------|-------------|
 | `WindowFunctionSupport` | `WindowFunctionMixin` | Window functions (OVER, PARTITION BY) |
 | `CTESupport` | `CTEMixin` | Common Table Expressions (WITH clause) |
-| `AdvancedGroupingSupport` | `AdvancedGroupingMixin` | ROLLUP, CUBE, GROUPING SETS |
-| `ReturningSupport` | `ReturningMixin` | RETURNING clause |
+| `AdvancedGroupingSupport` | `DQLMixin` | ROLLUP, CUBE, GROUPING SETS |
+| `ReturningSupport` | `DMLMixin` | RETURNING clause |
 | `UpsertSupport` | `UpsertMixin` | UPSERT operations (ON CONFLICT) |
 | `LateralJoinSupport` | `LateralJoinMixin` | LATERAL joins |
 | `ArraySupport` | `ArrayMixin` | Array types and operations |
 | `JSONSupport` | `JSONMixin` | JSON types and operations |
 | `ExplainSupport` | `ExplainMixin` | EXPLAIN statement |
-| `FilterClauseSupport` | `FilterClauseMixin` | FILTER clause for aggregates |
-| `OrderedSetAggregationSupport` | `OrderedSetAggregationMixin` | WITHIN GROUP (ORDER BY) |
+| `FilterClauseSupport` | `ExpressionMixin` | FILTER clause for aggregates |
+| `OrderedSetAggregationSupport` | `ExpressionMixin` | WITHIN GROUP (ORDER BY) |
 | `MergeSupport` | `MergeMixin` | MERGE statement |
 | `TemporalTableSupport` | `TemporalTableMixin` | FOR SYSTEM_TIME queries |
-| `QualifyClauseSupport` | `QualifyClauseMixin` | QUALIFY clause |
-| `LockingSupport` | `LockingMixin` | FOR UPDATE, SKIP LOCKED |
+| `QualifyClauseSupport` | `DQLMixin` | QUALIFY clause |
+| `LockingSupport` | `DQLMixin` | FOR UPDATE, SKIP LOCKED |
 | `GraphSupport` | `GraphMixin` | Graph queries (MATCH) |
 | `JoinSupport` | `JoinMixin` | JOIN operations |
 | `SetOperationSupport` | `SetOperationMixin` | UNION, INTERSECT, EXCEPT |
 | `ILIKESupport` | `ILIKEMixin` | Case-insensitive LIKE |
-| `TableSupport` | `TableMixin` | CREATE/DROP/ALTER TABLE |
-| `ViewSupport` | `ViewMixin` | CREATE/DROP VIEW |
+| `TableObjectSupport` | `TableNameMixin` / `TableMixin` | Naming a table / CREATE-DROP-ALTER TABLE |
+| `ViewObjectSupport` | `ViewNameMixin` / `ViewMixin` | Naming a view / CREATE-DROP VIEW |
 | `TruncateSupport` | `TruncateMixin` | TRUNCATE TABLE |
-| `SchemaSupport` | `SchemaMixin` | CREATE/DROP SCHEMA |
-| `IndexSupport` | `IndexMixin` | CREATE/DROP INDEX |
-| `SequenceSupport` | `SequenceMixin` | CREATE/DROP/ALTER SEQUENCE |
-| `TriggerSupport` | `TriggerMixin` | CREATE/DROP TRIGGER (SQL:1999) |
-| `FunctionSupport` | `FunctionMixin` | CREATE/DROP FUNCTION (SQL/PSM) |
+| `NamespaceSupport` | `NamespaceMixin` | Which namespace levels a name may carry |
+| `IndexObjectSupport` | `IndexNameMixin` / `IndexMixin` | Naming an index / CREATE-DROP INDEX |
+| `SequenceObjectSupport` | `SequenceNameMixin` / `SequenceMixin` | Naming a sequence / CREATE-DROP-ALTER SEQUENCE |
+| `TriggerObjectSupport` | `TriggerNameMixin` / `TriggerMixin` | Naming a trigger / CREATE-DROP TRIGGER (SQL:1999) |
+| `RoutineObjectSupport` | `FunctionNameMixin` / `FunctionMixin` | Naming a routine / CREATE-DROP FUNCTION (SQL/PSM) |
+
+Naming an object and changing one are separate protocols: `TableObjectSupport`
+says how a table is spelled, `CreateTableSupport` says `CREATE TABLE` is
+accepted. A dialect may have one without the other. The naming protocols are
+in `dialect/protocols/object/`, the statement protocols in
+`dialect/protocols/ddl/`, and the formatters they name are the `*NameMixin`
+and DDL mixins respectively.
+
+`NamespaceSupport` is the naming protocol, not a DDL one: it answers whether a
+name may be *qualified* with a catalog or a schema. Whether the engine *has*
+those objects is a separate question, answered by `CreateSchemaSupport` /
+`CreateDatabaseSupport`, and an engine can answer the two differently.
+`NamespaceSupport`'s members are `validate_namespace` (the check, which raises
+rather than answering `False`) and `format_qualified_name` (the spelling, which
+reads the object's slots and joins them with the dialect's `separator`). These
+are separate on purpose: a dialect may declare a level renderable and spell it
+differently, and the two answers must be stated together.
+
+A dialect therefore declares its whole naming side in **one** mixin. Snowflake's
+is `SnowflakeNamespaceMixin` (`impl/snowflake/mixins/namespace.py`), holding the
+three qualification probes plus the `validate_catalog_name` rule that a Snowflake
+database is never usable without a schema. The DDL-side `supports_schema` is a
+different question and stays on `SnowflakeSchemaMixin` beside the granular
+`supports_create_schema` family it umbrellas. Splitting one name across two
+mixins is what produced this backend's duplicate-`supports_schema` bug: both
+copies answered `True`, both docstrings described the naming layer, and the copy
+C3 happened to shadow was the one whose docstring matched its body.
+
+The Mixin column above is the mixin that *implements the protocol's probes*, not
+necessarily a mixin of the same name. Six entries had no same-named mixin at all
+and were the stale ones this table carried; each now names the mixin that really
+owns the probes.
 
 ##### Principles for Adding New Protocols/Mixins
 
@@ -315,8 +347,8 @@ Every dialect inherits from:
 
 | Feature | SQL Standard? | Location |
 |---------|---------------|----------|
-| `CREATE TRIGGER` | Yes (SQL:1999) | Main Package (`TriggerSupport`) |
-| `CREATE FUNCTION` | Yes (SQL/PSM) | Main Package (`FunctionSupport`) |
+| `CREATE TRIGGER` | Yes (SQL:1999) | Main Package (`CreateTriggerSupport`) |
+| `CREATE FUNCTION` | Yes (SQL/PSM) | Main Package (`CreateRoutineSupport`) |
 | `COMMENT ON` | No (PostgreSQL/Oracle) | PostgreSQL Extension |
 | `CREATE TYPE ... AS ENUM` | No (PostgreSQL-specific) | PostgreSQL Extension |
 | `AUTO_INCREMENT` | No (MySQL-specific) | MySQL Extension |

@@ -21,6 +21,7 @@ from rhosocial.activerecord.backend.expression import (
     QueryExpression,
     Literal,
 )
+from rhosocial.activerecord.backend.expression.objects import Table
 
 
 @pytest.fixture
@@ -37,34 +38,41 @@ class TestSnowflakeCreateTableFamily:
         assert dialect.supports_create_table_using_template() is True
 
     def test_create_table_like(self, dialect):
-        sql, params = CreateTableLikeExpression(dialect, "copy", "src").to_sql()
+        sql, params = CreateTableLikeExpression(
+            dialect, Table(dialect, "copy"), Table(dialect, "src")
+        ).to_sql()
         assert sql == 'CREATE TABLE "copy" LIKE "src"'
         assert params == ()
 
     def test_create_table_clone(self, dialect):
         sql, params = CreateTableCloneExpression(
-            dialect, "clone_t", "src", copy_grants=True
+            dialect, Table(dialect, "clone_t"), Table(dialect, "src"), copy_grants=True
         ).to_sql()
         assert sql == 'CREATE TABLE "clone_t" CLONE "src" COPY GRANTS'
         assert params == ()
 
     def test_create_table_copy(self, dialect):
         sql, params = CreateTableCloneExpression(
-            dialect, "copy_t", "src", mode=CreateTableCloneMode.COPY
+            dialect,
+            Table(dialect, "copy_t"),
+            Table(dialect, "src"),
+            mode=CreateTableCloneMode.COPY,
         ).to_sql()
         assert sql == 'CREATE TABLE "copy_t" COPY "src"'
         assert params == ()
 
     def test_create_table_using_template(self, dialect):
         template = QueryExpression(dialect, select=[Literal(dialect, 1)])
-        sql, params = CreateTableFromTemplateExpression(dialect, "t", template).to_sql()
+        sql, params = CreateTableFromTemplateExpression(
+            dialect, Table(dialect, "t"), template
+        ).to_sql()
         assert "USING TEMPLATE" in sql
         assert params == (1,)
 
     def test_create_or_replace(self, dialect):
         expr = CreateTableExpression(
             dialect,
-            table="t",
+            table=Table(dialect, "t"),
             columns=[],
             table_options=CreateTableOptions(dialect, or_replace=True),
         )
@@ -74,7 +82,7 @@ class TestSnowflakeCreateTableFamily:
     def test_create_transient(self, dialect):
         expr = CreateTableExpression(
             dialect,
-            table="t",
+            table=Table(dialect, "t"),
             columns=[],
             table_options=SnowflakeCreateTableOptions(dialect, transient=True),
         )
@@ -84,7 +92,7 @@ class TestSnowflakeCreateTableFamily:
     def test_create_or_replace_transient(self, dialect):
         expr = CreateTableExpression(
             dialect,
-            table="t",
+            table=Table(dialect, "t"),
             columns=[],
             table_options=SnowflakeCreateTableOptions(
                 dialect, or_replace=True, transient=True
