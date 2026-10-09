@@ -35,6 +35,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     AutoIncrementColumnSupport,
     CollationSupport,
     ColumnAttributeSupport,
+    ColumnTypeSupport,
     CommentSupport,
     ConstraintSupport,
     CreateDatabaseSupport,
@@ -109,6 +110,9 @@ SNOWFLAKE_PROTOCOLS = [
     CollationSupport,
     CTESupport,
     ColumnAttributeSupport,
+    # Column classes: which operations a value carries, where DDLTypeSupport
+    # answers how it is stored. SnowflakeColumnTypeMixin supplies the table.
+    ColumnTypeSupport,
     CommentSupport,
     DDLTypeSupport,
     ExplainSupport,

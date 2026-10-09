@@ -1,10 +1,10 @@
-# tests/rhosocial/activerecord_snowflake_test/feature/backend/types/test_column_suggestions.py
-"""Snowflake's column-type suggestion table, and the capability narrowing it declares.
+# tests/rhosocial/activerecord_snowflake_test/feature/backend/types/test_column_types.py
+"""Snowflake's column-type table, asserted against the rebuilt core protocol.
 
 Everything asserted here is **文档（待云验）**: the table was built from
 Snowflake's official documentation, and no Snowflake instance was reachable
 while it was written. These tests therefore check that the backend *says* what
-it means, and that the two provisional cells stay visibly provisional -- they
+it means, and that the provisional cells stay visibly provisional -- they
 cannot check that a server agrees, which is what the cloud probe is for.
 """
 import datetime
@@ -15,17 +15,14 @@ import uuid
 
 import pytest
 
-from rhosocial.activerecord.backend.expression.column_suggestions import (
-    COLUMN_TYPE_ENTRIES,
-    UNSUPPORTED,
-)
+from rhosocial.activerecord.backend.dialect.mixins import ColumnTypeMixin
+from rhosocial.activerecord.backend.dialect.protocols import ColumnTypeSupport
 from rhosocial.activerecord.backend.expression.column_types import (
+    ArrayColumn,
     BinaryColumn,
     BooleanColumn,
     ColumnBase,
     DateTimeColumn,
-    DecimalColumn,
-    FloatColumn,
     IntegerColumn,
     JSONColumn,
     NumericColumn,
@@ -33,11 +30,19 @@ from rhosocial.activerecord.backend.expression.column_types import (
     UUIDColumn,
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
-from rhosocial.activerecord.backend.impl.snowflake.mixins import column_suggestion
-from rhosocial.activerecord.backend.impl.snowflake.mixins.column_suggestion import (
-    SNOWFLAKE_COLUMN_SUGGESTION_EVIDENCE,
-    SNOWFLAKE_PROVISIONAL_COLUMN_SUGGESTIONS,
-    SnowflakeColumnSuggestionMixin,
+from rhosocial.activerecord.backend.impl.snowflake.mixins import column_type
+from rhosocial.activerecord.backend.impl.snowflake.mixins.column_type import (
+    SNOWFLAKE_COLUMN_TYPE_EVIDENCE,
+    SNOWFLAKE_COLUMN_TYPES,
+    SNOWFLAKE_PROVISIONAL_COLUMN_TYPES,
+    SnowflakeColumnTypeMixin,
+)
+# The shared contract list: the common Python types every backend must answer
+# for, in the testsuite's own words, so this file and the contract tests read
+# the same list rather than two copies that can drift.
+from rhosocial.activerecord.testsuite.feature.query.typed_column.column_helpers import (
+    COMMON_TYPES,
+    resolve_column_class,
 )
 
 
@@ -51,55 +56,60 @@ def table(dialect):
     return dialect.suggested_column_types()
 
 
-def _class_source():
-    """The mixin's own source, with the capability method's text removed.
-
-    ``COLUMN_TYPE_SUGGESTIONS`` and its group comments are one block; the
-    ``supports_column_operation`` docstring below them carries markers of its
-    own, and counting those as if they belonged to a cell would make a
-    "one marker per group" assertion measure the wrong thing.
-    """
-    source = inspect.getsource(SnowflakeColumnSuggestionMixin)
-    return source.split("def supports_column_operation", 1)[0]
-
-
 def _table_source():
-    """The table literal and the group comments attached to it.
+    """The module source from the table's own leading comment onward.
 
-    Group 1's comment sits above the attribute rather than inside the literal,
-    so the split starts at the class docstring's end rather than at the
-    attribute's name.
+    The table literal and the group comments attached to it are one block; the
+    module docstring and the class around it carry markers of their own, and
+    counting those as if they belonged to a cell would make a "one marker per
+    group" assertion measure the wrong thing.
     """
-    return _class_source().split('"""', 2)[-1]
+    source = inspect.getsource(column_type)
+    return source.split("#: Snowflake's full answer", 1)[-1]
 
 
 # ---------------------------------------------------------------------------
-# Completeness: every entry of the closed core list is answered
+# The protocol: the dialect composes the new mixin and answers through it
 # ---------------------------------------------------------------------------
 
 
-def test_the_table_answers_every_entry_of_the_closed_list(table):
+def test_the_dialect_composes_the_column_type_protocol(dialect):
+    """The rebuilt protocol, composed and answered.
+
+    ``ColumnTypeMixin`` is the core base (its ``suggested_column_types`` has no
+    default and raises when not overridden), ``ColumnTypeSupport`` is the
+    ``isinstance`` answer, and the mixin is the Snowflake half. All three have
+    to hold for a model's ``Model.c.<field>`` to resolve on this backend.
+    """
+    assert issubclass(SnowflakeColumnTypeMixin, ColumnTypeMixin)
+    assert isinstance(dialect, SnowflakeColumnTypeMixin)
+    assert isinstance(dialect, ColumnTypeSupport)
+
+
+def test_the_table_answers_every_entry_of_the_common_list(table):
     """A hole in the table is a definition-time failure, so it must be a test failure.
 
-    The protocol forbids both answers that look like an answer: leaving an entry
-    out and answering ``None``. So this asserts the keys match the core list
+    The protocol forbids the answer that looks like an answer by being absent:
+    every one of the shared list's entries must be a key, answered with a class
+    or with a deliberate ``None``. This asserts the keys match the list
     exactly, in neither direction.
     """
-    assert set(table) == set(COLUMN_TYPE_ENTRIES)
-    assert len(COLUMN_TYPE_ENTRIES) == 18
+    assert set(table) == set(COMMON_TYPES)
+    assert len(COMMON_TYPES) == 18
 
 
-def test_no_entry_is_unsupported(dialect, table):
+def test_no_entry_is_refused(dialect, table):
     """Snowflake answers every entry with a column class.
 
-    ``UNSUPPORTED`` is how a backend says "this entry has no column class here",
-    and it exists for backends with real gaps (Firebird has no JSON functions
-    at all). Snowflake has none: VARIANT carries a document and ILIKE carries
-    a case-insensitive match, so every entry has somewhere to go. A future edit
-    that introduces ``UNSUPPORTED`` has to change this test on purpose, which is
-    the point -- the gap becomes a declaration rather than a silent omission.
+    ``None`` is how the rebuilt protocol says "this backend genuinely has no
+    column for this value family", and it is a last resort that has to carry
+    its reason where the entry is written. Snowflake has no such entry:
+    VARIANT carries a document and a native ILIKE carries a case-insensitive
+    match, so every entry has somewhere to go. A future edit that answers
+    ``None`` has to change this test on purpose, which is the point -- the gap
+    becomes a declaration rather than a silent omission.
     """
-    refused = [key for key, value in table.items() if value is UNSUPPORTED]
+    refused = [key for key, value in table.items() if value is None]
     assert refused == []
     assert all(value is not None for value in table.values())
 
@@ -113,12 +123,15 @@ def test_every_answer_is_a_column_class(table):
 def test_the_dialect_resolves_every_entry_to_the_table_answer(dialect, table):
     """What a model builds is what this dialect's table says.
 
-    Table-relative on purpose: the answer may legitimately differ from another
-    backend's (``list`` is a document here and a native array on PostgreSQL),
-    and what may not differ is the model and the table disagreeing.
+    The selection step is the model layer's own (the testsuite's
+    ``resolve_column_class`` helper), which replaced the protocol's deleted
+    ``column_class_for``. Table-relative on purpose: the answer may
+    legitimately differ from another backend's (``list`` is a document here
+    and a native array on PostgreSQL), and what may not differ is the model
+    and the table disagreeing.
     """
-    for entry in COLUMN_TYPE_ENTRIES:
-        assert dialect.column_class_for(entry) is table[entry], entry
+    for entry in COMMON_TYPES:
+        assert resolve_column_class(dialect, entry) is table[entry], entry
 
 
 def test_the_table_is_a_copy_so_a_caller_cannot_corrupt_it(dialect):
@@ -126,7 +139,18 @@ def test_the_table_is_a_copy_so_a_caller_cannot_corrupt_it(dialect):
     first = dialect.suggested_column_types()
     first[int] = StringColumn
     assert dialect.suggested_column_types()[int] is IntegerColumn
-    assert SnowflakeColumnSuggestionMixin.COLUMN_TYPE_SUGGESTIONS[int] is IntegerColumn
+    assert SNOWFLAKE_COLUMN_TYPES[int] is IntegerColumn
+
+
+def test_the_backend_offers_no_extra_types(dialect):
+    """The extras table is empty: Snowflake has no Python type of its own to add.
+
+    The rebuilt protocol's second table exists for a backend's own vocabulary
+    (a ``Point``, a ``complex``); the default is ``{}`` and that is the honest
+    answer here. An entry added later would be a new vocabulary item and
+    belongs in this test deliberately.
+    """
+    assert dialect.suggested_extra_column_types() == {}
 
 
 # ---------------------------------------------------------------------------
@@ -139,8 +163,8 @@ def test_the_table_is_a_copy_so_a_caller_cannot_corrupt_it(dialect):
     [
         (bool, BooleanColumn),
         (int, IntegerColumn),
-        (float, FloatColumn),
-        (decimal.Decimal, DecimalColumn),
+        (float, NumericColumn),
+        (decimal.Decimal, NumericColumn),
         (str, StringColumn),
         (bytes, BinaryColumn),
         (bytearray, BinaryColumn),
@@ -160,6 +184,12 @@ def test_the_table_is_a_copy_so_a_caller_cannot_corrupt_it(dialect):
 )
 def test_the_documented_answer_per_entry(dialect, annotation, expected):
     """Each entry's answer, asserted one at a time so a change names the cell.
+
+    ``float`` and ``decimal.Decimal`` both answering ``NumericColumn`` is the
+    rebuilt core's doing, not a Snowflake finding: the numeric families were
+    collapsed into one class because arithmetic on them is the same operation
+    family, and the precision difference lives in the DDL layer's
+    ``DataType``. See the group-2 comment in the mixin.
 
     ``timedelta -> NumericColumn`` is the one that reads like a mistake and is
     not: Snowflake *does* document twelve storable interval data types, but core
@@ -189,7 +219,7 @@ def test_uuid_is_answered_the_same_on_both_sides_of_the_10_2_gate(dialect):
 
 
 # ---------------------------------------------------------------------------
-# The two provisional cells (议题 B: VARIANT / OBJECT / ARRAY)
+# The provisional cells (议题 B: VARIANT / OBJECT / ARRAY)
 # ---------------------------------------------------------------------------
 
 
@@ -198,7 +228,7 @@ def test_the_provisional_cells_are_the_five_semi_structured_entries():
 
     Exported as a constant so the marking is checkable rather than only prose.
     """
-    assert set(SNOWFLAKE_PROVISIONAL_COLUMN_SUGGESTIONS) == {
+    assert set(SNOWFLAKE_PROVISIONAL_COLUMN_TYPES) == {
         dict,
         list,
         tuple,
@@ -217,7 +247,7 @@ def test_the_provisional_cells_all_answer_json_column(dialect):
     semi-structured concepts separately.
     """
     table = dialect.suggested_column_types()
-    for entry in SNOWFLAKE_PROVISIONAL_COLUMN_SUGGESTIONS:
+    for entry in SNOWFLAKE_PROVISIONAL_COLUMN_TYPES:
         assert table[entry] is JSONColumn, entry
 
 
@@ -231,8 +261,6 @@ def test_list_is_not_answered_as_an_array_column(table):
     ``UseColumnType(ArrayColumn)`` escape hatch remains available and is what a
     caller should reach for in the meantime.
     """
-    from rhosocial.activerecord.backend.expression.column_types import ArrayColumn
-
     assert table[list] is not ArrayColumn
 
 
@@ -247,7 +275,7 @@ def test_the_provisional_cells_are_documented_as_provisional():
     source = _table_source()
     assert "PROVISIONAL" in source
     assert "议题 B" in source
-    for entry in SNOWFLAKE_PROVISIONAL_COLUMN_SUGGESTIONS:
+    for entry in SNOWFLAKE_PROVISIONAL_COLUMN_TYPES:
         name = entry.__name__
         assert f"{name}: JSONColumn" in source, name
 
@@ -260,67 +288,9 @@ def test_the_three_semi_structured_types_are_described_as_distinct():
     parse choice for a statement about Snowflake. It is a design trade-off
     (议题 B), not a limitation the documentation imposes.
     """
-    module_source = inspect.getsource(column_suggestion)
+    module_source = inspect.getsource(column_type)
     assert "three distinct server types" in module_source
     assert "data-types-semistructured" in module_source
-
-
-# ---------------------------------------------------------------------------
-# Capability narrowing: docs-only, and it narrows nothing
-# ---------------------------------------------------------------------------
-
-
-def test_ilike_is_not_narrowed(dialect):
-    """Snowflake has a native ``[ NOT ] ILIKE``, so narrowing it would be wrong.
-
-    Five of the ten backends synthesise ``LOWER(x) LIKE LOWER(y)`` and pay for
-    it; this one has the operator, with its own ``ESCAPE`` clause. Narrowing
-    would refuse a query that works, which is the direction the protocol says
-    not to be wrong in.
-    """
-    assert dialect.supports_column_operation("StringColumn", "ilike") is True
-    assert dialect.supports_ilike() is True
-
-
-def test_the_json_path_operations_are_not_narrowed(dialect):
-    """``GET_PATH`` and ``:`` take a VARIANT/OBJECT/ARRAY column, so both path
-    operations are available on a ``JSONColumn`` here."""
-    assert dialect.supports_column_operation("JSONColumn", "json_path") is True
-    assert dialect.supports_column_operation("JSONColumn", "json_value") is True
-    assert dialect.supports_json_operations() is True
-
-
-def test_nothing_is_narrowed_on_this_backend(dialect):
-    """A docs-only pass found nothing to narrow; this pins that verdict.
-
-    Not an aspiration -- a statement about the documentation read. If a later
-    pass cites a page saying an operation does not exist, this test is where the
-    narrowing is added deliberately, with its evidence.
-    """
-    pairs = [
-        ("StringColumn", op)
-        for op in ("like", "ilike", "concat", "lower", "upper", "length", "substr")
-    ] + [
-        ("IntegerColumn", op) for op in ("__add__", "__sub__", "__mul__")
-    ] + [("JSONColumn", op) for op in ("json_path", "json_value", "cast")]
-    for column_name, op in pairs:
-        assert dialect.supports_column_operation(column_name, op) is True, (column_name, op)
-
-
-def test_the_open_array_operation_probe_is_recorded_rather_than_guessed():
-    """``ARRAY_LENGTH``/``UNNEST`` are left unanswered, and that is written down.
-
-    Core's ``ArrayColumn`` renders those two names; Snowflake documents
-    ``ARRAY_SIZE`` and the ``FLATTEN`` table function, and neither name appears
-    in its function index. Absence from an index is not proof of absence, and
-    the protocol requires narrowing to be backed by a real server -- so the
-    probe is recorded as 待云验 rather than answered. This test keeps the record
-    from being lost.
-    """
-    source = inspect.getsource(SnowflakeColumnSuggestionMixin.supports_column_operation)
-    assert "ARRAY_SIZE" in source
-    assert "FLATTEN" in source
-    assert "ARRAY_LENGTH" in source
 
 
 # ---------------------------------------------------------------------------
@@ -334,7 +304,7 @@ def test_the_evidence_level_is_stated_once_and_is_docs_pending_cloud():
     Exported as a constant so this test can assert it, and so that a later
     cloud-verified pass has one place to change.
     """
-    assert SNOWFLAKE_COLUMN_SUGGESTION_EVIDENCE == "文档（待云验）"
+    assert SNOWFLAKE_COLUMN_TYPE_EVIDENCE == "文档（待云验）"
 
 
 def test_every_entry_group_carries_the_marker_and_a_doc_url():

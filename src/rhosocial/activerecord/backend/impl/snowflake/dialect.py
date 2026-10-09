@@ -26,6 +26,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     ArraySupport,
     AutoIncrementColumnSupport,
     CollationSupport,
+    ColumnTypeSupport,
     ConstraintSupport,
     CreateTypeSupport,
     CTESupport,
@@ -151,12 +152,12 @@ from .mixins import (
     SnowflakeTransactionMixin,
     SnowflakeTypeDDLMixin,
     SnowflakeTypeSupportMixin,
-    # Column-type suggestions: which column class each common Python type means
-    # on this server. It subclasses core's ColumnSuggestionMixin, so the
-    # protocol's own resolution comes with it and only the answer is Snowflake's.
+    # Column types: which column class each common Python type means on this
+    # server. It subclasses core's ColumnTypeMixin, so the protocol's own
+    # plumbing comes with it and only the answer is Snowflake's.
     # Placed among the Snowflake-specific mixins because nothing generic can
     # answer for a VARIANT document or for Snowflake's ILIKE.
-    SnowflakeColumnSuggestionMixin,
+    SnowflakeColumnTypeMixin,
     SnowflakeUndropMixin,
     SnowflakeVariantMixin,
     SnowflakeAlterColumnModifierMixin,
@@ -220,7 +221,7 @@ class SnowflakeDialect(
     SnowflakeGeneratedColumnMixin,
     SnowflakeOrderedSetAggregationMixin,
     SnowflakeTruncateMixin,
-    SnowflakeColumnSuggestionMixin,
+    SnowflakeColumnTypeMixin,
     # New Mixins (shared by all modern backends)
     PredicateMixin,
     ILIKEMixin,
@@ -294,6 +295,10 @@ class SnowflakeDialect(
     ArraySupport,
     AutoIncrementColumnSupport,
     CollationSupport,
+    # Column classes: which operations a value carries, where DDLTypeSupport
+    # answers how it is stored. The mixin (above) supplies the table; the
+    # protocol records that this dialect answers the question at all.
+    ColumnTypeSupport,
     CTESupport,
     ConstraintSupport,
     DDLTypeSupport,
