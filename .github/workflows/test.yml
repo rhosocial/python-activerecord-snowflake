@@ -33,8 +33,8 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-          pip install git+https://github.com/rhosocial/python-activerecord.git@release/v1.0.0.dev30#egg=rhosocial-activerecord
-          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/expression-schema-object-refactor#egg=rhosocial-activerecord-testsuite
+          pip install git+https://github.com/rhosocial/python-activerecord.git@feature/typed-columns#egg=rhosocial-activerecord
+          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@test/typed-column-contracts#egg=rhosocial-activerecord-testsuite
 
       - name: Install package
         run: |
@@ -77,8 +77,8 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-          pip install git+https://github.com/rhosocial/python-activerecord.git@release/v1.0.0.dev30#egg=rhosocial-activerecord
-          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/expression-schema-object-refactor#egg=rhosocial-activerecord-testsuite
+          pip install git+https://github.com/rhosocial/python-activerecord.git@feature/typed-columns#egg=rhosocial-activerecord
+          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@test/typed-column-contracts#egg=rhosocial-activerecord-testsuite
 
       - name: Install package
         run: |
@@ -109,8 +109,8 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-          pip install git+https://github.com/rhosocial/python-activerecord.git@release/v1.0.0.dev30#egg=rhosocial-activerecord
-          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/expression-schema-object-refactor#egg=rhosocial-activerecord-testsuite
+          pip install git+https://github.com/rhosocial/python-activerecord.git@feature/typed-columns#egg=rhosocial-activerecord
+          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@test/typed-column-contracts#egg=rhosocial-activerecord-testsuite
 
       - name: Install package
         run: |

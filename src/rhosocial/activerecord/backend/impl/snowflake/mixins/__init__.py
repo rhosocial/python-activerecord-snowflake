@@ -35,6 +35,7 @@ from .transaction import (
 from .undrop import SnowflakeUndropMixin
 from .variant import SnowflakeVariantMixin
 from .types import SnowflakeTypeSupportMixin
+from .column_suggestion import SnowflakeColumnSuggestionMixin
 from .warehouse import SnowflakeWarehouseMixin
 from .ddl import SnowflakeAlterColumnModifierMixin
 from .ddl_type import SnowflakeTypeDDLMixin
@@ -78,6 +79,7 @@ __all__ = [
     "SnowflakeUndropMixin",
     "SnowflakeVariantMixin",
     "SnowflakeTypeSupportMixin",
+    "SnowflakeColumnSuggestionMixin",
     "SnowflakeWarehouseMixin",
     "SnowflakeAlterColumnModifierMixin",
     "SnowflakeTypeDDLMixin",

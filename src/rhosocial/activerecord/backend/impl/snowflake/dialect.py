@@ -151,6 +151,12 @@ from .mixins import (
     SnowflakeTransactionMixin,
     SnowflakeTypeDDLMixin,
     SnowflakeTypeSupportMixin,
+    # Column-type suggestions: which column class each common Python type means
+    # on this server. It subclasses core's ColumnSuggestionMixin, so the
+    # protocol's own resolution comes with it and only the answer is Snowflake's.
+    # Placed among the Snowflake-specific mixins because nothing generic can
+    # answer for a VARIANT document or for Snowflake's ILIKE.
+    SnowflakeColumnSuggestionMixin,
     SnowflakeUndropMixin,
     SnowflakeVariantMixin,
     SnowflakeAlterColumnModifierMixin,
@@ -214,6 +220,7 @@ class SnowflakeDialect(
     SnowflakeGeneratedColumnMixin,
     SnowflakeOrderedSetAggregationMixin,
     SnowflakeTruncateMixin,
+    SnowflakeColumnSuggestionMixin,
     # New Mixins (shared by all modern backends)
     PredicateMixin,
     ILIKEMixin,
@@ -293,6 +300,13 @@ class SnowflakeDialect(
     CreateTypeSupport,
     AlterTypeSupport,
     DropTypeSupport,
+    # SnowflakeTypeSupport is deliberately NOT a base here. It states the two
+    # conditional data-type probes -- CREATE TYPE arrived in server 10.8, the
+    # native UUID in 10.2 -- that no naming convention can express, and
+    # SnowflakeTypeSupportMixin implements both. Listing it as a base would only
+    # add an isinstance answer nothing asks for: no code in this backend tests
+    # it, and it does not appear in the conformance list either. It is still
+    # exported from ``protocols``, which is what the protocol is for.
     ExplainSupport,
     FilterClauseSupport,
     GeneratedColumnSupport,
@@ -433,6 +447,12 @@ class SnowflakeDialect(
     def supports_data_type_integer(self) -> bool:
         return True
 
+    def supports_data_type_tinyint(self) -> bool:
+        # Rendered, not substituted: TINYINT is one of Snowflake's own integer
+        # names.  It stores NUMBER(38, 0) like every other one — see
+        # SnowflakeTypeSupportMixin.format_data_type_tinyint.
+        return True
+
     def supports_data_type_bigint(self) -> bool:
         return True
 
@@ -440,6 +460,11 @@ class SnowflakeDialect(
         return True
 
     def supports_data_type_float(self) -> bool:
+        return True
+
+    def supports_data_type_real(self) -> bool:
+        # Snowflake's REAL is its 64-bit FLOAT; the word exists, the 4-byte
+        # width does not.  Rendered so the requested spelling stays visible.
         return True
 
     def supports_data_type_double(self) -> bool:
@@ -463,6 +488,11 @@ class SnowflakeDialect(
     def supports_data_type_blob(self) -> bool:
         return True
 
+    def supports_data_type_custom(self) -> bool:
+        # So that parse_type()'s honest-ignorance fallback can be written back
+        # out verbatim; the name is validated in CustomType's constructor.
+        return True
+
     def supports_data_type_datetime(self) -> bool:
         return True
 
@@ -472,7 +502,17 @@ class SnowflakeDialect(
     def supports_data_type_time(self) -> bool:
         return True
 
+    def supports_data_type_timetz(self) -> bool:
+        # Snowflake has no TIME WITH TIME ZONE, so this renders TIME — but the
+        # concept is accepted rather than refused because the zone is the only
+        # part that has no storage, and the time of day does.
+        return True
+
     def supports_data_type_timestamp(self) -> bool:
+        return True
+
+    def supports_data_type_timestamptz(self) -> bool:
+        # Rendered as TIMESTAMP_TZ, which stores the offset with the value.
         return True
 
     def supports_data_type_json(self) -> bool:
@@ -505,7 +545,7 @@ class SnowflakeDialect(
     def supports_data_type_snowflake_time(self) -> bool:
         return True
 
-    def supports_data_type_snowflake_binary(self) -> bool:
+    def supports_data_type_snowflake_blob(self) -> bool:
         return True
 
     def supports_data_type_snowflake_variant(self) -> bool:
