@@ -289,9 +289,9 @@ def _assert_declaration_model(model):
         VALUE_GENERATED,
     )
     assert metadata.annotations == expected_annotations
-    assert model.column_type("value") is SQL_TYPE
-    assert model.column_type("value").data_types == NATIVE_TYPES
-    assert _same_objects(model.column_type("value").data_types, NATIVE_TYPES)
+    assert model.column_data_type("value") is SQL_TYPE
+    assert model.column_data_type("value").data_types == NATIVE_TYPES
+    assert _same_objects(model.column_data_type("value").data_types, NATIVE_TYPES)
 
     value_constraints = model.column_constraints("value")
     assert [item.constraint_type for item in value_constraints] == [
@@ -360,9 +360,9 @@ def _assert_batch_interfaces(model):
         "id": "record_id",
         "quantity": "quantity",
     }
-    assert list(model.columns_type(fields)) == fields
-    assert model.columns_type(fields)["value"] is SQL_TYPE
-    assert model.columns_type(fields)["quantity"] is None
+    assert list(model.columns_data_type(fields)) == fields
+    assert model.columns_data_type(fields)["value"] is SQL_TYPE
+    assert model.columns_data_type(fields)["quantity"] is None
     assert list(model.columns_constraints(fields)) == fields
     assert model.columns_constraints(fields)["value"][0] is DEFAULT_CONSTRAINT.constraint
     assert list(model.columns_attributes(fields)) == fields
@@ -443,7 +443,7 @@ async def test_sync_and_async_declarations_are_identical():
     sync_model, async_model = MODEL_CLASSES
     assert sync_model.ddl_field_names() == async_model.ddl_field_names()
     assert sync_model.columns_name() == async_model.columns_name()
-    assert sync_model.column_type("value") is async_model.column_type("value")
+    assert sync_model.column_data_type("value") is async_model.column_data_type("value")
     assert sync_model.column_constraints("value") == async_model.column_constraints("value")
     assert sync_model.column_attributes("value") == async_model.column_attributes("value")
     sync_indexes = sync_model.column_indexes("value")
@@ -467,7 +467,7 @@ async def test_sync_and_async_declarations_are_identical():
 
 def test_collected_snowflake_type_renders_minimal_column():
     dialect = SnowflakeDialect(version=(8, 0, 0))
-    data_type = DeclarationModel.column_type("value").data_types[0]
+    data_type = DeclarationModel.column_data_type("value").data_types[0]
     assert isinstance(data_type, SnowflakeVarcharType)
     data_type.dialect = dialect
     try:
