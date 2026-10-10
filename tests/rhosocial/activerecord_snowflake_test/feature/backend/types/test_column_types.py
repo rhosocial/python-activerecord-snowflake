@@ -22,11 +22,11 @@ from rhosocial.activerecord.backend.expression.column_types import (
     BinaryColumn,
     BooleanColumn,
     ColumnBase,
-    DateTimeColumn,
     IntegerColumn,
     JSONColumn,
     NumericColumn,
     StringColumn,
+    TimestampColumn,
     UUIDColumn,
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
@@ -168,9 +168,9 @@ def test_the_backend_offers_no_extra_types(dialect):
         (str, StringColumn),
         (bytes, BinaryColumn),
         (bytearray, BinaryColumn),
-        (datetime.date, DateTimeColumn),
-        (datetime.time, DateTimeColumn),
-        (datetime.datetime, DateTimeColumn),
+        (datetime.date, TimestampColumn),
+        (datetime.time, TimestampColumn),
+        (datetime.datetime, TimestampColumn),
         (datetime.timedelta, NumericColumn),
         (uuid.UUID, UUIDColumn),
         (dict, JSONColumn),
@@ -197,7 +197,7 @@ def test_the_documented_answer_per_entry(dialect, annotation, expected):
     from VARIANT, clustered, dynamic and Iceberg tables, so it is not the
     portable default. See the group-5 comment in the mixin.
 
-    ``date``/``time`` answering ``DateTimeColumn`` is likewise a core gap (no
+    ``date``/``time`` answering ``TimestampColumn`` is likewise a core gap (no
     ``DateColumn``/``TimeColumn`` yet), not a claim that Snowflake conflates them
     -- it has three distinct ``TIMESTAMP_*`` types.
     """

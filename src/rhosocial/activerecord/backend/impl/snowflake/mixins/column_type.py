@@ -103,11 +103,11 @@ from rhosocial.activerecord.backend.expression.column_types import (
     BinaryColumn,
     BooleanColumn,
     ColumnBase,
-    DateTimeColumn,
     IntegerColumn,
     JSONColumn,
     NumericColumn,
     StringColumn,
+    TimestampColumn,
     UUIDColumn,
 )
 
@@ -166,15 +166,15 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     # ``TIMESTAMP_*`` variants are distinct server types, and ``TIMESTAMP``
     # is an alias that is "never stored in tables" (its variant comes from
     # the ``TIMESTAMP_TYPE_MAPPING`` session parameter, ``TIMESTAMP_NTZ`` by
-    # default). Core has one ``DateTimeColumn`` for all of them and no
+    # default). Core has one ``TimestampColumn`` for all of them and no
     # ``DateColumn`` / ``TimeColumn`` yet, so ``date`` and ``time`` answer
     # it too; the split is a core gap, not a Snowflake one. Which variant
     # a *value* gets -- ``TIMESTAMP_NTZ`` for a naive datetime,
     # ``TIMESTAMP_TZ`` for an aware one -- is the DataType layer's decision.
     # 文档（待云验）<https://docs.snowflake.com/en/sql-reference/data-types-datetime>
-    datetime.date: DateTimeColumn,
-    datetime.time: DateTimeColumn,
-    datetime.datetime: DateTimeColumn,
+    datetime.date: TimestampColumn,
+    datetime.time: TimestampColumn,
+    datetime.datetime: TimestampColumn,
     # **Group 5 -- duration.** ``NumericColumn``, and the reason is *not*
     # that Snowflake lacks an interval type: the date & time page documents
     # twelve storable interval data types ("To store interval values in a
