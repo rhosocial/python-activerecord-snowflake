@@ -66,6 +66,9 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     ArrayMixin,
     AutoIncrementMixin,
     CollationMixin,
+    LpadMixin,
+    RepeatMixin,
+    RpadMixin,
     CommentOnMixin,
     ConstraintMixin,
     CTEMixin,
@@ -172,6 +175,7 @@ from .mixins import (
     SnowflakeDQLMixin,
     SnowflakeCapabilityMixin,
     SnowflakeILIKEMixin,
+    SnowflakeTrimMixin,
     SnowflakeGeneratedColumnMixin,
     SnowflakeOrderedSetAggregationMixin,
     SnowflakeTruncateMixin,
@@ -220,6 +224,14 @@ class SnowflakeDialect(
     SnowflakeILIKEMixin,
     SnowflakeGeneratedColumnMixin,
     SnowflakeOrderedSetAggregationMixin,
+    # TRIM/LPAD/RPAD/REPEAT are nodes with default formatters. LPAD, RPAD and
+    # REPEAT are the shared spellings verbatim on Snowflake, so the generic
+    # mixins are the answer for those three; TRIM differs and is overridden by
+    # SnowflakeTrimMixin (above) for the reason documented there.
+    SnowflakeTrimMixin,
+    LpadMixin,
+    RepeatMixin,
+    RpadMixin,
     SnowflakeTruncateMixin,
     SnowflakeColumnTypeMixin,
     # New Mixins (shared by all modern backends)

@@ -42,6 +42,7 @@ from .ddl_type import SnowflakeTypeDDLMixin
 # New mixins from dialect.py split
 from .datetime import SnowflakeDateTimeMixin
 from .collation import SnowflakeCollationMixin
+from .trim import SnowflakeTrimMixin
 from .set_operation import SnowflakeSetOperationMixin
 from .dql import SnowflakeDQLMixin
 from .capabilities import SnowflakeCapabilityMixin
@@ -85,6 +86,7 @@ __all__ = [
     "SnowflakeTypeDDLMixin",
     "SnowflakeDateTimeMixin",
     "SnowflakeCollationMixin",
+    "SnowflakeTrimMixin",
     "SnowflakeSetOperationMixin",
     "SnowflakeDQLMixin",
     "SnowflakeCapabilityMixin",
