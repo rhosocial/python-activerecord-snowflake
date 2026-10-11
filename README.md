@@ -33,6 +33,11 @@ _ca909a9_
 depends on `cryptography`, which depends on `cffi`, and `cffi` has no
 free-threaded CPython 3.13 build. 3.14t is untested for the same reason.
 
+**3.15 has no CI leg.** `snowflake-connector-python` 4.8.0 ships no cp315
+wheel — the source tarball only, with no `Python :: 3.15` classifier declaring
+support — so a 3.15 leg would fail at install. This awaits a driver release,
+not this repository.
+
 ## Installation
 
 ```bash

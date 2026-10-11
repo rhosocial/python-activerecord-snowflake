@@ -27,6 +27,7 @@ Design principle: Sync and Async are separate and cannot coexist.
 
 import asyncio
 import copy
+import warnings
 from typing import Any, Dict, List, Optional
 
 from rhosocial.activerecord.backend.introspection.base import (
@@ -129,15 +130,248 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             )
         return tables
 
+    #: Concept name -> the ``INFORMATION_SCHEMA.COLUMNS`` column that carries
+    #: that concept's width.
+    #:
+    #: Keyed by the concept's own ``name``, **not** by the catalog word, so the
+    #: dialect stays the only place that knows which words mean which concept:
+    #: the shape is decided by parsing the bare word once and reading ``name`` off
+    #: the result, and this table only has to say which column answers which
+    #: parameter.  That is the same division the rest of the codebase uses -- one
+    #: place per vocabulary -- and it is why adding ``NVARCHAR2`` or ``CHAR
+    #: VARYING`` to the manual needs no edit here.
+    #:
+    #: Every key names a concept whose size the manual states in **characters**,
+    #: which is what the one column is documented in: "Maximum length in
+    #: characters of string columns."
+    #: https://docs.snowflake.com/en/sql-reference/info-schema/columns
+    #:
+    #: ``text`` is here because Snowflake documents it as the same storage:
+    #: "STRING, TEXT, VARCHAR2, NVARCHAR, NVARCHAR2, CHAR VARYING, NCHAR
+    #: VARYING -- Synonymous with VARCHAR."  A *sized* ``TEXT(50)`` column is
+    #: therefore a 50-character variable-length string, and it is parsed as one;
+    #: a bare ``TEXT`` stays :class:`~...expression.types.TextType`, because the
+    #: bare form genuinely is the unbounded concept.  See
+    #: :meth:`~...mixins.types.SnowflakeTypeSupportMixin.parse_type`.
+    _SNOW_WIDTH_COLUMN = {
+        "varchar": "CHARACTER_MAXIMUM_LENGTH",
+        "char": "CHARACTER_MAXIMUM_LENGTH",
+        "text": "CHARACTER_MAXIMUM_LENGTH",
+    }
+
+    #: The concept whose size the catalog reports as **numeric precision and
+    #: scale** rather than as a length.  It is deliberately a single name and
+    #: not a family, because the split is documented per type, not per shape:
+    #:
+    #: * ``NUMBER`` and its synonyms do carry both, and the catalog reports
+    #:   them -- "NUMERIC_PRECISION -- Numeric precision of numeric columns",
+    #:   "NUMERIC_SCALE -- Scale of numeric columns", and a bare ``NUMBER`` is
+    #:   "NUMBER(38, 0)" by the manual's own words.
+    #:   https://docs.snowflake.com/en/sql-reference/data-types-numeric
+    #: * the integer names are documented as "Synonymous with NUMBER, **except
+    #:   precision and scale can't be specified**", so their ``NUMERIC_PRECISION``
+    #:   of 38 is the bare ``NUMBER`` they are, not a declared precision, and
+    #:   composing it would turn every ``INT`` column into ``DecimalType(38, 0)``.
+    #: * the float family is not composed at all: ``DESC TABLE`` renders
+    #:   ``DOUBLE``, ``DOUBLE PRECISION`` and ``REAL`` as a bare ``FLOAT`` with
+    #:   no precision, and the column that would settle what unit a reported
+    #:   precision is in -- ``NUMERIC_PRECISION_RADIX``, documented as "Radix of
+    #:   precision of numeric columns" -- is not selected by the query above.
+    #:   Composing a number whose unit is unresolved would be a guess.
+    _SNOW_NUMERIC_CONCEPT = "decimal"
+
+    #: Concept names whose size is a **byte** count in the catalog rather than a
+    #: character count, so they must never be fed the character column.
+    #:
+    #: ``BINARY`` is the only one, and it is here as a statement about what this
+    #: backend does **not** claim.  The manual is explicit that the two are
+    #: different units: "Unlike VARCHAR, the BINARY data type has no notion of
+    #: Unicode characters, so the length is always measured in terms of bytes"
+    #: (``BINARY(n)`` defaults to 8388608, and ``DESC TABLE`` renders
+    #: ``BINARY(100)``).  But neither catalog column is documented for it --
+    #: ``CHARACTER_MAXIMUM_LENGTH`` is "in characters of **string** columns" and
+    #: ``CHARACTER_OCTET_LENGTH`` is "in bytes of **string** columns", and the
+    #: manual files BINARY under "Data types for **binary** strings" -- so there
+    #: is no column this backend can honestly read a binary width from.  It is
+    #: named so the gap is visible in the source rather than implied by an
+    #: absence, and ``_SNOW_WIDTH_COLUMN`` does not mention it.
+    #: https://docs.snowflake.com/en/sql-reference/data-types-text
+    _SNOW_BYTE_COUNTED_CONCEPTS = ("blob",)
+
+    @staticmethod
+    def _catalog_number(value: Any) -> Optional[int]:
+        """One catalog number as an ``int``, or ``None`` when there is not one.
+
+        The catalog columns are declared ``NUMBER``, so the driver hands back an
+        integer; ``None`` is the documented "not applicable for this column"
+        answer and is the only thing mapped to ``None`` here.  A value that is not
+        a number at all is treated as absent rather than raising: the catalog is
+        not under this backend's control, and an unreadable size should cost one
+        column its width, not the whole table.
+
+        **Zero is preserved, not filtered.**  ``NUMERIC_SCALE`` of ``0`` is a real
+        answer with a meaning -- ``NUMBER(10, 0)`` is a column with no fractional
+        digits, which is not the same column as a scale of "unspecified" -- so
+        deciding what counts as a usable number is left to each call site, where
+        the rule for that parameter is known.  Folding zero into "absent" here
+        would have turned every ``NUMBER(10, 0)`` into ``NUMBER(10)`` and
+        ``NUMBER(38, 0)`` -- the documented bare ``NUMBER`` -- into ``NUMBER(38)``,
+        which is precisely the value :meth:`_catalog_type_string` has to recognise
+        as the default.
+        """
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _catalog_width(value: Any) -> Optional[int]:
+        """A catalog length, or ``None`` when the column reports no usable one.
+
+        A width of zero is not a column Snowflake can declare -- ``VARCHAR`` and
+        ``CHAR`` both have a minimum of one character -- so a zero or a missing
+        value is "no width here" and the bare word is what gets composed.
+        """
+        width = SnowflakeIntrospectorMixin._catalog_number(value)
+        return width if width is not None and width > 0 else None
+
+    def _catalog_type_string(
+        self,
+        row: Dict[str, Any],
+        dialect: Any,
+    ) -> str:
+        """The one type string ``parse_type`` is asked to read, size included.
+
+        Snowflake splits what a caller writes as a single type across several
+        catalog columns, so handing ``parse_type`` the bare ``DATA_TYPE`` alone
+        throws away the size and only the size.  Measured on this worktree with
+        the query in :meth:`~...mixins.introspection.SnowflakeIntrospectionMixin.format_column_info_query`:
+        a ``VARCHAR(50)`` column answered ``16777216`` -- the *bare* word reached
+        the parser and the parser honestly filled in Snowflake's documented
+        default -- and a ``NUMBER(10, 2)`` column answered ``DecimalType()`` with
+        both parameters gone.  Two different symptoms, one cause: the width never
+        left the catalog.
+
+        The shape of the fix follows the sibling introspectors rather than
+        anything new.  PostgreSQL never has this problem because
+        ``pg_catalog.format_type(a.atttypid, a.atttypmod)`` hands back a composed
+        ``character varying(50)``; MySQL prefers ``COLUMN_TYPE`` over
+        ``DATA_TYPE``, i.e. it asks for the already-composed column; SQL Server
+        builds ``f"{data_type}({max_len})"`` / ``f"{data_type}({precision},{scale})"``
+        / the bare word from ``INFORMATION_SCHEMA.COLUMNS`` itself, which is the
+        shape Snowflake needs and the one used here.
+        https://docs.snowflake.com/en/sql-reference/info-schema/columns
+
+        What differs is *which column answers which shape*, and Snowflake's
+        catalog answers per type rather than per family:
+
+        ``CHARACTER_MAXIMUM_LENGTH``
+            "Maximum length in **characters** of string columns" -- so it is fed
+            to the string concepts named in :attr:`_SNOW_WIDTH_COLUMN` and to
+            nothing else.  That it carries the declared width, not a fixed
+            column width, is documented with a worked example: when Snowpark
+            creates a string column as ``VARCHAR(134217728)``, "INFORMATION_SCHEMA
+            .COLUMNS reports a ``CHARACTER_MAXIMUM_LENGTH`` of 134217728, not
+            16777216."
+        ``NUMERIC_PRECISION`` / ``NUMERIC_SCALE``
+            "Numeric precision of numeric columns" / "Scale of numeric columns",
+            fed to :attr:`_SNOW_NUMERIC_CONCEPT` only -- see that attribute for
+            why the integer and float shapes are left alone.
+
+        The exact numeric shape is the one whose reported pair used to be folded
+        back to the bare word, and that folding is gone.  It existed only because
+        a declaration that named no precision could carry none: the bare word was
+        the one thing it could compare equal to.  Core now resolves
+        ``DecimalType.precision``/``scale`` against
+        :meth:`~...mixins.types.SnowflakeTypeSupportMixin.type_parameter_defaults`
+        at read time, so ``DecimalType(dialect)`` carries 38/0 and
+        ``NUMBER(38, 0)`` -- the pair the catalog reported, and the manual's own
+        words for a bare ``NUMBER`` -- parses to an equal object.  Composing the
+        pair the catalog actually reported is therefore both safe and more
+        honest: ``data_type_full`` says what the size is instead of repeating a
+        word whose size was only implied.
+        """
+        from rhosocial.activerecord.backend.expression.types._base import DataType
+
+        word = row.get("DATA_TYPE") or "VARCHAR"
+        # Which concept the catalog's word names is the dialect's answer, not
+        # this file's: parse the bare word and read the identity off the result.
+        # An unreadable word is caught here rather than raised, because not being
+        # able to name its concept is the same as not knowing which column would
+        # have carried its size -- so nothing is composed, the bare word is handed
+        # on, and :meth:`_parse_data_type` is where the unreadable type is
+        # reported and degraded to ``None`` for that one column.
+        try:
+            concept = getattr(
+                DataType.parse_data_type_str(dialect, word), "name", None
+            )
+        except Exception:  # noqa: BLE001 -- see the docstring
+            concept = None
+        width_column = self._SNOW_WIDTH_COLUMN.get(concept)
+        if width_column is not None:
+            width = self._catalog_width(row.get(width_column))
+            return f"{word}({width})" if width is not None else word
+        if concept == self._SNOW_NUMERIC_CONCEPT:
+            precision = self._catalog_number(row.get("NUMERIC_PRECISION"))
+            scale = self._catalog_number(row.get("NUMERIC_SCALE"))
+            if precision is None or precision <= 0:
+                return word
+            if scale is None:
+                return f"{word}({precision})"
+            return f"{word}({precision}, {scale})"
+        # Every other shape -- the integer names, the float family, BINARY,
+        # BOOLEAN, the date/time words, VARIANT/OBJECT/ARRAY, GEOGRAPHY,
+        # GEOMETRY, UUID -- is reported with no size the catalog documents for
+        # it, and the bare word is the honest input for all of them.
+        return word
+
+    @staticmethod
+    def _parse_data_type(
+        composed: str, row: Dict[str, Any], dialect: Any
+    ) -> Optional[Any]:
+        """Read one composed catalog type string into a ``DataType``, or ``None``.
+
+        ``ColumnInfo.parsed_data_type`` is ``None`` for exactly one reason --
+        the catalog string could not be read -- and core's differ branches on
+        it, falling back to comparing the ``data_type`` *strings*.  So an
+        unreadable column must degrade to ``None`` rather than abort
+        ``list_columns`` for the table: the catalog is not under this backend's
+        control, and MariaDB's introspector already carries this guard for the
+        same reason.
+
+        The string handed in is built by :meth:`_catalog_type_string` and is read
+        by the dialect's own ``parse_type``, so a type Snowflake adds cannot
+        fail here unless it fails in ``parse_type`` too -- and ``parse_type``
+        ends in ``CustomType``, whose constructor validates the raw name, so an
+        unmodelled type still parses rather than raises.
+        """
+        from rhosocial.activerecord.backend.expression.types._base import DataType
+
+        try:
+            return DataType.parse_data_type_str(dialect, composed)
+        except Exception as exc:  # noqa: BLE001 -- see the docstring
+            warnings.warn(
+                f"Snowflake reported column type {composed!r} (DATA_TYPE "
+                f"{row.get('DATA_TYPE')!r}), which this backend's parse_type "
+                f"could not read ({type(exc).__name__}: {exc}). That column's "
+                f"parsed_data_type is left unset, so the schema differ will "
+                f"compare its data_type string rather than the type object. "
+                f"The rest of the table is unaffected.",
+                RuntimeWarning,
+                stacklevel=3,
+            )
+            return None
+
     def _parse_columns(
         self,
         rows: List[Dict[str, Any]],
         table_name: str,
         schema: str,
     ) -> List[ColumnInfo]:
-        from rhosocial.activerecord.backend.expression.types._base import DataType
-
         columns = []
+        dialect = getattr(self._backend, "dialect", None)
         for row in rows:
             nullable = (
                 ColumnNullable.NULLABLE
@@ -145,11 +379,13 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
                 else ColumnNullable.NOT_NULL
             )
             data_type = row.get("DATA_TYPE") or "VARCHAR"
-            dialect = getattr(self._backend, "dialect", None)
-            parsed_data_type = (
-                DataType.parse_data_type_str(dialect, data_type)
-                if dialect
-                else None
+            # ``data_type`` stays the bare word the catalog reported and
+            # ``data_type_full`` carries the size, which is what the two fields
+            # are for: the string core's differ falls back to when a type cannot
+            # be parsed is the word, and the composed spelling is the one that
+            # says how wide the column is.
+            composed = (
+                self._catalog_type_string(row, dialect) if dialect else data_type
             )
             columns.append(
                 ColumnInfo(
@@ -158,8 +394,12 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
                     schema=schema,
                     ordinal_position=row.get("ORDINAL_POSITION"),
                     data_type=data_type.lower(),
-                    data_type_full=data_type,
-                    parsed_data_type=parsed_data_type,
+                    data_type_full=composed,
+                    parsed_data_type=(
+                        self._parse_data_type(composed, row, dialect)
+                        if dialect
+                        else None
+                    ),
                     nullable=nullable,
                     default_value=row.get("COLUMN_DEFAULT"),
                     comment=row.get("COMMENT"),

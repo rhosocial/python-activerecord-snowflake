@@ -35,6 +35,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     AutoIncrementColumnSupport,
     CollationSupport,
     ColumnAttributeSupport,
+    ColumnTypeSupport,
     CommentSupport,
     ConstraintSupport,
     CreateDatabaseSupport,
@@ -50,7 +51,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     CreateViewSupport,
     CTESupport,
     DDLTypeSupport,
-    DateTimeSupport,
+    TimestampSupport,
     DqlOrderSupport,
     DropDatabaseSupport,
     DropIndexSupport,
@@ -109,6 +110,9 @@ SNOWFLAKE_PROTOCOLS = [
     CollationSupport,
     CTESupport,
     ColumnAttributeSupport,
+    # Column classes: which operations a value carries, where DDLTypeSupport
+    # answers how it is stored. SnowflakeColumnTypeMixin supplies the table.
+    ColumnTypeSupport,
     CommentSupport,
     DDLTypeSupport,
     ExplainSupport,
@@ -162,7 +166,7 @@ SNOWFLAKE_PROTOCOLS = [
     CreateTableUsingTemplateSupport,
     CreateTypeSupport,
     CreateViewSupport,
-    DateTimeSupport,
+    TimestampSupport,
     DqlOrderSupport,
     DropDatabaseSupport,
     DropIndexSupport,
@@ -244,6 +248,11 @@ class TestSnowflakeDialectProtocolConformance:
 # ever satisfies one by accident, the negative test fails and forces a conscious
 # decision (move to SNOWFLAKE_PROTOCOLS or revert).
 SNOWFLAKE_NOT_IMPLEMENTED = [
+    # UUID value expressions (generation / nil-max constants / cast) are not
+    # implemented yet on this dialect. Listed here so the omission is a
+    # recorded decision rather than a gap; move it to the implemented list
+    # when the mixin lands.
+    dialect_protocols.UUIDSupport,
     # --- Intentional non-support ---
     # Snowflake has no SQL/PGQ property-graph tables.
     dialect_protocols.GraphTableSupport,

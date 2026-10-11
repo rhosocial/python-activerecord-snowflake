@@ -272,9 +272,12 @@ class TestSnowflakeDataTypeFormatting:
         assert params == ()
 
     def test_varchar_type_default(self, dialect):
+        # An undeclared width is Snowflake's own default: "If no length is
+        # specified, the default is 16777216."  It used to render a bare
+        # ``VARCHAR``, which is the same column on this server.
         t = SnowflakeVarcharType(dialect)
         sql, params = t.to_sql()
-        assert sql == "VARCHAR"
+        assert sql == "VARCHAR(16777216)"
         assert params == ()
 
     def test_number_type(self, dialect):
@@ -283,14 +286,20 @@ class TestSnowflakeDataTypeFormatting:
         assert sql == "NUMBER(38, 2)"
 
     def test_number_type_precision_only(self, dialect):
+        # A precision with no scale is still stored with scale 0 — the manual's
+        # default — and core resolves the declared pair onto the type, so the
+        # pair is what gets written.
         t = SnowflakeNumberType(dialect, precision=10)
         sql, params = t.to_sql()
-        assert sql == "NUMBER(10)"
+        assert sql == "NUMBER(10, 0)"
 
     def test_number_type_default(self, dialect):
+        # A bare ``NUMBER`` is ``NUMBER(38, 0)``: "By default, precision is 38,
+        # and scale is 0; that is, NUMBER(38, 0)".  The resolved pair is what
+        # the catalog reports for the column, so it is what the type renders.
         t = SnowflakeNumberType(dialect)
         sql, params = t.to_sql()
-        assert sql == "NUMBER"
+        assert sql == "NUMBER(38, 0)"
 
     def test_boolean_type(self, dialect):
         t = SnowflakeBooleanType(dialect)
@@ -384,7 +393,7 @@ class TestSnowflakeDataTypeFormatting:
         assert "snowflake_geometry" in result
         assert "snowflake_date" in result
         assert "snowflake_time" in result
-        assert "snowflake_binary" in result
+        assert "snowflake_blob" in result
 
 
 class TestSnowflakeDialectVersion:

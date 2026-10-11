@@ -35,12 +35,14 @@ from .transaction import (
 from .undrop import SnowflakeUndropMixin
 from .variant import SnowflakeVariantMixin
 from .types import SnowflakeTypeSupportMixin
+from .column_type import SnowflakeColumnTypeMixin
 from .warehouse import SnowflakeWarehouseMixin
 from .ddl import SnowflakeAlterColumnModifierMixin
 from .ddl_type import SnowflakeTypeDDLMixin
 # New mixins from dialect.py split
 from .datetime import SnowflakeDateTimeMixin
 from .collation import SnowflakeCollationMixin
+from .trim import SnowflakeTrimMixin
 from .set_operation import SnowflakeSetOperationMixin
 from .dql import SnowflakeDQLMixin
 from .capabilities import SnowflakeCapabilityMixin
@@ -78,11 +80,13 @@ __all__ = [
     "SnowflakeUndropMixin",
     "SnowflakeVariantMixin",
     "SnowflakeTypeSupportMixin",
+    "SnowflakeColumnTypeMixin",
     "SnowflakeWarehouseMixin",
     "SnowflakeAlterColumnModifierMixin",
     "SnowflakeTypeDDLMixin",
     "SnowflakeDateTimeMixin",
     "SnowflakeCollationMixin",
+    "SnowflakeTrimMixin",
     "SnowflakeSetOperationMixin",
     "SnowflakeDQLMixin",
     "SnowflakeCapabilityMixin",

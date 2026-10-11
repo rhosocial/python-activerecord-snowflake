@@ -25,6 +25,7 @@ from .sample import SnowflakeSampleSupport
 from .pivot import SnowflakePivotSupport
 from .dml import SnowflakeDMLSupport
 from .show import SnowflakeShowSupport
+from .type import SnowflakeTypeSupport
 
 __all__ = [
     "SnowflakeTimeTravelSupport",
@@ -46,4 +47,5 @@ __all__ = [
     "SnowflakePivotSupport",
     "SnowflakeDMLSupport",
     "SnowflakeShowSupport",
+    "SnowflakeTypeSupport",
 ]

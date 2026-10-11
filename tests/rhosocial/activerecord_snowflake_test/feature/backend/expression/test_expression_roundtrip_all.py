@@ -776,6 +776,20 @@ def register_specials():
             d, _table_obj(d), dml.ValuesSource(d, [[Literal(d, 1)]])
         ),
     )
+    # CUSTOM. Its ``raw`` slot exists to carry the SQL type name and defaults
+    # to the empty string, which the filler skips and the class refuses while
+    # constructing. Handed a real name it builds and renders, so it is a
+    # constructor rather than a skip -- and for that same reason it is absent
+    # from LEGITIMATE_NON_RENDERS, which would pin a rendering nothing could
+    # ask for.
+    def _custom_type(dialect):
+        from rhosocial.activerecord.backend.expression.types.custom import (
+            CustomType,
+        )
+
+        return CustomType(dialect, "VARCHAR")
+
+    register_special_constructor("types.custom.CustomType", _custom_type)
 
 
 register_specials()
@@ -833,6 +847,14 @@ UNCONSTRUCTIBLE = (
     # positional, so the constructor skips it and the type declares no members
     # (``ValueError: EnumType requires values``).
     "rhosocial.activerecord.backend.expression.types.enum_.EnumType",
+    # The three UUID nodes refuse in __init__, not in to_sql(): Snowflake
+    # spells no UUID SQL, so the answer is the same for every argument and no
+    # registered constructor can change it. Measured with valid arguments --
+    # an invalid ``which`` raises ValueError first and hides the dialect's
+    # answer, which is how the nil/max constant was first misread as rescuable.
+    "rhosocial.activerecord.backend.expression.uuid.UUIDCastExpression",
+    "rhosocial.activerecord.backend.expression.uuid.UUIDConstantExpression",
+    "rhosocial.activerecord.backend.expression.uuid.UUIDGenerationExpression",
 )
 
 #: Formatters Snowflake declares no implementation of, grouped by the feature
@@ -1151,27 +1173,7 @@ LEGITIMATE_NON_RENDERS = {
         TypeError,
         _NO_GENERIC_TYPE,
     ),
-    "rhosocial.activerecord.backend.expression.types.custom.CustomType": (
-        TypeError,
-        _NO_GENERIC_TYPE,
-    ),
     "rhosocial.activerecord.backend.expression.types.datetime_.IntervalType": (
-        TypeError,
-        _NO_GENERIC_TYPE,
-    ),
-    "rhosocial.activerecord.backend.expression.types.datetime_.TimeTzType": (
-        TypeError,
-        _NO_GENERIC_TYPE,
-    ),
-    "rhosocial.activerecord.backend.expression.types.datetime_.TimestampTzType": (
-        TypeError,
-        _NO_GENERIC_TYPE,
-    ),
-    "rhosocial.activerecord.backend.expression.types.integer.IntType": (
-        TypeError,
-        _NO_GENERIC_TYPE,
-    ),
-    "rhosocial.activerecord.backend.expression.types.integer.TinyIntType": (
         TypeError,
         _NO_GENERIC_TYPE,
     ),
@@ -1179,11 +1181,11 @@ LEGITIMATE_NON_RENDERS = {
         TypeError,
         _NO_GENERIC_TYPE,
     ),
-    "rhosocial.activerecord.backend.expression.types.numeric.RealType": (
+    "rhosocial.activerecord.backend.expression.types.uuid_.UUIDType": (
         TypeError,
         _NO_GENERIC_TYPE,
     ),
-    "rhosocial.activerecord.backend.expression.types.uuid_.UUIDType": (
+    "rhosocial.activerecord.backend.expression.types.xml_.XmlType": (
         TypeError,
         _NO_GENERIC_TYPE,
     ),

@@ -384,5 +384,84 @@ class SnowflakeCapabilityMixin:
         """Snowflake has no traditional indexes."""
         return False
 
+    def supports_json_type(self) -> bool:
+        """Snowflake stores semi-structured values in VARIANT.
+
+        VARIANT is its JSON type, so the JSON path operations exist even though
+        the arrow operators and JSON_TABLE do not.
+
+        Declared here rather than in SnowflakeVariantMixin: the core JSONMixin
+        comes earlier in the MRO than that mixin does, so a probe written there
+        is dead code and the core's False is what a caller sees.
+        """
+        return True
+
+    #: The JSON path function Snowflake spells this way. Declared so a
+    #: conformance check can tell it from a function inherited from the core,
+    #: which is MySQL's JSON_EXTRACT.
+    _JSON_FUNCTION_NAMES = ("GET_PATH",)
+
+    def supports_json_function(self, function_name: str) -> bool:
+        """Whether a named JSON function is available on this server."""
+        return function_name.upper() in self._JSON_FUNCTION_NAMES
+
+    def format_json_function_expression(self, expr) -> Tuple[str, tuple]:
+        """Render a JSON path with GET_PATH.
+
+        GET_PATH takes a variant path — ``a.b[0]`` — where the shared jsonpath
+        syntax leads with ``$.``, so the leading marker goes and the notation
+        after it is the same. ``->`` yields the VARIANT GET_PATH returns;
+        ``->>`` casts to VARCHAR, which is what that operator means elsewhere.
+        """
+        from ....expression import bases
+
+        if isinstance(expr.column, bases.BaseExpression):
+            col_sql, col_params = expr.column.to_sql()
+        else:
+            col_sql, col_params = self.format_identifier(str(expr.column)), ()
+
+        literal = self.format_literal(_variant_path(expr.path))
+        if expr.operation == "->>":
+            sql = f"GET_PATH({col_sql}, {literal})::VARCHAR"
+        else:
+            sql = f"GET_PATH({col_sql}, {literal})"
+
+        if expr.alias:
+            sql = f"{sql} AS {self.format_identifier(expr.alias)}"
+        return sql, col_params
+
+    def format_json_arrow_expression(self, expr) -> Tuple[str, tuple]:
+        """Snowflake has no ``->`` operator, so ARROW mode is refused.
+
+        The caller asked for a spelling this server does not have. Emitting the
+        arrow token anyway would be a syntax error rather than a wrong answer,
+        so the refusal with a route forward is the useful form.
+        """
+        from ....dialect.exceptions import UnsupportedFeatureError
+
+        raise UnsupportedFeatureError(
+            dialect_name=type(self).__name__,
+            feature_name="the -> and ->> JSON operators",
+            suggestion=(
+                "Snowflake has no arrow operators for JSON. Use "
+                "JSONPathMode.FUNCTION, or AUTO, which falls back to GET_PATH."
+            ),
+        )
+
+
+
+def _variant_path(path: str) -> str:
+    """Convert a shared jsonpath to Snowflake's variant path notation.
+
+    ``GET_PATH`` takes ``a.b[0]`` where jsonpath is ``$.a.b[0]``: the same
+    notation behind a leading marker it does not use. A quoted segment keeps
+    its quotes, since that is how a key containing a dot is written.
+    """
+    text = str(path or "").strip()
+    if text.startswith("$."):
+        return text[2:]
+    if text == "$":
+        return ""
+    return text
 
 __all__ = ['SnowflakeCapabilityMixin']
