@@ -375,8 +375,24 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         lost by dropping the *concept* on this backend; what would be lost is
         the caller's statement that these particular columns hold no negative
         value, and that belongs in a ``CHECK`` constraint.
+
+        The shape check comes first because this method is the **only** place
+        that sees the field: the expression's constructor collects ``unsigned``
+        without judging it — only the formatter knows which backend has to honour
+        it — so a non-boolean reaches here instead of being rejected at
+        construction.  A truth test cannot see it: ``unsigned=0``,
+        ``unsigned=""`` and ``unsigned=None`` are all falsy, so they would sail
+        past the test below, render a signed column and report success, which is
+        the same silent loss this method exists to prevent.  Naming the shape is
+        what a truth test cannot do.
         """
-        if not expr.unsigned:
+        unsigned = expr.unsigned
+        if not isinstance(unsigned, bool):
+            raise TypeError(
+                f"unsigned must be a bool, got {type(unsigned).__name__}; it "
+                f"becomes a type modifier in the rendered DDL."
+            )
+        if not unsigned:
             return
         raise UnsupportedFeatureError(
             self.name,
@@ -461,8 +477,24 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         out-of-range number.  Every one of those existing checks still fires
         unchanged for a signed declaration, which is what
         ``test_snowflake_type_protocol.py`` pins.
+
+        The shape check is first for the reason given in
+        :meth:`_refuse_unsigned_integer`, and it matters **twice** over here
+        because this is the gate for two class hierarchies: a non-boolean
+        reaches the formatter unjudged (the constructors collect ``unsigned``
+        without validating it), and a falsy one — ``0``, ``""``, ``None``, an
+        empty container — is invisible to the truth test that follows, so it
+        would render a signed ``NUMBER`` / ``FLOAT`` / ``DOUBLE`` and report
+        success whether it arrived through ``DecimalType`` or through
+        :class:`~...expression.types.SnowflakeNumberType`.
         """
-        if not getattr(expr, "unsigned", False):
+        unsigned = expr.unsigned
+        if not isinstance(unsigned, bool):
+            raise TypeError(
+                f"unsigned must be a bool, got {type(unsigned).__name__}; it "
+                f"becomes a type modifier in the rendered DDL."
+            )
+        if not unsigned:
             return
         raise UnsupportedFeatureError(
             self.name,
