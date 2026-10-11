@@ -100,7 +100,7 @@ class SnowflakeTimeTravelMixin:
             ValueError: no temporal options were given.
             UnsupportedFeatureError: an option Snowflake cannot express.
         """
-        options: Dict[str, Any] = getattr(expr, "options", None) or {}
+        options: Dict[str, Any] = expr.options or {}
         if not options:
             raise ValueError(
                 "Temporal options cannot be empty. If no temporal options are needed, "

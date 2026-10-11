@@ -85,7 +85,7 @@ class SnowflakeMaterializedViewMixin:
             raise UnsupportedFeatureError(
                 self.name, "MATERIALIZED VIEW STORAGE PARAMETERS"
             )
-        if getattr(expr, "with_data", False) or getattr(expr, "no_data", False):
+        if expr.with_data or expr.no_data:
             # The clause is absent from Snowflake's grammar entirely: the view
             # is created empty and filled in the background. An explicitly
             # requested spelling is refused by name rather than dropped.
@@ -114,7 +114,7 @@ class SnowflakeMaterializedViewMixin:
         view_sql, _view_params = expr.view.to_sql()
         parts.append(view_sql)
 
-        column_aliases = getattr(expr, "column_aliases", None)
+        column_aliases = expr.column_aliases
         if column_aliases:
             cols = ", ".join(self.format_identifier(col) for col in column_aliases)
             parts.append(f"({cols})")
