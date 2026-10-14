@@ -12,13 +12,19 @@ import pytest
 from rhosocial.activerecord.backend.expression.core import Column
 from rhosocial.activerecord.backend.expression import ComparisonPredicate, Literal
 from rhosocial.activerecord.backend.expression.statements import (
-    ColumnConstraintType,
+    ColumnCheckConstraint,
     ColumnDefinition,
+    ColumnDefaultConstraint,
+    ColumnNotNullConstraint,
+    ColumnPrimaryKeyConstraint,
+    ColumnUniqueConstraint,
     CreateTableStatement,
     IndexDefinition,
     StorageOptionsExpression,
+    TableCheckConstraint,
     TableConstraint,
-    TableConstraintType,
+    TablePrimaryKeyConstraint,
+    TableUniqueConstraint,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_partition import (
     PartitionClause,
@@ -48,21 +54,21 @@ NATIVE_TYPES = (SnowflakeVarcharType(length=32), SnowflakeVariantType())
 SQL_TYPE = UseSqlType(*NATIVE_TYPES)
 VALUE_COLUMN = UseColumn("physical_value")
 DEFAULT_CONSTRAINT = UseConstraint(
-    ColumnConstraintType.DEFAULT,
+    ColumnDefaultConstraint,
     name="dflt_value",
-    default_value=17,
+    value=17,
 )
 UNIQUE_CONSTRAINT = UseConstraint(
-    ColumnConstraintType.UNIQUE,
+    ColumnUniqueConstraint,
     name="uq_value",
 )
 CHECK_CONDITION = ComparisonPredicate(
     None, "=", Column(None, "physical_value"), Literal(None, "active")
 )
 CHECK_CONSTRAINT = UseConstraint(
-    ColumnConstraintType.CHECK,
+    ColumnCheckConstraint,
     name="ck_value",
-    check_condition=CHECK_CONDITION,
+    condition=CHECK_CONDITION,
 )
 FIRST_INDEX_CONDITION = object()
 FIRST_INCLUDE_COLUMNS = ["id"]
@@ -92,17 +98,18 @@ VALUE_GENERATED = UseGeneratedColumn(GENERATED_EXPRESSION)
 
 TABLE_CONSTRAINT_ONE = TableConstraint(
     None,
-    TableConstraintType.UNIQUE,
+    branch=TableUniqueConstraint(None, ["physical_value", "quantity"]),
     name="uq_physical_quantity",
-    columns=["physical_value", "quantity"],
 )
 TABLE_CONSTRAINT_TWO = TableConstraint(
     None,
-    TableConstraintType.CHECK,
-    name="ck_physical_quantity",
-    check_condition=ComparisonPredicate(
-        None, "=", Column(None, "physical_value"), Literal(None, "active")
+    branch=TableCheckConstraint(
+        None,
+        ComparisonPredicate(
+            None, "=", Column(None, "physical_value"), Literal(None, "active")
+        ),
     ),
+    name="ck_physical_quantity",
 )
 TABLE_CONSTRAINTS = [TABLE_CONSTRAINT_ONE, TABLE_CONSTRAINT_TWO]
 TABLE_INDEX_ONE = IndexDefinition(
@@ -130,9 +137,13 @@ TABLE_INHERITS = ["parent_a", "parent_b"]
 TABLE_TABLESPACE = "ts_data"
 COMPOSITE_CONSTRAINT = TableConstraint(
     None,
-    TableConstraintType.CHECK,
+    branch=TableCheckConstraint(
+        None,
+        ComparisonPredicate(
+            None, "=", Column(None, "tenant_id"), Literal(None, "active")
+        ),
+    ),
     name="ck_composite",
-    columns=["tenant_id", "order_id"],
 )
 
 
@@ -181,7 +192,7 @@ class DeclarationModel(TableDeclarationOverrides, ActiveRecord):
         VALUE_COMMENT,
         VALUE_GENERATED,
     ] = None
-    quantity: Annotated[int, UseConstraint(ColumnConstraintType.DEFAULT, default_value=7)] = 1
+    quantity: Annotated[int, UseConstraint(ColumnDefaultConstraint, value=7)] = 1
 
     __table_constraints__ = TABLE_CONSTRAINTS
     __table_indexes__ = TABLE_INDEXES
@@ -206,7 +217,7 @@ class AsyncDeclarationModel(TableDeclarationOverrides, AsyncActiveRecord):
         VALUE_COMMENT,
         VALUE_GENERATED,
     ] = None
-    quantity: Annotated[int, UseConstraint(ColumnConstraintType.DEFAULT, default_value=7)] = 1
+    quantity: Annotated[int, UseConstraint(ColumnDefaultConstraint, value=7)] = 1
 
     __table_constraints__ = TABLE_CONSTRAINTS
     __table_indexes__ = TABLE_INDEXES
@@ -299,15 +310,15 @@ def _assert_declaration_model(model):
     assert _same_objects(model.column_data_type("value").data_types, NATIVE_TYPES)
 
     value_constraints = model.column_constraints("value")
-    assert [item.constraint_type for item in value_constraints] == [
-        ColumnConstraintType.DEFAULT,
-        ColumnConstraintType.UNIQUE,
-        ColumnConstraintType.CHECK,
+    assert [type(item.branch) for item in value_constraints] == [
+        ColumnDefaultConstraint,
+        ColumnUniqueConstraint,
+        ColumnCheckConstraint,
     ]
     assert value_constraints[0] is DEFAULT_CONSTRAINT.constraint
     assert value_constraints[1] is UNIQUE_CONSTRAINT.constraint
     assert value_constraints[2] is CHECK_CONSTRAINT.constraint
-    assert value_constraints[2].check_condition is CHECK_CONDITION
+    assert value_constraints[2].branch.condition is CHECK_CONDITION
 
     value_indexes = model.column_indexes("value")
     assert [item.name for item in value_indexes] == [
@@ -332,15 +343,15 @@ def _assert_declaration_model(model):
     assert model.column_options("value") is None
 
     id_constraints = model.column_constraints("id")
-    assert [item.constraint_type for item in id_constraints] == [
-        ColumnConstraintType.PRIMARY_KEY,
-        ColumnConstraintType.NOT_NULL,
+    assert [type(item.branch) for item in id_constraints] == [
+        ColumnPrimaryKeyConstraint,
+        ColumnNotNullConstraint,
     ]
     quantity_constraints = model.column_constraints("quantity")
     assert model.model_fields["quantity"].default == 1
-    assert quantity_constraints[0].constraint_type == ColumnConstraintType.DEFAULT
-    assert quantity_constraints[0].default_value == 7
-    assert quantity_constraints[1].constraint_type == ColumnConstraintType.NOT_NULL
+    assert isinstance(quantity_constraints[0].branch, ColumnDefaultConstraint)
+    assert quantity_constraints[0].branch.value == 7
+    assert isinstance(quantity_constraints[1].branch, ColumnNotNullConstraint)
 
     assert model.table_options() is TABLE_OPTIONS
     assert [item.transient for item in model.table_options()] == [False, True]
@@ -414,16 +425,16 @@ def _assert_composite_model(model):
     }
     for field in ("tenant_ref", "order_ref"):
         constraints = model.column_constraints(field)
-        assert [item.constraint_type for item in constraints] == [
-            ColumnConstraintType.NOT_NULL,
+        assert [type(item.branch) for item in constraints] == [
+            ColumnNotNullConstraint,
         ]
 
     constraints = model.table_constraints()
     assert constraints[0] is COMPOSITE_CONSTRAINT
-    assert constraints[-1].constraint_type == TableConstraintType.PRIMARY_KEY
-    assert constraints[-1].columns == ["tenant_id", "order_id"]
+    assert isinstance(constraints[-1].branch, TablePrimaryKeyConstraint)
+    assert constraints[-1].branch.columns == ["tenant_id", "order_id"]
     assert all(
-        item.constraint_type != TableConstraintType.PRIMARY_KEY
+        not isinstance(item.branch, TablePrimaryKeyConstraint)
         for item in constraints[:-1]
     )
 

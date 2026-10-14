@@ -46,6 +46,7 @@ from .trim import SnowflakeTrimMixin
 from .set_operation import SnowflakeSetOperationMixin
 from .dql import SnowflakeDQLMixin
 from .capabilities import SnowflakeCapabilityMixin
+from .constraint import SnowflakeConstraintMixin
 from .ilike import SnowflakeILIKEMixin
 from .generated_column import SnowflakeGeneratedColumnMixin
 from .ordered_set_aggregation import SnowflakeOrderedSetAggregationMixin
@@ -90,6 +91,7 @@ __all__ = [
     "SnowflakeSetOperationMixin",
     "SnowflakeDQLMixin",
     "SnowflakeCapabilityMixin",
+    "SnowflakeConstraintMixin",
     "SnowflakeILIKEMixin",
     "SnowflakeGeneratedColumnMixin",
     "SnowflakeOrderedSetAggregationMixin",

@@ -89,7 +89,7 @@ from rhosocial.activerecord.backend.expression.statements.ddl_table import (
     CreateTableAsStatement,
     DropTableStatement,
     IdentityClause,
-    TableConstraintType,
+    TableCheckConstraint,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_truncate import (
     TruncateStatement,
@@ -596,7 +596,7 @@ MANDATORY_CASES: Tuple[MandatoryPairCase, ...] = (
     MandatoryPairCase(
         "AlterConstraint.enforced",
         lambda d, **kw: AlterConstraint(
-            d, "c", constraint_type=TableConstraintType.CHECK, **kw
+            d, "c", constraint_kind=TableCheckConstraint, **kw
         ),
         "enforced",
         "not_enforced",

@@ -5,16 +5,16 @@ These leverage Snowflake-specific features like QUALIFY, time travel,
 VARIANT path access, and MERGE.
 
 Usage:
-    from rhosocial.activerecord.backend.named_query import resolve_named_query
+    from rhosocial.activerecord.backend.named_expression import resolve_named_expression
     from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 
     dialect = SnowflakeDialect(version=(8, 0, 0))
-    expr, sql, params = resolve_named_query(
+    expr = resolve_named_expression(
         "rhosocial.activerecord.backend.impl.snowflake.examples.named_queries.snow_queries.daily_sales_report",
         dialect=dialect,
         user_params={"report_date": "2024-01-15"},
     )
-    print(sql, params)
+    print(expr.to_sql())
 """
 from typing import Optional
 

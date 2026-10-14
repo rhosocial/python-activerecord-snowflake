@@ -11,8 +11,9 @@ import pytest
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression.statements import (
     ColumnConstraint,
-    ColumnConstraintType,
+    ColumnDefaultConstraint,
     ColumnDefinition,
+    ColumnNotNullConstraint,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_alter import (
     AddColumn,
@@ -53,7 +54,11 @@ class TestSnowflakeAddColumnIfNotExists:
                 dialect,
                 "content",
                 TextType(dialect),
-                constraints=[ColumnConstraint(dialect, ColumnConstraintType.NOT_NULL)],
+                constraints=[
+                    ColumnConstraint(
+                        dialect, branch=ColumnNotNullConstraint(dialect)
+                    )
+                ],
             ),
             if_not_exists=True,
         )
@@ -69,7 +74,9 @@ class TestSnowflakeAddColumnIfNotExists:
                 "content",
                 VarCharType(dialect, length=50),
                 constraints=[
-                    ColumnConstraint(dialect, ColumnConstraintType.DEFAULT, default_value="x")
+                    ColumnConstraint(
+                        dialect, branch=ColumnDefaultConstraint(dialect, "x")
+                    )
                 ],
             ),
             if_not_exists=True,

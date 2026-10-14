@@ -118,6 +118,10 @@ from rhosocial.activerecord.backend.expression.datetime import (
     TemporalOptionsExpression,
 )
 from rhosocial.activerecord.backend.expression.predicates import ComparisonPredicate
+from rhosocial.activerecord.backend.expression.predicates import (
+    ILikePredicate,
+    LikePredicate,
+)
 from rhosocial.activerecord.backend.expression.query_parts import JoinClause
 from rhosocial.activerecord.backend.expression.serialization import (
     ExpressionRegistry,
@@ -154,12 +158,12 @@ from rhosocial.activerecord.backend.expression.statements.ddl_domain import (
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_table import (
     ColumnConstraint,
-    ColumnConstraintType,
+    ColumnNotNullConstraint,
     ForeignKeyConstraint,
     IndexDefinition,
     ReferencesClause,
     TableConstraint,
-    TableConstraintType,
+    TablePrimaryKeyConstraint,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_trigger import (
     TriggerEvent,
@@ -176,6 +180,7 @@ from rhosocial.activerecord.backend.expression.types import (
     VarCharType,
 )
 from rhosocial.activerecord.backend.expression.xml import (
+    PassingClause,
     XMLAttribute,
     XMLAttributesExpression,
     XMLConcatExpression,
@@ -573,12 +578,14 @@ def register_specials():
     # -- constraints and column pieces ---------------------------------------
     register_special_constructor(
         "statements.ddl_table.ColumnConstraint",
-        lambda d: ColumnConstraint(d, ColumnConstraintType.NOT_NULL, name="c"),
+        lambda d: ColumnConstraint(
+            d, branch=ColumnNotNullConstraint(d), name="c"
+        ),
     )
     register_special_constructor(
         "statements.ddl_table.TableConstraint",
         lambda d: TableConstraint(
-            d, TableConstraintType.PRIMARY_KEY, name="c", columns=["a"]
+            d, branch=TablePrimaryKeyConstraint(d, ["a"]), name="c"
         ),
     )
     register_special_constructor(
@@ -612,9 +619,33 @@ def register_specials():
         lambda d: ddl_alter.AddTableConstraint(
             d,
             TableConstraint(
-                d, TableConstraintType.PRIMARY_KEY, name="c", columns=["a"]
+                d, branch=TablePrimaryKeyConstraint(d, ["a"]), name="c"
             ),
         ),
+    )
+
+    # -- predicates whose operands are value nodes --------------------------
+    # A LIKE/ILIKE operand is a value node, and the introspective guess fills
+    # the slot with a bare string; the formatter then asks the string for
+    # ``to_sql()``. Core's own dummy2 matrix registers both, and core's
+    # wildcard split notes that these two need it, so the registration is
+    # copied rather than re-derived from the failure.
+    register_special_constructor(
+        "predicates.LikePredicate",
+        lambda d: LikePredicate(d, "LIKE", Column(d, "a"), Literal(d, "%x%")),
+    )
+    register_special_constructor(
+        "predicates.ILikePredicate",
+        lambda d: ILikePredicate(d, Column(d, "a"), "%x%"),
+    )
+
+    # -- XML PASSING ----------------------------------------------------------
+    # The clause carries a list of value expressions; a bare "x" string is not
+    # one. Snowflake has no SQL/XML, so the class lands in the unmodelled table
+    # either way -- but it has to construct first for that answer to be reached.
+    register_special_constructor(
+        "xml.PassingClause",
+        lambda d: PassingClause(d, [Column(d, "a")]),
     )
 
     # -- expressions that need at least one member --------------------------
@@ -822,7 +853,7 @@ register_specials()
 #: :data:`UNMODELLED_FORMATTERS` under SQL/XML rather than the class staying pinned
 #: here -- the matrix could not find that out while the class could not be built.
 UNCONSTRUCTIBLE = (
-    # ALTER CONSTRAINT. ``name`` and ``constraint_type`` sit behind defaulted
+    # ALTER CONSTRAINT. ``name`` and ``constraint_kind`` sit behind defaulted
     # positionals and are keyword-only, so the introspective constructor skips
     # them and the class refuses an incomplete action (`ValueError:
     # constraint_name must be a non-empty string`, because the defaulted
@@ -901,6 +932,7 @@ UNMODELLED_FORMATTERS = {
         "format_xmlroot_expression",
         "format_xmlserialize_expression",
         "format_xmltable_expression",
+        "format_passing_clause",
     ),
     # --- SQL/PGQ property graphs: no graph tables, no MATCH ---------------
     "SQL/PGQ property graphs (Snowflake has no GRAPH_TABLE and no Cypher)": (
@@ -1145,6 +1177,26 @@ LEGITIMATE_NON_RENDERS = {
     "rhosocial.activerecord.backend.expression.statements.ddl_function.CreateFunctionStatement": (  # noqa: E501
         AttributeError,
         "'CreateFunctionStatement' object has no attribute 'name'",
+    ),
+    # --- the two constraint branch roots and the column-clause root ---------
+    # Each names a *level* rather than a renderable construct: the branch roots
+    # hold the per-kind nodes, and ``ColumnClause`` holds collation, identity,
+    # the inline comment and the like.  They deliberately declare no
+    # ``format_method`` -- the shared getter raises -- so ``to_sql()`` reports
+    # that there is nothing to dispatch, which is the same answer every other
+    # abstract root in this table gives.  Pinned per class so one of them
+    # starting to render fails here instead of passing quietly.
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.ColumnClause": (
+        NotImplementedError,
+        _NO_FORMAT_METHOD_NAME,
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.ColumnConstraintBranch": (
+        NotImplementedError,
+        _NO_FORMAT_METHOD_NAME,
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.TableConstraintBranch": (
+        NotImplementedError,
+        _NO_FORMAT_METHOD_NAME,
     ),
     # ---- the root of the type tree: incomplete rather than unsupported ----
     # Every concrete type declares its own generic ``name``, which is what

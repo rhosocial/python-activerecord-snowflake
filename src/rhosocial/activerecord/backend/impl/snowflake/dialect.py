@@ -174,6 +174,7 @@ from .mixins import (
     SnowflakeSetOperationMixin,
     SnowflakeDQLMixin,
     SnowflakeCapabilityMixin,
+    SnowflakeConstraintMixin,
     SnowflakeILIKEMixin,
     SnowflakeTrimMixin,
     SnowflakeGeneratedColumnMixin,
@@ -221,6 +222,11 @@ class SnowflakeDialect(
     SnowflakeSetOperationMixin,
     SnowflakeDQLMixin,
     SnowflakeCapabilityMixin,
+    # Constraint capabilities: every answer core's constraint probes and
+    # renderers consult, declared in this package. Placed well before the core
+    # ``ConstraintMixin`` / ``DDLColumnMixin`` (below) so the local answers win
+    # over the shared defaults.
+    SnowflakeConstraintMixin,
     SnowflakeILIKEMixin,
     SnowflakeGeneratedColumnMixin,
     SnowflakeOrderedSetAggregationMixin,

@@ -355,23 +355,34 @@ class SnowflakeCapabilityMixin:
         return ModifyColumn(self, column=new_col)
 
     def format_modify_column_action(self, action) -> Tuple[str, tuple]:
-        """Render Snowflake ALTER TABLE ... MODIFY COLUMN <col> <type>."""
-        from rhosocial.activerecord.backend.expression.statements.ddl_table import (
-            ColumnConstraintType,
+        """Render Snowflake ALTER TABLE ... MODIFY COLUMN <col> <type>.
+
+        The MODIFY path re-spells the column's inline constraint list, which
+        Snowflake accepts on a column type change: NOT NULL, NULL and DEFAULT.
+        The other kinds cannot ride this action and are not rendered here; the
+        original list is not filtered down to these three (a PK is skipped, not
+        refused) because this is a *re-spelling* of an already-validated column,
+        not a new declaration.
+        """
+        from rhosocial.activerecord.backend.expression.statements import (
+            ColumnDefaultConstraint,
+            ColumnNotNullConstraint,
+            ColumnNullableConstraint,
         )
 
         col = action.column
         type_sql, _ = self.format_data_type(col.data_type)
         parts = [type_sql]
         for c in col.constraints:
-            if c.constraint_type == ColumnConstraintType.NOT_NULL:
+            branch = c.branch
+            if isinstance(branch, ColumnNotNullConstraint):
                 parts.append("NOT NULL")
-            elif c.constraint_type == ColumnConstraintType.NULL:
+            elif isinstance(branch, ColumnNullableConstraint):
                 parts.append("NULL")
-            elif c.constraint_type == ColumnConstraintType.DEFAULT and c.default_value is not None:
+            elif isinstance(branch, ColumnDefaultConstraint) and branch.value is not None:
                 from rhosocial.activerecord.backend.expression.core import Literal
 
-                lit_sql, lit_params = Literal(self, c.default_value).to_sql()
+                lit_sql, lit_params = Literal(self, branch.value).to_sql()
                 parts.append(f"DEFAULT {lit_sql}")
         spec = " ".join(parts)
         return f"MODIFY COLUMN {self.format_identifier(col.name)} {spec}", ()

@@ -9,10 +9,12 @@ would move Snowflake's contract with it.  A declaration here is the pin.  Before
 this module the backend declared **three** constraint switches in total
 (:meth:`supports_constraints`, :meth:`supports_drop_constraint_if_exists` and
 :meth:`supports_column_comment`), so every other answer below was whatever core
-happened to say -- and for two of them core is actively wrong about Snowflake.
+happened to say -- and for three of them (the two enforcement probes and the
+deferral probe) core's default licensed a render this backend never measured.
+Every such answer is now a local declaration, stated here rather than inherited.
 
-Evidence level: 文档（待云验）
-----------------------------
+Evidence level: not server-verified (文档（待云验）)
+--------------------------------------------------
 **Every value below is official-grammar-only.  Nothing here was measured.**
 There is no Snowflake instance reachable from this repository's test environment
 -- no account credentials exist, and the repository has no Snowflake emulator --
@@ -21,10 +23,40 @@ reference pages were transcribed on 2026-10-12 and are named at
 :data:`OFFICIAL_GRAMMAR_URL` and :data:`ALTER_TABLE_GRAMMAR_URL`; a ``待云验``
 marker means "a real Snowflake run must confirm this before a caller relies on
 it".  The contract tests assert the *declaration*, never the server's agreement
-with it.
+with it, and every test for this file is render-only -- a rendering assertion
+here is **not** a measurement and must never be read as one.
 
-Two of the three corrections here are unusually load-bearing, because they turn
-a refusal into a render:
+Modifier policy: the grammar has the tokens; this dialect does not render them
+---------------------------------------------------------------------------
+``supports_constraint_enforced``, ``supports_alter_constraint_enforced`` and
+``supports_deferrable_constraint`` are declared **explicitly ``False``** even
+though the grammar productions transcribed below contain ``[ [ NOT ] ENFORCED ]``
+and ``[ [ NOT ] DEFERRABLE ]``.  Three reasons, in order of weight:
+
+* **Not verified.**  No Snowflake instance is reachable, so a ``True`` here would
+  license SQL nobody has seen the server accept.  The project's rule for the
+  clauses it cannot measure is to fail closed, and the two probes core's
+  renderers consult are exactly where a guess would turn into emitted SQL.
+* **``ENFORCED`` is worse than a syntax error on this server.**  The reference
+  states that for a standard table a PRIMARY KEY, UNIQUE or FOREIGN KEY is not
+  enforced *regardless of the property*, and that specifying the non-default
+  ``ENABLE`` / ``VALIDATE`` when creating one means *"the constraint isn't
+  created"* -- silently, with no error.  Rendering the marker would therefore
+  hand a caller a success that enforces nothing.
+* **Precedent in this repository.**  ``supports_alter_constraint_enforced`` was
+  already declared ``False`` before this file existed, and the clause-pair guard
+  asserts the two spellings are refused by name.  Flipping it without a server
+  would be a regression in the honest direction.
+
+The per-level and per-kind grammar probes (``supports_{column,table}_*``,
+``supports_*_enforced_*_constraint``, ``supports_*_deferrable_*_constraint``)
+stay as the record of *what the grammar contains*: they are backend-only, no core
+formatter consults them, and they are what an eventual live measurement would be
+checked against.  The two families are kept apart deliberately and each
+docstring says which one it is.
+
+Two corrections to the inherited answers are unusually load-bearing, because they
+turn a refusal of real grammar into a render:
 
 * :meth:`supports_fk_match` moves **``False`` -> ``True``**.  Core reaches
   ``False`` by accident of MRO -- ``DDLColumnMixin`` declares the probe with a
@@ -32,11 +64,18 @@ a refusal into a render:
   declares the same probe with a ``True`` default.  Snowflake is one of the few
   backends in this group that genuinely has ``MATCH``, so the inherited answer
   was refusing SQL Snowflake's own grammar contains.
-* :meth:`supports_alter_constraint_enforced` moves **``False`` -> ``True``**.
-  Core's default is ``False``, so today ``ALTER CONSTRAINT ... NOT ENFORCED`` is
-  refused -- even though Snowflake's ``constraintAction`` lists
+* :meth:`supports_alter_constraint_enforced` stays **``False``**, but is now a
+  *declaration* rather than an inherited default (core's P1 flipped the shared
+  default to ``False`` as well, so the value is unchanged and the ownership is
+  what moved).  Snowflake's ``constraintAction`` lists
   ``[ [ NOT ] ENFORCED ]`` as one of only three properties the ALTER branch can
   set.
+* :meth:`supports_constraint_enforced` and
+  :meth:`supports_deferrable_constraint` likewise stay **``False``** as explicit
+  declarations where the core default used to license a render: before P1,
+  ``ConstraintMixin`` answered ``True`` for both, so Snowflake emitted
+  ``ENFORCED`` / ``DEFERRABLE`` it had never measured.  See the modifier-policy
+  section above for why the declaration outweighs the grammar reading.
 
 Source, transcribed 2026-10-12 from the two pages every production below is on
 
@@ -239,30 +278,27 @@ not mistake the pins for working behaviour:
 * **The enforcement marker is unreachable on a column-level primary key.**
   ``inlineUniquePK`` has ``[ [ NOT ] ENFORCED ]``, and
   :meth:`supports_column_enforced_primary_key_constraint` is ``True`` -- but
-  ``format_primary_key_constraint`` calls ``_format_constraint_enforcement``,
-  whose first act is to raise ``ValueError`` for any kind other than ``CHECK``
-  or ``FOREIGN KEY``::
-
-      ValueError: ENFORCED/NOT ENFORCED is only valid for CHECK and FOREIGN KEY constraints
-
-  So on this core a caller cannot *ask* for ``ENFORCED`` on a Snowflake primary
-  key, and the probe is never consulted for one.  Closing this means changing
-  that ``ValueError`` in core, not a switch value.  The same applies to
-  ``UNIQUE``.
-* **``NOT ENFORCED`` is still not emitted unless a caller asks for it.**  This
-  is the more awkward half of the same problem on Snowflake than on any other
+  core's ``format_constraint_traits`` renders a trait only after the flat
+  :meth:`supports_constraint_enforced` agrees, and that flat probe is ``False``
+  here (see the modifier-policy section above).  So the per-kind ``True`` records
+  the grammar while the render path refuses the spelling, and the refusal is a
+  decision (fail closed without a server) rather than an accident of core's
+  internals.  The same applies to ``UNIQUE``.
+* **``NOT ENFORCED`` is not rendered at all, and that is a decision.**  This is
+  the more awkward half of the same problem on Snowflake than on any other
   backend, because ``NOT ENFORCED`` **is** the Snowflake default: a caller who
   omits it already gets ``NOT ENFORCED`` semantics from the server.  Not
   emitting it is therefore *correct* here and wrong on BigQuery, where the token
   is compulsory -- do not "fix" one backend by copying the other.
-* **``ENFORCED`` / ``ENABLE`` / ``VALIDATE`` are not refused, and on a standard
-  table they are worse than a syntax error.**  The reference is explicit:
-  *"for PRIMARY KEY, UNIQUE, and FOREIGN KEY constraints, if you specify ENABLE
-  or VALIDATE (the non-default values for these properties) when creating a new
-  constraint, the constraint isn't created."*  A renderer that honours a caller
-  who asks for them therefore emits SQL that **silently succeeds while creating
-  no constraint at all**.  Refusing the spelling is a change to
-  ``_format_constraint_enforcement`` and the Snowflake render path.
+* **``ENFORCED`` / ``ENABLE`` / ``VALIDATE`` are refused by the flat probes, and
+  on a standard table they are worse than a syntax error.**  The reference is
+  explicit: *"for PRIMARY KEY, UNIQUE, and FOREIGN KEY constraints, if you
+  specify ENABLE or VALIDATE (the non-default values for these properties) when
+  creating a new constraint, the constraint isn't created."*  A renderer that
+  honoured a caller who asked for them would emit SQL that **silently succeeds
+  while creating no constraint at all** -- which is why the flat
+  ``supports_constraint_enforced`` answers ``False`` rather than leaving the
+  spelling reachable.
 * **``NOT VALID`` is not a Snowflake spelling; ``NOVALIDATE`` is.**
   ``_format_constraint_validation`` emits the two-word ``" NOT VALID"``, which
   Snowflake's grammar does not contain anywhere.  That is why
@@ -301,8 +337,6 @@ evidence, **on the understanding that core S3 may rename or absorb them**.  The
 flat switches are the ones core's renderers actually consult today; the two
 groups are kept apart deliberately, and every docstring says which it is.
 """
-
-from typing import Any
 
 #: The page the inline/out-of-line constraint productions and every property
 #: default were transcribed from.  Kept as a constant so the docstrings, the
@@ -366,8 +400,8 @@ class SnowflakeConstraintMixin:
 
         Declared locally even though core's ``ConstraintMixin`` already answers
         ``True``: it is the gate on the refusal in
-        ``format_primary_key_constraint``, so the value is load-bearing and must
-        not be able to move with a core default.
+        ``format_column_primary_key_constraint``, so the value is load-bearing
+        and must not be able to move with a core default.
 
         Distinct from :meth:`supports_primary_key_constraint`, the flat probe
         core's formatter actually consults.  Both are ``True`` and both are
@@ -384,8 +418,8 @@ class SnowflakeConstraintMixin:
         (quoted in full at :meth:`supports_column_primary_key_constraint`).
 
         Core consults :meth:`supports_unique_constraint` -- not this one -- for
-        ``ColumnConstraintType.UNIQUE`` in ``format_column_constraint``; both are
-        declared and both are ``True``.
+        the ``UNIQUE`` branch in ``format_column_constraint``; both are declared
+        and both are ``True``.
 
         文档（待云验）: grammar-only, not server-verified.
         """
@@ -727,12 +761,12 @@ class SnowflakeConstraintMixin:
         on a hybrid table it is the one that matters (the reference notes you
         cannot set ``NOT ENFORCED`` on a hybrid ``PRIMARY KEY`` at all).
 
-        Reachability, so the ``True`` is not over-read: on this core
-        ``format_primary_key_constraint`` calls ``_format_constraint_enforcement``,
-        which raises ``ValueError`` for any kind other than ``CHECK`` or
-        ``FOREIGN KEY`` before consulting any probe.  The probe is therefore
-        unreachable for a primary key today; closing that is a core change to the
-        ``ValueError``, not a switch value.  See the module docstring.
+        Reachability, so the ``True`` is not over-read: it records the grammar
+        only.  Core's render path consults the flat
+        :meth:`supports_constraint_enforced`, which is ``False`` here, so the
+        marker is refused for a primary key (and for every other kind) rather
+        than emitted.  See the modifier-policy section of the module docstring
+        for why the grammar answer and the render answer differ.
 
         Name note: no core probe is per-level or per-kind for enforcement yet.
 
@@ -746,8 +780,8 @@ class SnowflakeConstraintMixin:
         Official grammar: ``{ UNIQUE | PRIMARY KEY }`` then
         ``[ [ NOT ] ENFORCED ]`` -- one production covers both kinds, so this is
         the same fact as :meth:`supports_column_enforced_primary_key_constraint`
-        and inherits every caveat in its docstring, including the unreachable-on-
-        this-core note (``UNIQUE`` is turned away by the same ``ValueError``).
+        and inherits every caveat in its docstring, including the note that the
+        flat render gate is ``False`` here (``UNIQUE`` is refused by it).
 
         文档（待云验）: grammar-only, not server-verified.
         """
@@ -767,10 +801,10 @@ class SnowflakeConstraintMixin:
               [ [ NOT ] ENFORCED ]
               ...
 
-        ``Default: NOT ENFORCED``, the SQL-standard inverse.  Unlike the primary
-        key and unique, this one **is** reachable today: ``FOREIGN KEY`` is one
-        of the two kinds ``_format_constraint_enforcement`` permits, so this
-        probe is load-bearing on the column foreign-key path.
+        ``Default: NOT ENFORCED``, the SQL-standard inverse.  Like every other
+        kind, the flat :meth:`supports_constraint_enforced` is ``False`` here, so
+        the render path refuses the spelling; this ``True`` is the grammar record
+        and nothing more.
 
         文档（待云验）: grammar-only, not server-verified.
         """
@@ -791,11 +825,11 @@ class SnowflakeConstraintMixin:
         "unavailable" in the ordinary sense -- it is not in the language.
 
         The direction of the core default is what makes this the one to pin
-        hardest.  ``ConstraintMixin.supports_constraint_enforced`` answers
-        ``True``, so without a local declaration Snowflake would be licensed to
-        render `` CHECK (<expr>) NOT ENFORCED`` -- and CHECK is the one kind
-        Snowflake *does* enforce on a standard table, so the marker would be the
-        most consequential clause available to get wrong.
+        hardest.  ``ConstraintMixin.supports_constraint_enforced`` once answered
+        ``True``, and core's P1 flipped that default to ``False``; this
+        declaration pins Snowflake's own answer either way.  CHECK is the one
+        kind Snowflake *does* enforce on a standard table, so the marker would
+        be the most consequential clause available to get wrong.
 
         Name note: no core probe is per-level or per-kind for enforcement yet.
 
@@ -958,12 +992,13 @@ class SnowflakeConstraintMixin:
         property is the *combined* ``ENABLE { VALIDATE | NOVALIDATE }``, which
         has no room for a separate deferral.
 
-        ``ConstraintMixin.supports_deferrable_constraint`` answers ``True``, and
-        that flat probe is the gate ``format_references_clause`` raises on -- so
-        on a Snowflake foreign key the answer must stay ``True`` while the
-        CHECK answer must stay ``False``.  Those two are different questions and
-        only the per-kind pair can hold both at once; see the flat
-        :meth:`supports_deferrable_constraint` for how the two are kept apart.
+        ``ConstraintMixin.supports_deferrable_constraint`` once answered ``True``
+        and core's P1 flipped it to ``False``; this declaration pins Snowflake's
+        own answer.  The flat probe is the gate ``format_references_clause``
+        raises on -- so it is declared ``False`` here (see the modifier-policy
+        section of the module docstring) while the per-kind pair below carries
+        the grammar record.  Those two are different questions, which is why
+        they are kept apart.
 
         文档（待云验）: grammar-only, not server-verified.
         """
@@ -1274,12 +1309,50 @@ class SnowflakeConstraintMixin:
     # per-level, per-kind shape; these are what a formatter asks.  Where the two
     # could be read as disagreeing, the entry that differs says so -- most
     # importantly :meth:`supports_constraint_enforced` versus
-    # :meth:`supports_column_enforced_check_constraint`, which are ``True`` and
-    # ``False`` for the same backend and the same page.
+    # :meth:`supports_column_enforced_check_constraint`: the flat probe is
+    # ``False`` (the render decision; see the module docstring) while the
+    # per-kind grammar record is ``True`` for the key kinds and ``False`` for
+    # CHECK.
     # ------------------------------------------------------------------
 
+    def supports_constraint_naming(self) -> bool:
+        """True: ``[ CONSTRAINT <constraint_name> ]`` opens every constraint production.
+
+        Official grammar.  All three column-level branches::
+
+            inlineUniquePK ::= [ CONSTRAINT <constraint_name> ] { UNIQUE | PRIMARY KEY } ...
+            inlineFK       ::= [ CONSTRAINT <constraint_name> ] [ FOREIGN KEY ] REFERENCES ...
+            inlineCH       ::= [ CONSTRAINT <constraint_name> ] CHECK ( <expr> ) ...
+
+        and all three table-level ones, from the same page::
+
+            outoflineUniquePK ::= [ CONSTRAINT <constraint_name> ] { UNIQUE | PRIMARY KEY } ( ... )
+            outoflineFK       ::= [ CONSTRAINT <constraint_name> ] FOREIGN KEY ( ... ) REFERENCES ...
+            outoflineCH       ::= [ CONSTRAINT <constraint_name> ] CHECK ( <expr> )
+
+        So the name is optional, universal and not kind-dependent: every kind at
+        both levels carries the prefix.  That is the contract's "Snowflake 待核"
+        item answered from the reference -- there is no Snowflake page that
+        omits the bracket, and the ALTER TABLE page depends on the name being
+        there (``ALTER CONSTRAINT <name>`` and ``RENAME CONSTRAINT <name> TO``
+        are by-name verbs).
+
+        This is the flat probe core's ``format_column_constraint`` /
+        ``format_table_constraint`` consult before rendering the prefix, so the
+        declaration is load-bearing.  The per-level, per-kind
+        :meth:`supports_column_naming_*` / :meth:`supports_table_naming_*` probes
+        below record the same fact kind by kind; both families are declared so a
+        change to one cannot move the other silently.
+
+        Declared locally even though core's default is ``True``: the value is the
+        gate on a refusal, so it must be Snowflake's statement.
+
+        文档（待云验）: grammar-only, not server-verified.
+        """
+        return True
+
     def supports_primary_key_constraint(self) -> bool:
-        """True: core's ``format_primary_key_constraint`` may emit ``PRIMARY KEY``.
+        """True: core's ``format_column_primary_key_constraint`` may emit ``PRIMARY KEY``.
 
         Official grammar: ``{ UNIQUE | PRIMARY KEY }`` in ``inlineUniquePK`` at
         column level and in ``outoflineUniquePK`` at table level -- the keyword is
@@ -1303,8 +1376,8 @@ class SnowflakeConstraintMixin:
         Official grammar: the same ``{ UNIQUE | PRIMARY KEY }`` pair in
         ``inlineUniquePK`` and ``outoflineUniquePK``.
 
-        Load-bearing detail: ``format_column_constraint`` pairs
-        ``ColumnConstraintType.UNIQUE`` with **this** probe and raises
+        Load-bearing detail: ``format_column_unique_constraint`` pairs the
+        ``UNIQUE`` branch with **this** probe and raises
         ``UnsupportedFeatureError(self.name, "UNIQUE column constraint")`` when it
         declines, so the ``True`` is the gate on that refusal.
 
@@ -1324,7 +1397,8 @@ class SnowflakeConstraintMixin:
               [ , ... ]
             )
 
-            ADD [ COLUMN ] [ IF NOT EXISTS ] <col_name> <col_type> [ ... ] [ NOT NULL ] { inlineUniquePK | inlineFK | inlineCH }
+            ADD [ COLUMN ] [ IF NOT EXISTS ] <col_name> <col_type> [ ... ] [ NOT NULL ]
+              { inlineUniquePK | inlineFK | inlineCH }
 
         Two facts beyond the ``True``:
 
@@ -1494,38 +1568,41 @@ class SnowflakeConstraintMixin:
         return True
 
     def supports_deferrable_constraint(self) -> bool:
-        """True -- for the key kinds.  ``CHECK`` is the per-kind ``False``.
+        """**False** -- the render decision, not the grammar answer.
 
         Official grammar: ``[ [ NOT ] DEFERRABLE ] [ INITIALLY { DEFERRED |
         IMMEDIATE } ]`` appear in ``inlineUniquePK``, ``inlineFK``,
         ``outoflineUniquePK`` and ``outoflineFK`` -- and in **neither** ``CHECK``
         branch.
 
-        This switch is the gate ``format_references_clause`` raises on
-        (``"DEFERRABLE / INITIALLY clause on a foreign key"``), and a foreign
-        key is one of the kinds that **does** have deferral, so ``True`` is
-        correct for it.
+        So the tokens are in the language, and the per-kind probes below record
+        that.  This flat probe is the gate ``format_references_clause`` and
+        ``format_constraint_traits`` raise on, and it answers ``False`` anyway,
+        because this backend has no live server to confirm that Snowflake
+        honours the clause: *"For standard tables, NOT NULL and CHECK are the
+        only types of constraints that are enforced by Snowflake"*, so a
+        rendered ``DEFERRABLE`` would be a promise nobody has seen kept.  Core's
+        P1 flipped the shared default to ``False``; this declaration pins the
+        answer locally so a core change cannot move it.  See the
+        modifier-policy section of the module docstring.
 
-        **The ``CHECK`` answer is ``False`` and lives elsewhere**, at
-        :meth:`supports_column_deferrable_check_constraint` and
-        :meth:`supports_table_deferrable_check_constraint`.  That is not an
-        oversight to be tidied up: core has one flat probe and Snowflake's grammar
-        needs two answers, so the flat one answers for the kind core can reach and
-        the per-kind pair carries the answer core cannot ask for.  Anyone
-        collapsing them must first show that core never routes a CHECK through
-        the flat probe.
+        **The per-kind grammar answer lives elsewhere**, at
+        :meth:`supports_column_deferrable_primary_key_constraint` and its
+        siblings.  That is not a contradiction to tidy up: core has one flat
+        probe, this server has no measurement, and the per-kind pair is the
+        record a live run would be checked against.
 
         ``INITIALLY``'s inverted default (``INITIALLY DEFERRED``) is recorded at
         :meth:`supports_column_deferrable_primary_key_constraint`.
 
         文档（待云验）: grammar-only, not server-verified.
         """
-        return True
+        return False
 
-    def supports_constraint_enforced(self, constraint_type: Any = None) -> bool:
-        """True -- the clause exists on two of the four kinds, and ``CHECK`` is not one.
+    def supports_constraint_enforced(self) -> bool:
+        """**False** -- the render decision, taken deliberately.
 
-        Official grammar, in the two branches that have it::
+        Official grammar, in the two branches that have the token::
 
             inlineUniquePK ::= [ CONSTRAINT <n> ] { UNIQUE | PRIMARY KEY } [ [ NOT ] ENFORCED ] ...
             inlineFK       ::= [ CONSTRAINT <n> ] [ FOREIGN KEY ] REFERENCES ... [ [ NOT ] ENFORCED ] ...
@@ -1535,38 +1612,36 @@ class SnowflakeConstraintMixin:
             inlineCH ::= [ CONSTRAINT <n> ] CHECK ( <expr> ) [ ENABLE { VALIDATE | NOVALIDATE } ]
             outoflineCH ::= [ CONSTRAINT <n> ] CHECK ( <expr> ) [ ENABLE { VALIDATE | NOVALIDATE } ]
 
-        The `constraint_type` argument is accepted and ignored, matching core's
-        calling convention (``_format_constraint_enforcement`` passes the kind
-        through ``_call_constraint_capability``).  **Snowflake's answer does not
-        vary by kind here** -- which is precisely the gap: it is ``True`` for the
-        two kinds that have the clause and ``False`` for the one that does not,
-        and one boolean cannot be both.  The kind-accurate answers are
+        So the clause is in the grammar for the key kinds, and the per-kind
+        probes record exactly that.  This flat probe is what
+        ``_format_constraint_enforcement`` consumes, and it answers ``False``:
+        with no Snowflake instance reachable, a ``True`` would licence
+        ``ENFORCED`` and ``NOT ENFORCED`` SQL nobody has seen the server accept,
+        and the reference says the non-default spelling is worse than an error --
+        *"for PRIMARY KEY, UNIQUE, and FOREIGN KEY constraints, if you specify
+        ENABLE or VALIDATE ... the constraint isn't created."*  Core's P1 flipped
+        the shared default to ``False``; this declaration pins it here so the
+        answer is Snowflake's, not an inherited one.
+
+        The kind-accurate grammar record lives at
         :meth:`supports_{column,table}_enforced_{primary_key,unique,foreign_key}_constraint`
         (``True``) and :meth:`supports_{column,table}_enforced_check_constraint`
-        (``False``).  Read this ``True`` as "yes, on the kinds that have it".
+        (``False``).  The two families disagree on purpose; see the
+        modifier-policy section of the module docstring.
 
         ``Default: NOT ENFORCED`` -- the SQL-standard inverse -- and on a standard
-        table the property changes nothing: *"For standard tables, NOT NULL and
-        CHECK are the only types of constraints that are enforced by Snowflake,
-        regardless of this property."*
-
-        **Reachability.**  ``_format_constraint_enforcement`` permits only
-        ``CHECK`` and ``FOREIGN KEY`` and raises ``ValueError`` before consulting
-        this probe for anything else, so today it is load-bearing for a foreign
-        key and inert for a primary key and a unique.
-
-        **Known gap, recorded rather than worked around.**  With this ``True``, a
-        caller who sets ``enforced=True`` on a foreign key gets a bare
-        ``ENFORCED`` rendered, which on a standard table is the spelling that
-        makes Snowflake *not* create the constraint.  Refusing that spelling is a
-        formatter change, out of this module's scope.
+        table the property changes nothing either way: *"For standard tables, NOT
+        NULL and CHECK are the only types of constraints that are enforced by
+        Snowflake, regardless of this property."*  A caller who sets nothing
+        already gets ``NOT ENFORCED`` semantics, which is why refusing to spell it
+        costs this backend nothing it actually relies on.
 
         文档（待云验）: grammar-only, not server-verified.
         """
-        return True
+        return False
 
-    def supports_alter_constraint_enforced(self, constraint_type: Any = None) -> bool:
-        """**True -- corrected from core's ``False``.**  The ALTER branch lists it.
+    def supports_alter_constraint_enforced(self) -> bool:
+        """**False -- declared explicitly, not inherited.**  The ALTER branch lists it.
 
         Official grammar, the ``{ ALTER | MODIFY }`` branch of
         ``constraintAction``, in full::
@@ -1579,30 +1654,30 @@ class SnowflakeConstraintMixin:
                 [ [ NOT ] ENFORCED ] [ VALIDATE | NOVALIDATE ] [ RELY | NORELY ]
 
         ``[ [ NOT ] ENFORCED ]`` is the **first** of the three properties this
-        branch can set.  Core's ``ConstraintMixin`` defaults this probe to
-        ``False``, so before this declaration ``ALTER CONSTRAINT ... NOT
-        ENFORCED`` was refused by name -- ``format_alter_constraint_action``
-        raises ``UnsupportedFeatureError(self.name, "ALTER CONSTRAINT
-        ENFORCED/NOT ENFORCED")`` -- for SQL that Snowflake's grammar contains.
+        branch can set, so the grammar answer is "the token is there".  This
+        declaration is the *render* answer and it is ``False``, for the same
+        reason as :meth:`supports_constraint_enforced`: no Snowflake instance is
+        reachable, so ``ALTER CONSTRAINT ... [NOT] ENFORCED`` cannot be emitted
+        on anyone's word; core's ``format_alter_constraint_action`` refuses it by
+        name.  The backend already declared this ``False`` before this file
+        existed, and the clause-pair guard pins both spellings to the refusal, so
+        keeping it is the honest direction.
 
-        The `constraint_type` argument is accepted and ignored, for the same
-        calling-convention reason as :meth:`supports_constraint_enforced`.
-        ``ALTER``'s reach is broader than ``CHECK`` and ``FOREIGN KEY`` --
-        ``PRIMARY KEY`` and ``UNIQUE`` are addressable too -- whereas
-        ``format_alter_constraint_action`` refuses any other kind with
-        ``ValueError`` before reaching this probe.  That narrowing is a core
-        gap, recorded here and not worked around.
+        Declared locally -- rather than left to core's shared default, which P1
+        also flipped to ``False`` -- so the verdict is Snowflake's and the MRO
+        guard can see which class owns it.
 
-        This ``True`` is the same fact as :meth:`supports_table_alter_constraint`
-        seen from the property side: Snowflake's ALTER surface is **strictly
-        smaller** than its ADD surface, and the three properties it does have are
-        exactly the three here plus ``RELY | NORELY``.  Deferral is ADD-only --
-        see the module docstring, and the comment on the render path in
+        This answers the property side of the fact
+        :meth:`supports_table_alter_constraint` records: Snowflake's ALTER
+        surface is **strictly smaller** than its ADD surface, and the properties
+        it does have are exactly the three in the production above.  Deferral is
+        ADD-only -- see the module docstring, and the comment on the render path
+        in
         :mod:`~rhosocial.activerecord.backend.impl.snowflake.mixins.ddl`.
 
         文档（待云验）: grammar-only, not server-verified.
         """
-        return True
+        return False
 
     # ------------------------------------------------------------------
     # ALTER TABLE constraint lifecycle.
@@ -1894,9 +1969,8 @@ class SnowflakeConstraintMixin:
         Core's ``_format_constraint_validation`` emits the two-word ``" NOT
         VALID"`` and gates it on this probe, so declaring ``False`` is what keeps
         that spelling out of Snowflake DDL.  Before the declaration the probe was
-        simply **absent** from the backend, and core's
-        ``getattr(self, "supports_constraint_novalidate", None) is None`` branch
-        raised -- an absence doing the work of a decision.  Now it is a decision.
+        simply **absent** from the backend, and core consulted it defensively; an
+        absence doing the work of a decision.  Now it is a decision.
 
         **Must not be reconciled with**
         :meth:`supports_table_constraint_novalidate` / ``_column_``, which are
@@ -1994,33 +2068,15 @@ class SnowflakeConstraintMixin:
         """
         return True
 
-    def supports_column_collation(self) -> bool:
-        """True -- and the specification must be **quoted**.
-
-        Official grammar, on both pages, in the column definition::
-
-            ... [ COLLATE '<collation_specification>' ]
-
-        ``DDLColumnMixin`` defaults this to ``True`` and ``format_column_attribute``
-        raises ``UnsupportedFeatureError(self.name, "column-level COLLATE")`` when
-        it declines, so the inherited answer was right -- but again by default.
-
-        What the ``True`` does **not** cover is the spelling, and on Snowflake the
-        spelling is the whole difficulty: the value is a
-        **string literal in single quotes** (``COLLATE 'und:ci'``), not a bare
-        identifier the way every other backend in this group spells it.
-        ``SnowflakeCollationMixin.format_column_attribute`` is what renders the
-        quotes, via ``validate_snowflake_collation_name``; this switch only says
-        the clause may appear.
-
-        Name note: this probe is a column-attribute question that happens to be
-        declared in a constraint mixin, because it lives in the same column
-        definition and the discipline here is that this package states the answer.
-        Its runtime home is ``SnowflakeCollationMixin``.
-
-        文档（待云验）: grammar-only, not server-verified.
-        """
-        return True
+    # ``supports_column_collation`` deliberately has **no** declaration here.
+    # It is a column-attribute question (``COLLATE '<spec>'`` in the column
+    # definition), not a constraint answer, and ``SnowflakeCollationMixin`` --
+    # which precedes this class in the dialect's MRO -- already declares it
+    # ``True`` next to the ``format_column_attribute`` that renders the quotes.
+    # A second copy here would be dead code that the MRO never reaches, and two
+    # owners for one switch is the thing the local-declaration rule exists to
+    # prevent.  The draft that became this module carried such a copy; it was
+    # dropped rather than kept in parallel with the runtime home.
 
 
 __all__ = ["ALTER_TABLE_GRAMMAR_URL", "OFFICIAL_GRAMMAR_URL", "SnowflakeConstraintMixin"]

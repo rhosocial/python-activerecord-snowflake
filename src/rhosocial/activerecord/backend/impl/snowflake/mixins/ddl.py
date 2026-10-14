@@ -4,7 +4,12 @@
 from typing import Tuple
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
-from rhosocial.activerecord.backend.expression.statements import ColumnConstraintType
+from rhosocial.activerecord.backend.expression.statements import (
+    ColumnDefaultConstraint,
+    ColumnForeignKeyConstraint,
+    ColumnPrimaryKeyConstraint,
+    ColumnUniqueConstraint,
+)
 
 
 class SnowflakeAlterColumnModifierMixin:
@@ -45,13 +50,19 @@ class SnowflakeAlterColumnModifierMixin:
 
     def format_add_column_action(self, action) -> Tuple[str, tuple]:
         if getattr(action, "if_not_exists", None) is True:
+            # The kinds Snowflake's documented restriction names: DEFAULT,
+            # IDENTITY (which ``AUTO_INCREMENT`` is a spelling of here), PRIMARY
+            # KEY, FOREIGN KEY and UNIQUE.  The kind is the *branch class* now --
+            # ``ColumnConstraintType`` is gone -- so the set is a set of classes.
             forbidden = {
-                ColumnConstraintType.DEFAULT,
-                ColumnConstraintType.PRIMARY_KEY,
-                ColumnConstraintType.FOREIGN_KEY,
-                ColumnConstraintType.UNIQUE,
+                ColumnDefaultConstraint,
+                ColumnPrimaryKeyConstraint,
+                ColumnForeignKeyConstraint,
+                ColumnUniqueConstraint,
             }
-            if any(c.constraint_type in forbidden for c in action.column.constraints):
+            if any(
+                type(c.branch) in forbidden for c in action.column.constraints
+            ):
                 raise UnsupportedFeatureError(
                     self.name,
                     "ADD COLUMN IF NOT EXISTS with DEFAULT/IDENTITY/PK/FK/UNIQUE",
