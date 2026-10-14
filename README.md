@@ -56,8 +56,8 @@ from rhosocial.activerecord.backend.expression import CreateTableStatement
 from rhosocial.activerecord.backend.expression.objects import Table
 from rhosocial.activerecord.backend.expression.statements import (
     ColumnConstraint,
-    ColumnConstraintType,
     ColumnDefinition,
+    ColumnPrimaryKeyConstraint,
 )
 from rhosocial.activerecord.backend.expression.types import VarCharType
 from rhosocial.activerecord.model import ActiveRecord
@@ -93,7 +93,9 @@ User.__backend__.execute(*CreateTableStatement(
     columns=[
         ColumnDefinition(
             dialect, "id", VarCharType(dialect, 36),
-            constraints=[ColumnConstraint(dialect, ColumnConstraintType.PRIMARY_KEY)],
+            constraints=[ColumnConstraint(
+                dialect, branch=ColumnPrimaryKeyConstraint(dialect),
+            )],
         ),
         ColumnDefinition(dialect, "name", VarCharType(dialect, 100)),
         ColumnDefinition(dialect, "email", VarCharType(dialect, 255)),
