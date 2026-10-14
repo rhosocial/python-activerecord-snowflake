@@ -8,9 +8,9 @@ import pytest
 
 from rhosocial.activerecord.backend.expression import (
     Column,
-    InsertExpression,
+    InsertStatement,
     Literal,
-    QueryExpression,
+    QueryStatement,
     SelectSource,
     ValuesSource,
 )
@@ -31,7 +31,7 @@ def dialect():
 
 @pytest.fixture
 def select_source(dialect):
-    query = QueryExpression(
+    query = QueryStatement(
         dialect,
         select=[Column(dialect, "id"), Column(dialect, "name")],
         from_=Table(dialect, "src"),
@@ -68,14 +68,14 @@ class TestSnowflakeInsertOverwrite:
         assert params == ()
 
     def test_insert_overwrite_standalone(self, dialect, select_source):
-        expr = InsertExpression(
+        expr = InsertStatement(
             dialect, into=Table(dialect, "t"), source=select_source, columns=["id", "name"]
         )
         sql, _ = dialect.format_insert_overwrite_statement(expr)
         assert sql.startswith("INSERT OVERWRITE INTO ")
 
     def test_plain_insert_unchanged(self, dialect, select_source):
-        expr = InsertExpression(
+        expr = InsertStatement(
             dialect, into=Table(dialect, "t"), source=select_source, columns=["id", "name"]
         )
         sql, _ = expr.to_sql()

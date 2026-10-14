@@ -14,7 +14,7 @@ from rhosocial.activerecord.backend.expression import ComparisonPredicate, Liter
 from rhosocial.activerecord.backend.expression.statements import (
     ColumnConstraintType,
     ColumnDefinition,
-    CreateTableExpression,
+    CreateTableStatement,
     IndexDefinition,
     StorageOptionsExpression,
     TableConstraint,
@@ -159,7 +159,7 @@ class TableDeclarationOverrides:
 
     @classmethod
     def create_table_statement_classes(cls):
-        return CreateTableExpression
+        return CreateTableStatement
 
 
 class DeclarationModel(TableDeclarationOverrides, ActiveRecord):
@@ -349,7 +349,7 @@ def _assert_declaration_model(model):
     assert model.table_partition().keys[0].name == "physical_value"
     assert model.table_inherits() is TABLE_INHERITS
     assert model.table_tablespace() == TABLE_TABLESPACE
-    assert model.create_table_statement_classes() is CreateTableExpression
+    assert model.create_table_statement_classes() is CreateTableStatement
     assert model.table_constraints() == TABLE_CONSTRAINTS
     assert _same_objects(model.table_constraints(), TABLE_CONSTRAINTS)
     assert model.table_indexes() == TABLE_INDEXES

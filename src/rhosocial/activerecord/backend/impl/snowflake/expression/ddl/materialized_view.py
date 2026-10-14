@@ -7,7 +7,7 @@ CREATE [OR REPLACE] MATERIALIZED VIEW statements with optional column
 aliases, CLUSTER BY keys and COMMENT.
 
 The expression extends the core
-:class:`~rhosocial.activerecord.backend.expression.statements.ddl_view.CreateMaterializedViewExpression`
+:class:`~rhosocial.activerecord.backend.expression.statements.ddl_view.CreateMaterializedViewStatement`
 so the generic MV API works on Snowflake, and layers the Snowflake-specific
 options on top.
 
@@ -29,7 +29,7 @@ from typing import Any, List, Optional, Tuple, Union, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.objects import MaterializedView
 from rhosocial.activerecord.backend.expression.statements.ddl_view import (
-    CreateMaterializedViewExpression,
+    CreateMaterializedViewStatement,
 )
 
 if TYPE_CHECKING:
@@ -41,7 +41,7 @@ __all__ = [
 ]
 
 
-class SnowflakeCreateMaterializedViewExpression(CreateMaterializedViewExpression):
+class SnowflakeCreateMaterializedViewExpression(CreateMaterializedViewStatement):
     """Snowflake CREATE [OR REPLACE] MATERIALIZED VIEW statement expression.
 
     Accepts both the Snowflake field names (``name`` / ``as_query`` /
@@ -53,7 +53,7 @@ class SnowflakeCreateMaterializedViewExpression(CreateMaterializedViewExpression
     Attributes:
         view: The ``MaterializedView`` object being created; a bare name is
             accepted and wrapped in one.
-        query: Defining query — a ``QueryExpression`` or a raw SQL string.
+        query: Defining query — a ``QueryStatement`` or a raw SQL string.
         column_aliases: Optional column alias list.
         or_replace: Emit ``OR REPLACE`` (mutually exclusive with ``if_not_exists``).
         if_not_exists: Emit ``IF NOT EXISTS``.

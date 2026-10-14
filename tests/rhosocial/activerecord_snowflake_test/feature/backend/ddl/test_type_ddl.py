@@ -20,9 +20,9 @@ from rhosocial.activerecord.backend.expression.serialization import (
     serialize_xml,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_type import (
-    AlterTypeExpression,
-    CreateTypeExpression,
-    DropTypeExpression,
+    AlterTypeStatement,
+    CreateTypeStatement,
+    DropTypeStatement,
     TypeDefinition,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
@@ -135,9 +135,9 @@ def test_version_boundary_and_low_version_fail_fast():
     set_action = SnowflakeSetTypeCommentAction(dialect, "comment")
     reference = SnowflakeUserDefinedType(dialect, type_name="age")
     statements = [
-        CreateTypeExpression(dialect, Type(dialect, "age"), scalar),
-        AlterTypeExpression(dialect, Type(dialect, "age"), [set_action]),
-        DropTypeExpression(dialect, Type(dialect, "age")),
+        CreateTypeStatement(dialect, Type(dialect, "age"), scalar),
+        AlterTypeStatement(dialect, Type(dialect, "age"), [set_action]),
+        DropTypeStatement(dialect, Type(dialect, "age")),
     ]
 
     assert dialect.supports_type_objects() is False
@@ -166,7 +166,7 @@ def test_scalar_create_type_renders_schema_qualification():
         SnowflakeNumberType(dialect, precision=3, scale=0),
     )
 
-    expression = CreateTypeExpression(
+    expression = CreateTypeStatement(
         dialect,
         Type(dialect, "age", schema_name="app"),
         definition,
@@ -316,7 +316,7 @@ def test_alter_type_set_and_unset_comment_actions():
         [set_action],
         if_exists=True,
     )
-    unset_expression = AlterTypeExpression(
+    unset_expression = AlterTypeStatement(
         dialect,
         Type(dialect, "age", schema_name="APP"),
         [SnowflakeUnsetTypeCommentAction(dialect)],
@@ -335,7 +335,7 @@ def test_alter_type_set_and_unset_comment_actions():
 def test_alter_type_rejects_multiple_or_unknown_actions():
     dialect = _dialect()
 
-    expression = AlterTypeExpression(
+    expression = AlterTypeStatement(
         dialect,
         Type(dialect, "age"),
         [
@@ -362,7 +362,7 @@ def test_drop_type_has_no_if_exists_cascade_or_restrict():
     )
 
     with pytest.raises(UnsupportedFeatureError, match="IF EXISTS"):
-        DropTypeExpression(dialect, Type(dialect, "age"), if_exists=True).to_sql()
+        DropTypeStatement(dialect, Type(dialect, "age"), if_exists=True).to_sql()
     with pytest.raises(UnsupportedFeatureError, match="CASCADE"):
         SnowflakeDropTypeExpression(
             dialect, Type(dialect, "age"), cascade=True

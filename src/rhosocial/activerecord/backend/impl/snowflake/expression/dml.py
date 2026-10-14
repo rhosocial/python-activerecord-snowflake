@@ -3,13 +3,13 @@
 
 from typing import TYPE_CHECKING
 
-from rhosocial.activerecord.backend.expression.statements import InsertExpression
+from rhosocial.activerecord.backend.expression.statements import InsertStatement
 
 if TYPE_CHECKING:  # pragma: no cover
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
 
-class SnowflakeInsertExpression(InsertExpression):
+class SnowflakeInsertExpression(InsertStatement):
     """A Snowflake INSERT statement extending the generic one.
 
     Snowflake supports ``INSERT OVERWRITE INTO`` which truncates the target

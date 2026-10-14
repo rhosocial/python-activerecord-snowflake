@@ -15,7 +15,7 @@ from typing import Any, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.transaction import (
-        BeginTransactionExpression,
+        BeginTransactionStatement,
         SetTransactionExpression,
     )
 
@@ -411,7 +411,7 @@ class SnowflakeDialect(
         placeholder = self.get_parameter_placeholder()
         return f"IDENTIFIER({placeholder})"
 
-    def format_begin_transaction(self, expr: "BeginTransactionExpression") -> Tuple[str, tuple]:
+    def format_begin_transaction_statement(self, expr: "BeginTransactionStatement") -> Tuple[str, tuple]:
         """Format BEGIN TRANSACTION for Snowflake, consuming its mode pairs.
 
         Snowflake's BEGIN takes no transaction characteristics; in particular
@@ -443,7 +443,7 @@ class SnowflakeDialect(
                 "BEGIN TRANSACTION NOT DEFERRABLE",
                 suggestion="Snowflake does not support DEFERRABLE transactions.",
             )
-        return super().format_begin_transaction(expr)
+        return super().format_begin_transaction_statement(expr)
 
     def format_set_transaction(self, expr: "SetTransactionExpression") -> Tuple[str, tuple]:
         """Format SET TRANSACTION statement for Snowflake.

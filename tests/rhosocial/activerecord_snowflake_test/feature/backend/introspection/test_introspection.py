@@ -19,18 +19,18 @@ from rhosocial.activerecord.backend.impl.snowflake.introspection import (
     AsyncSnowflakeIntrospector,
 )
 from rhosocial.activerecord.backend.introspection.types import (
-    DatabaseInfo,
-    TableInfo,
+    IntrospectionDatabaseInfo,
+    IntrospectionTableInfo,
     TableType,
-    ColumnInfo,
+    IntrospectionColumnInfo,
     ColumnNullable,
     IndexInfo,
     IndexColumnInfo,
     IndexType,
-    ForeignKeyInfo,
+    IntrospectionForeignKeyInfo,
     ReferentialAction,
-    ViewInfo,
-    TriggerInfo,
+    IntrospectionViewInfo,
+    IntrospectionTriggerInfo,
 )
 from rhosocial.activerecord.backend.introspection.executor import SyncIntrospectorExecutor
 
@@ -180,14 +180,14 @@ class TestSnowflakeIntrospectorParsing:
             {"CATALOG_NAME": "MY_DB", "SERVER_VERSION": "8.32.0"},
         ]
         result = introspector_mixin._parse_database_info(rows)
-        assert isinstance(result, DatabaseInfo)
+        assert isinstance(result, IntrospectionDatabaseInfo)
         assert result.name == "MY_DB"
         assert result.vendor == "Snowflake"
         assert result.version_tuple == (8, 32, 0)
 
     def test_parse_database_info_empty_rows(self, introspector_mixin):
         result = introspector_mixin._parse_database_info([])
-        assert isinstance(result, DatabaseInfo)
+        assert isinstance(result, IntrospectionDatabaseInfo)
         assert result.vendor == "Snowflake"
 
     def test_parse_tables(self, introspector_mixin):
@@ -380,7 +380,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
 
         A ``NUMBER(10, 2)`` column used to answer a bare ``DecimalType``:
         ``NUMERIC_PRECISION`` and ``NUMERIC_SCALE`` were selected by the
-        query, recorded on ``ColumnInfo``, and then never read.
+        query, recorded on ``IntrospectionColumnInfo``, and then never read.
 
         ``(38, 0)`` is deliberately **not** in this list: it is the
         documented default and therefore the bare form, which the next test
@@ -480,7 +480,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
             assert parsed == expected(dialect), f"{word} -> {parsed!r}"
 
     def test_data_type_full_carries_the_size_and_data_type_does_not(self, introspector_mixin):
-        """The two ``ColumnInfo`` fields finally differ, which is their purpose.
+        """The two ``IntrospectionColumnInfo`` fields finally differ, which is their purpose.
 
         ``data_type`` is the word core's differ falls back to when a type
         cannot be parsed; ``data_type_full`` is the spelling that says how
@@ -726,7 +726,7 @@ class TestSyncSnowflakeIntrospector:
             {"CATALOG_NAME": "MY_DB", "SERVER_VERSION": "8.32.0"},
         ]
         info = introspector.get_database_info()
-        assert isinstance(info, DatabaseInfo)
+        assert isinstance(info, IntrospectionDatabaseInfo)
         assert info.vendor == "Snowflake"
         assert info.name == "MY_DB"
         mock_executor.execute.assert_called_once()
@@ -803,7 +803,7 @@ class TestAsyncSnowflakeIntrospector:
     @pytest.mark.asyncio
     async def test_get_database_info(self, introspector, mock_executor):
         info = await introspector.get_database_info()
-        assert isinstance(info, DatabaseInfo)
+        assert isinstance(info, IntrospectionDatabaseInfo)
         assert info.vendor == "Snowflake"
 
     @pytest.mark.asyncio

@@ -54,8 +54,8 @@ class SnowflakeMaterializedViewMixin:
         """Format CREATE [OR REPLACE] MATERIALIZED VIEW statement.
 
         Accepts both ``SnowflakeCreateMaterializedViewExpression`` and the core
-        ``CreateMaterializedViewExpression``; the defining query may be a
-        ``QueryExpression`` or a raw SQL string.
+        ``CreateMaterializedViewStatement``; the defining query may be a
+        ``QueryStatement`` or a raw SQL string.
 
         Args:
             expr: Materialized view create expression.
@@ -138,7 +138,7 @@ class SnowflakeMaterializedViewMixin:
         """Return the defining query as SQL text, or None when absent.
 
         Snowflake's own expression carries a raw ``as_query`` string; the core
-        expression carries a ``QueryExpression``.
+        expression carries a ``QueryStatement``.
         """
         query = getattr(expr, "query", None)
         if query is None:

@@ -10,9 +10,9 @@ from rhosocial.activerecord.backend.expression.bases import BaseExpression
 from rhosocial.activerecord.backend.expression.objects import Type as TypeObject
 from rhosocial.activerecord.backend.expression.serialization import ExpressionRegistry
 from rhosocial.activerecord.backend.expression.statements.ddl_type import (
-    AlterTypeExpression,
-    CreateTypeExpression,
-    DropTypeExpression,
+    AlterTypeStatement,
+    CreateTypeStatement,
+    DropTypeStatement,
     TypeAlterAction,
     TypeDefinition,
 )
@@ -149,7 +149,7 @@ class SnowflakeUnsetTypeCommentAction(TypeAlterAction):
     action_kind = "snowflake.unset_type_comment"
 
 
-class SnowflakeCreateTypeExpression(CreateTypeExpression):
+class SnowflakeCreateTypeExpression(CreateTypeStatement):
     """CREATE TYPE expression with Snowflake qualification and comment syntax."""
 
     def __init__(
@@ -174,7 +174,7 @@ class SnowflakeCreateTypeExpression(CreateTypeExpression):
         self.comment = comment
 
 
-class SnowflakeAlterTypeExpression(AlterTypeExpression):
+class SnowflakeAlterTypeExpression(AlterTypeStatement):
     """ALTER TYPE expression over the Snowflake TYPE object."""
 
     def __init__(
@@ -193,7 +193,7 @@ class SnowflakeAlterTypeExpression(AlterTypeExpression):
         )
 
 
-class SnowflakeDropTypeExpression(DropTypeExpression):
+class SnowflakeDropTypeExpression(DropTypeStatement):
     """DROP TYPE expression over the Snowflake TYPE object."""
 
     def __init__(

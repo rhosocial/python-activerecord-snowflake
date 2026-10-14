@@ -5,7 +5,7 @@ from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.statements import (
-        InsertExpression,
+        InsertStatement,
     )
 
 
@@ -22,7 +22,7 @@ class SnowflakeDMLMixin:
         return True
 
     def format_insert_statement(
-        self, expr: "InsertExpression"
+        self, expr: "InsertStatement"
     ) -> Tuple[str, tuple]:
         """Format an INSERT statement, honouring the ``overwrite`` option.
 
@@ -30,7 +30,7 @@ class SnowflakeDMLMixin:
         rendered as ``INSERT OVERWRITE INTO ...``.
 
         Args:
-            expr: :class:`InsertExpression`.
+            expr: :class:`InsertStatement`.
 
         Returns:
             Tuple of (SQL string, params tuple).
@@ -41,7 +41,7 @@ class SnowflakeDMLMixin:
         return super().format_insert_statement(expr)
 
     def format_insert_overwrite_statement(
-        self, expr: "InsertExpression"
+        self, expr: "InsertStatement"
     ) -> Tuple[str, tuple]:
         """Format an INSERT OVERWRITE INTO statement.
 
@@ -49,7 +49,7 @@ class SnowflakeDMLMixin:
         same transaction (avoiding the implicit commit of a separate TRUNCATE).
 
         Args:
-            expr: :class:`InsertExpression`.
+            expr: :class:`InsertStatement`.
 
         Returns:
             Tuple of (SQL string, params tuple).

@@ -7,7 +7,7 @@ from rhosocial.activerecord.backend.expression.objects import Table
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.statements.ddl_truncate import (
-        TruncateExpression,
+        TruncateStatement,
     )
 
 
@@ -31,7 +31,7 @@ class SnowflakeTruncateMixin:
         """
         return True
 
-    def format_truncate_statement(self, expr: "TruncateExpression") -> Tuple[str, tuple]:
+    def format_truncate_statement(self, expr: "TruncateStatement") -> Tuple[str, tuple]:
         """Format Snowflake TRUNCATE TABLE <name>.
 
         Raises:

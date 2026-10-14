@@ -9,9 +9,9 @@ from rhosocial.activerecord.backend.expression.objects import Database
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.statements.ddl_database import (
-        AlterDatabaseExpression,
-        CreateDatabaseExpression,
-        DropDatabaseExpression,
+        AlterDatabaseStatement,
+        CreateDatabaseStatement,
+        DropDatabaseStatement,
     )
 
 
@@ -86,7 +86,7 @@ class SnowflakeDatabaseMixin:
         return True
 
     def format_create_database_statement(
-        self, expr: CreateDatabaseExpression
+        self, expr: CreateDatabaseStatement
     ) -> Tuple[str, tuple]:
         # The object-kind check belongs to the formatter that consumes the
         # object, not to the constructor. An object carries its own
@@ -116,7 +116,7 @@ class SnowflakeDatabaseMixin:
         return " ".join(parts), ()
 
     def format_drop_database_statement(
-        self, expr: DropDatabaseExpression
+        self, expr: DropDatabaseStatement
     ) -> Tuple[str, tuple]:
         if not isinstance(expr.database, Database):
             raise TypeError(
@@ -130,7 +130,7 @@ class SnowflakeDatabaseMixin:
         return " ".join(parts), ()
 
     def format_alter_database_statement(
-        self, expr: AlterDatabaseExpression
+        self, expr: AlterDatabaseStatement
     ) -> Tuple[str, tuple]:
         from rhosocial.activerecord.backend.expression.statements.ddl_database import AlterDatabaseAction
         if not isinstance(expr.database, Database):

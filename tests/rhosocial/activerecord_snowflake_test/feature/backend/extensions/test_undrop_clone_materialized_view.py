@@ -7,10 +7,10 @@ Pure construction tests — no real Snowflake instance required.
 import pytest
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
-from rhosocial.activerecord.backend.expression import Column, QueryExpression
+from rhosocial.activerecord.backend.expression import Column, QueryStatement
 from rhosocial.activerecord.backend.expression.objects import MaterializedView, Table
 from rhosocial.activerecord.backend.expression.statements.ddl_view import (
-    CreateMaterializedViewExpression,
+    CreateMaterializedViewStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.protocols import (
@@ -154,14 +154,14 @@ class TestSnowflakeGenericMaterializedViewInterop:
     """
 
     def _query(self, dialect):
-        return QueryExpression(
+        return QueryStatement(
             dialect=dialect,
             select=[Column(dialect, "c1")],
             from_=Table(dialect, "t"),
         )
 
     def test_generic_expression_renders(self, dialect):
-        expr = CreateMaterializedViewExpression(
+        expr = CreateMaterializedViewStatement(
             dialect=dialect,
             view=MaterializedView(dialect, "mv"),
             query=self._query(dialect),
@@ -171,7 +171,7 @@ class TestSnowflakeGenericMaterializedViewInterop:
         assert params == ()
 
     def test_generic_expression_with_column_aliases(self, dialect):
-        expr = CreateMaterializedViewExpression(
+        expr = CreateMaterializedViewStatement(
             dialect=dialect,
             view=MaterializedView(dialect, "mv"),
             query=self._query(dialect),
@@ -181,7 +181,7 @@ class TestSnowflakeGenericMaterializedViewInterop:
         assert '("alias_c1")' in sql
 
     def test_generic_expression_requires_query(self, dialect):
-        expr = CreateMaterializedViewExpression(
+        expr = CreateMaterializedViewStatement(
             dialect=dialect, view=MaterializedView(dialect, "mv"), query=None
         )
         with pytest.raises(ValueError):
@@ -237,7 +237,7 @@ class TestSnowflakeGenericMaterializedViewInterop:
 
     def test_with_data_is_refused_by_name(self, dialect):
         """Snowflake has no WITH [NO] DATA; the inherited pair must not leak out."""
-        expr = CreateMaterializedViewExpression(
+        expr = CreateMaterializedViewStatement(
             dialect=dialect,
             view=MaterializedView(dialect, "mv"),
             query=self._query(dialect),
@@ -248,7 +248,7 @@ class TestSnowflakeGenericMaterializedViewInterop:
         assert exc_info.value.feature_name == "MATERIALIZED VIEW WITH [NO] DATA"
 
     def test_no_data_is_refused_by_name(self, dialect):
-        expr = CreateMaterializedViewExpression(
+        expr = CreateMaterializedViewStatement(
             dialect=dialect,
             view=MaterializedView(dialect, "mv"),
             query=self._query(dialect),
@@ -260,7 +260,7 @@ class TestSnowflakeGenericMaterializedViewInterop:
 
     def test_unspecified_renders_without_the_clause(self, dialect):
         """Neither parameter set: Snowflake creates the view without either word."""
-        expr = CreateMaterializedViewExpression(
+        expr = CreateMaterializedViewStatement(
             dialect=dialect,
             view=MaterializedView(dialect, "mv"),
             query=self._query(dialect),
@@ -273,7 +273,7 @@ class TestSnowflakeGenericMaterializedViewInterop:
         with pytest.raises(
             ValueError, match="with_data and no_data are mutually exclusive"
         ):
-            CreateMaterializedViewExpression(
+            CreateMaterializedViewStatement(
                 dialect=dialect,
                 view=MaterializedView(dialect, "mv"),
                 query=self._query(dialect),

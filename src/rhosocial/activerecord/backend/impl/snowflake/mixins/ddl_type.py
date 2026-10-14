@@ -6,9 +6,9 @@ from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeature
 from rhosocial.activerecord.backend.dialect.mixins.user_defined_type import UserDefinedTypeMixin
 from rhosocial.activerecord.backend.expression.objects import Type as TypeObject
 from rhosocial.activerecord.backend.expression.statements.ddl_type import (
-    AlterTypeExpression,
-    CreateTypeExpression,
-    DropTypeExpression,
+    AlterTypeStatement,
+    CreateTypeStatement,
+    DropTypeStatement,
     TypeAlterAction,
     TypeDefinition,
 )
@@ -113,7 +113,7 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
 
     def _format_type_name(
         self,
-        expr: Union[CreateTypeExpression, AlterTypeExpression, DropTypeExpression],
+        expr: Union[CreateTypeStatement, AlterTypeStatement, DropTypeStatement],
     ) -> str:
         """Render *expr*'s TYPE name as SQL.
 
@@ -141,7 +141,7 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
 
     def format_create_type_statement(
         self,
-        expr: CreateTypeExpression,
+        expr: CreateTypeStatement,
     ) -> Tuple[str, tuple]:
         self._require_type_support("CREATE TYPE")
         if expr.if_not_exists and expr.or_replace:
@@ -172,7 +172,7 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
 
     def format_alter_type_statement(
         self,
-        expr: AlterTypeExpression,
+        expr: AlterTypeStatement,
     ) -> Tuple[str, tuple]:
         self._require_type_support("ALTER TYPE")
         if expr.if_exists and not self.supports_alter_type_if_exists():
@@ -200,7 +200,7 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
 
     def format_drop_type_statement(
         self,
-        expr: DropTypeExpression,
+        expr: DropTypeStatement,
     ) -> Tuple[str, tuple]:
         self._require_type_support("DROP TYPE")
         if expr.if_exists:

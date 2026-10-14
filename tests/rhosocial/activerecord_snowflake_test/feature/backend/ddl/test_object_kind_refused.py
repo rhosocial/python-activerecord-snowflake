@@ -10,7 +10,7 @@ Names are objects now, and an object renders itself: every one carries its own
 what removed the old accidental guard. Names used to be strings, so
 ``format_identifier`` accepted anything and a statement given a table where a
 sequence belonged raised on the spot. Nothing replaced it. So
-``CreateSequenceExpression(dialect, Table(dialect, "users"))`` renders
+``CreateSequenceStatement(dialect, Table(dialect, "users"))`` renders
 ``CREATE SEQUENCE "users"`` -- well-formed, and naming a table -- and the
 mistake is invisible from outside.
 
@@ -42,26 +42,26 @@ from rhosocial.activerecord.backend.expression.objects import (
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_database import (
     AlterDatabaseAction,
-    AlterDatabaseExpression,
-    CreateDatabaseExpression,
-    DropDatabaseExpression,
+    AlterDatabaseStatement,
+    CreateDatabaseStatement,
+    DropDatabaseStatement,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_schema import (
-    CreateSchemaExpression,
-    DropSchemaExpression,
+    CreateSchemaStatement,
+    DropSchemaStatement,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_truncate import (
-    TruncateExpression,
+    TruncateStatement,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_type import (
-    AlterTypeExpression,
-    CreateTypeExpression,
-    DropTypeExpression,
+    AlterTypeStatement,
+    CreateTypeStatement,
+    DropTypeStatement,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_view import (
-    CreateMaterializedViewExpression,
+    CreateMaterializedViewStatement,
 )
-from rhosocial.activerecord.backend.expression.statements.dql import QueryExpression
+from rhosocial.activerecord.backend.expression.statements.dql import QueryStatement
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.expression.database import (
     SnowflakeCreateDatabaseExpression,
@@ -86,7 +86,7 @@ def dialect():
 
 
 def _query(dialect):
-    return QueryExpression(
+    return QueryStatement(
         dialect=dialect, select=[Column(dialect, "id")], from_=Table(dialect, "t")
     )
 
@@ -100,27 +100,27 @@ def _query(dialect):
 CASES = [
     (
         "truncate",
-        lambda d, o: TruncateExpression(d, o),
+        lambda d, o: TruncateStatement(d, o),
         lambda d: Schema(d, "reporting"),
-        "TruncateExpression.table must be a Table, got Schema",
+        "TruncateStatement.table must be a Table, got Schema",
     ),
     (
         "create schema",
-        lambda d, o: CreateSchemaExpression(d, o),
+        lambda d, o: CreateSchemaStatement(d, o),
         lambda d: Database(d, "analytics"),
-        "CreateSchemaExpression.schema must be a Schema, got Database",
+        "CreateSchemaStatement.schema must be a Schema, got Database",
     ),
     (
         "drop schema",
-        lambda d, o: DropSchemaExpression(d, o),
+        lambda d, o: DropSchemaStatement(d, o),
         lambda d: Table(d, "users"),
-        "DropSchemaExpression.schema must be a Schema, got Table",
+        "DropSchemaStatement.schema must be a Schema, got Table",
     ),
     (
         "create database",
-        lambda d, o: CreateDatabaseExpression(d, o),
+        lambda d, o: CreateDatabaseStatement(d, o),
         lambda d: Table(d, "users"),
-        "CreateDatabaseExpression.database must be a Database, got Table",
+        "CreateDatabaseStatement.database must be a Database, got Table",
     ),
     (
         "snowflake create database",
@@ -130,23 +130,23 @@ CASES = [
     ),
     (
         "drop database",
-        lambda d, o: DropDatabaseExpression(d, o),
+        lambda d, o: DropDatabaseStatement(d, o),
         lambda d: Schema(d, "reporting"),
-        "DropDatabaseExpression.database must be a Database, got Schema",
+        "DropDatabaseStatement.database must be a Database, got Schema",
     ),
     (
         "alter database",
-        lambda d, o: AlterDatabaseExpression(
+        lambda d, o: AlterDatabaseStatement(
             d, o, action=AlterDatabaseAction.RENAME_TO, target="renamed"
         ),
         lambda d: Schema(d, "reporting"),
-        "AlterDatabaseExpression.database must be a Database, got Schema",
+        "AlterDatabaseStatement.database must be a Database, got Schema",
     ),
     (
         "create materialized view",
-        lambda d, o: CreateMaterializedViewExpression(d, o, _query(d)),
+        lambda d, o: CreateMaterializedViewStatement(d, o, _query(d)),
         lambda d: Table(d, "users"),
-        "CreateMaterializedViewExpression.view must be a MaterializedView, got Table",
+        "CreateMaterializedViewStatement.view must be a MaterializedView, got Table",
     ),
     (
         "snowflake create materialized view",
@@ -159,25 +159,25 @@ CASES = [
     ),
     (
         "create type",
-        lambda d, o: CreateTypeExpression(
+        lambda d, o: CreateTypeStatement(
             d, o, SnowflakeScalarTypeDefinition(d, IntegerType(d))
         ),
         lambda d: Table(d, "users"),
-        "CreateTypeExpression.type must be a Type, got Table",
+        "CreateTypeStatement.type must be a Type, got Table",
     ),
     (
         "alter type",
-        lambda d, o: AlterTypeExpression(
+        lambda d, o: AlterTypeStatement(
             d, o, [SnowflakeSetTypeCommentAction(d, "a note")]
         ),
         lambda d: Table(d, "users"),
-        "AlterTypeExpression.type must be a Type, got Table",
+        "AlterTypeStatement.type must be a Type, got Table",
     ),
     (
         "drop type",
-        lambda d, o: DropTypeExpression(d, o),
+        lambda d, o: DropTypeStatement(d, o),
         lambda d: Table(d, "users"),
-        "DropTypeExpression.type must be a Type, got Table",
+        "DropTypeStatement.type must be a Type, got Table",
     ),
 ]
 
@@ -234,24 +234,24 @@ class TestRightObjectKindStillRenders:
     """
 
     def test_truncate_renders(self, dialect):
-        sql, params = TruncateExpression(dialect, Table(dialect, "users")).to_sql()
+        sql, params = TruncateStatement(dialect, Table(dialect, "users")).to_sql()
         assert sql == 'TRUNCATE TABLE "users"'
         assert params == ()
 
     def test_create_and_drop_schema_render(self, dialect):
-        create_sql, _ = CreateSchemaExpression(
+        create_sql, _ = CreateSchemaStatement(
             dialect, Schema(dialect, "reporting")
         ).to_sql()
-        drop_sql, _ = DropSchemaExpression(dialect, Schema(dialect, "reporting")).to_sql()
+        drop_sql, _ = DropSchemaStatement(dialect, Schema(dialect, "reporting")).to_sql()
         assert create_sql.startswith("CREATE SCHEMA")
         assert '"reporting"' in create_sql
         assert drop_sql.startswith("DROP SCHEMA")
 
     def test_database_ddl_renders(self, dialect):
         database = Database(dialect, "analytics")
-        create_sql, _ = CreateDatabaseExpression(dialect, database).to_sql()
-        drop_sql, _ = DropDatabaseExpression(dialect, database).to_sql()
-        alter_sql, _ = AlterDatabaseExpression(
+        create_sql, _ = CreateDatabaseStatement(dialect, database).to_sql()
+        drop_sql, _ = DropDatabaseStatement(dialect, database).to_sql()
+        alter_sql, _ = AlterDatabaseStatement(
             dialect, database, action=AlterDatabaseAction.RENAME_TO, target="renamed"
         ).to_sql()
         assert create_sql.startswith("CREATE DATABASE")
@@ -260,7 +260,7 @@ class TestRightObjectKindStillRenders:
         assert "RENAME TO" in alter_sql
 
     def test_materialized_view_renders(self, dialect):
-        sql, _ = CreateMaterializedViewExpression(
+        sql, _ = CreateMaterializedViewStatement(
             dialect, MaterializedView(dialect, "mv"), _query(dialect)
         ).to_sql()
         assert sql.startswith('CREATE MATERIALIZED VIEW "mv" AS SELECT')
@@ -284,15 +284,15 @@ class TestRightObjectKindStillRenders:
         )
 
         type_object = TypeObject(dialect, "age")
-        create_sql, _ = CreateTypeExpression(
+        create_sql, _ = CreateTypeStatement(
             dialect, type_object, SnowflakeScalarTypeDefinition(dialect, IntegerType(dialect))
         ).to_sql()
-        alter_sql, _ = AlterTypeExpression(
+        alter_sql, _ = AlterTypeStatement(
             dialect,
             type_object,
             [SnowflakeSetTypeCommentAction(dialect, "a note")],
         ).to_sql()
-        drop_sql, _ = DropTypeExpression(dialect, type_object).to_sql()
+        drop_sql, _ = DropTypeStatement(dialect, type_object).to_sql()
         assert create_sql.startswith("CREATE TYPE")
         assert '"age"' in create_sql
         assert alter_sql.startswith("ALTER TYPE")
@@ -311,7 +311,7 @@ class TestTheCheckLivesInTheFormatter:
     """
 
     def test_construction_with_the_wrong_kind_succeeds(self):
-        expression = CreateDatabaseExpression(None, "analytics")
+        expression = CreateDatabaseStatement(None, "analytics")
         assert expression.database == "analytics"
 
     def test_rendering_it_without_a_dialect_fails(self):
@@ -321,6 +321,6 @@ class TestTheCheckLivesInTheFormatter:
         wrong kind, which is what it means for the kind check to live in the
         formatter. A constructor could not have made this distinction.
         """
-        expression = CreateDatabaseExpression(None, "analytics")
+        expression = CreateDatabaseStatement(None, "analytics")
         with pytest.raises(ValueError, match="no dialect bound"):
             expression.to_sql()

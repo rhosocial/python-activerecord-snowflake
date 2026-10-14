@@ -43,7 +43,7 @@ class TestSnowflakeDialectFormatting:
 
 
 class TestSnowflakeQualifyClauseAssembly:
-    """Test QUALIFY clause rendering within QueryExpression."""
+    """Test QUALIFY clause rendering within QueryStatement."""
 
     def test_qualify_before_order_by(self, dialect):
         """QUALIFY must be emitted once and placed before ORDER BY."""
@@ -53,11 +53,11 @@ class TestSnowflakeQualifyClauseAssembly:
             Literal,
             OrderByClause,
             QualifyClause,
-            QueryExpression,
+            QueryStatement,
         )
         from rhosocial.activerecord.backend.expression.objects import Table
 
-        query = QueryExpression(
+        query = QueryStatement(
             dialect,
             select=[Column(dialect, "id"), Column(dialect, "name")],
             from_=Table(dialect, "users"),

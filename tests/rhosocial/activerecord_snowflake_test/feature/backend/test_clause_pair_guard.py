@@ -74,35 +74,35 @@ from rhosocial.activerecord.backend.expression.objects import (
     Table,
     View,
 )
-from rhosocial.activerecord.backend.expression.query_sources import CTEExpression
+from rhosocial.activerecord.backend.expression.query_sources import CTEClause
 from rhosocial.activerecord.backend.expression.statements.ddl_alter import (
     AlterConstraint,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_schema import (
-    DropSchemaExpression,
+    DropSchemaStatement,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_sequence import (
-    AlterSequenceExpression,
-    CreateSequenceExpression,
+    AlterSequenceStatement,
+    CreateSequenceStatement,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_table import (
-    CreateTableAsExpression,
-    DropTableExpression,
+    CreateTableAsStatement,
+    DropTableStatement,
     IdentityClause,
     TableConstraintType,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_truncate import (
-    TruncateExpression,
+    TruncateStatement,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_view import (
-    CreateMaterializedViewExpression,
-    DropMaterializedViewExpression,
-    DropViewExpression,
-    RefreshMaterializedViewExpression,
+    CreateMaterializedViewStatement,
+    DropMaterializedViewStatement,
+    DropViewStatement,
+    RefreshMaterializedViewStatement,
 )
-from rhosocial.activerecord.backend.expression.statements.dql import QueryExpression
+from rhosocial.activerecord.backend.expression.statements.dql import QueryStatement
 from rhosocial.activerecord.backend.expression.transaction import (
-    BeginTransactionExpression,
+    BeginTransactionStatement,
     SetTransactionExpression,
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
@@ -134,7 +134,7 @@ def _table(d, name="t"):
 
 
 def _query(d):
-    return QueryExpression(d, select=[Column(d, "id")], from_=_table(d))
+    return QueryStatement(d, select=[Column(d, "id")], from_=_table(d))
 
 
 def _render(build: Callable[[], object]) -> Outcome:
@@ -187,8 +187,8 @@ class PairCase:
 PAIR_CASES: Tuple[PairCase, ...] = (
     # ---------------------------------------------------------- sequences --
     PairCase(
-        "CreateSequenceExpression.cycle",
-        lambda d, **kw: CreateSequenceExpression(d, Sequence(d, "s"), **kw),
+        "CreateSequenceStatement.cycle",
+        lambda d, **kw: CreateSequenceStatement(d, Sequence(d, "s"), **kw),
         "cycle",
         "no_cycle",
         ("rendered", 'CREATE SEQUENCE "s"'),
@@ -198,8 +198,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         note="Snowflake has neither CYCLE nor NO CYCLE; both requests are refused by name.",
     ),
     PairCase(
-        "CreateSequenceExpression.order",
-        lambda d, **kw: CreateSequenceExpression(d, Sequence(d, "s"), **kw),
+        "CreateSequenceStatement.order",
+        lambda d, **kw: CreateSequenceStatement(d, Sequence(d, "s"), **kw),
         "order",
         "no_order",
         ("rendered", 'CREATE SEQUENCE "s"'),
@@ -210,8 +210,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         note="CREATE SEQUENCE [ { ORDER | NOORDER } ].",
     ),
     PairCase(
-        "CreateSequenceExpression.cache",
-        lambda d, **kw: CreateSequenceExpression(d, Sequence(d, "s"), **kw),
+        "CreateSequenceStatement.cache",
+        lambda d, **kw: CreateSequenceStatement(d, Sequence(d, "s"), **kw),
         "cache",
         "no_cache",
         ("rendered", 'CREATE SEQUENCE "s"'),
@@ -222,8 +222,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         note="Snowflake has no CACHE clause on sequences.",
     ),
     PairCase(
-        "AlterSequenceExpression.cycle",
-        lambda d, **kw: AlterSequenceExpression(d, Sequence(d, "s"), **kw),
+        "AlterSequenceStatement.cycle",
+        lambda d, **kw: AlterSequenceStatement(d, Sequence(d, "s"), **kw),
         "cycle",
         "no_cycle",
         ("rendered", 'ALTER SEQUENCE "s"'),
@@ -232,8 +232,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         same_refusal_ok=True,
     ),
     PairCase(
-        "AlterSequenceExpression.order",
-        lambda d, **kw: AlterSequenceExpression(d, Sequence(d, "s"), **kw),
+        "AlterSequenceStatement.order",
+        lambda d, **kw: AlterSequenceStatement(d, Sequence(d, "s"), **kw),
         "order",
         "no_order",
         ("rendered", 'ALTER SEQUENCE "s"'),
@@ -244,8 +244,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         note="ALTER SEQUENCE ... SET [ { ORDER | NOORDER } ].",
     ),
     PairCase(
-        "AlterSequenceExpression.cache",
-        lambda d, **kw: AlterSequenceExpression(d, Sequence(d, "s"), **kw),
+        "AlterSequenceStatement.cache",
+        lambda d, **kw: AlterSequenceStatement(d, Sequence(d, "s"), **kw),
         "cache",
         "no_cache",
         ("rendered", 'ALTER SEQUENCE "s"'),
@@ -290,8 +290,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
     ),
     # ------------------------------------------------------- drop family --
     PairCase(
-        "DropSchemaExpression.cascade",
-        lambda d, **kw: DropSchemaExpression(d, Schema(d, "s"), **kw),
+        "DropSchemaStatement.cascade",
+        lambda d, **kw: DropSchemaStatement(d, Schema(d, "s"), **kw),
         "cascade",
         "restrict",
         ("rendered", 'DROP SCHEMA "s"'),
@@ -302,8 +302,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         note="DROP SCHEMA [ CASCADE | RESTRICT ]; Snowflake accepts both.",
     ),
     PairCase(
-        "DropTableExpression.cascade",
-        lambda d, **kw: DropTableExpression(d, _table(d), **kw),
+        "DropTableStatement.cascade",
+        lambda d, **kw: DropTableStatement(d, _table(d), **kw),
         "cascade",
         "restrict",
         ("rendered", 'DROP TABLE "t"'),
@@ -317,8 +317,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         ),
     ),
     PairCase(
-        "DropViewExpression.cascade",
-        lambda d, **kw: DropViewExpression(d, View(d, "v"), **kw),
+        "DropViewStatement.cascade",
+        lambda d, **kw: DropViewStatement(d, View(d, "v"), **kw),
         "cascade",
         "restrict",
         ("rendered", 'DROP VIEW "v"'),
@@ -327,8 +327,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         note="The DROP VIEW reference has neither keyword; both are refused by name.",
     ),
     PairCase(
-        "DropMaterializedViewExpression.cascade",
-        lambda d, **kw: DropMaterializedViewExpression(d, MaterializedView(d, "mv"), **kw),
+        "DropMaterializedViewStatement.cascade",
+        lambda d, **kw: DropMaterializedViewStatement(d, MaterializedView(d, "mv"), **kw),
         "cascade",
         "restrict",
         ("rendered", 'DROP MATERIALIZED VIEW "mv"'),
@@ -344,8 +344,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
     ),
     # ----------------------------------------------------------- truncate --
     PairCase(
-        "TruncateExpression.cascade",
-        lambda d, **kw: TruncateExpression(d, _table(d), **kw),
+        "TruncateStatement.cascade",
+        lambda d, **kw: TruncateStatement(d, _table(d), **kw),
         "cascade",
         "restrict",
         ("rendered", 'TRUNCATE TABLE "t"'),
@@ -354,8 +354,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         note="The TRUNCATE reference has neither keyword; both are refused by name.",
     ),
     PairCase(
-        "TruncateExpression.restart_identity",
-        lambda d, **kw: TruncateExpression(d, _table(d), **kw),
+        "TruncateStatement.restart_identity",
+        lambda d, **kw: TruncateStatement(d, _table(d), **kw),
         "restart_identity",
         "continue_identity",
         ("rendered", 'TRUNCATE TABLE "t"'),
@@ -369,8 +369,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
     # the pairs they gate are in scope here: each spelling is answered, never
     # dropped, and the answers are pinned to the reference grammar.
     PairCase(
-        "CreateTableAsExpression.with_data",
-        lambda d, **kw: CreateTableAsExpression(d, _table(d), _query(d), **kw),
+        "CreateTableAsStatement.with_data",
+        lambda d, **kw: CreateTableAsStatement(d, _table(d), _query(d), **kw),
         "with_data",
         "no_data",
         ("rendered", 'CREATE TABLE "t" AS SELECT "id" FROM "t"'),
@@ -386,8 +386,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         ),
     ),
     PairCase(
-        "CTEExpression.materialized",
-        lambda d, **kw: CTEExpression(d, "c", _query(d), **kw),
+        "CTEClause.materialized",
+        lambda d, **kw: CTEClause(d, "c", _query(d), **kw),
         "materialized",
         "not_materialized",
         ("rendered", '"c" AS (SELECT "id" FROM "t")'),
@@ -437,8 +437,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         note="CREATE FUNCTION ... [ { VOLATILE | IMMUTABLE } ]; default VOLATILE.",
     ),
     PairCase(
-        "CreateMaterializedViewExpression.with_data",
-        lambda d, **kw: CreateMaterializedViewExpression(
+        "CreateMaterializedViewStatement.with_data",
+        lambda d, **kw: CreateMaterializedViewStatement(
             d, MaterializedView(d, "mv"), _query(d), **kw
         ),
         "with_data",
@@ -454,8 +454,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         ),
     ),
     PairCase(
-        "BeginTransactionExpression.deferrable",
-        lambda d, **kw: BeginTransactionExpression(d, **kw),
+        "BeginTransactionStatement.deferrable",
+        lambda d, **kw: BeginTransactionStatement(d, **kw),
         "deferrable",
         "not_deferrable",
         ("rendered", "BEGIN"),
@@ -467,8 +467,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
     # TRANSACTION statement at all. The pair must refuse by name through
     # supports_transaction_wait() rather than be silently dropped.
     PairCase(
-        "BeginTransactionExpression.wait",
-        lambda d, **kw: BeginTransactionExpression(d, **kw),
+        "BeginTransactionStatement.wait",
+        lambda d, **kw: BeginTransactionStatement(d, **kw),
         "wait",
         "no_wait",
         ("rendered", "BEGIN"),
@@ -643,7 +643,7 @@ class TestNewlyGatedMasterProbes:
     """The four master probes core's new gates consult, and Snowflake's answers.
 
     Core commit c4d6adc made three previously-decorative probes load-bearing --
-    ``supports_materialized_cte`` on ``format_cte_expression``,
+    ``supports_materialized_cte`` on ``format_cte_clause``,
     ``supports_truncate`` on ``format_truncate_statement``, and the new
     ``supports_with_data_clause`` on CTAS / CREATE MATERIALIZED VIEW / REFRESH
     MATERIALIZED VIEW -- and added ``supports_transaction_wait`` for the new
@@ -681,11 +681,11 @@ class TestNewlyGatedMasterProbes:
             ({"not_materialized": True}, "NOT MATERIALIZED CTE"),
         ):
             with pytest.raises(UnsupportedFeatureError) as exc_info:
-                CTEExpression(d, "c", _query(d), **kw).to_sql()
+                CTEClause(d, "c", _query(d), **kw).to_sql()
             assert exc_info.value.feature_name == feature
             assert exc_info.value.dialect_name == "Snowflake"
         # Neither spelling requested: the probe is not consulted, nothing refused.
-        sql, _params = CTEExpression(d, "c", _query(d)).to_sql()
+        sql, _params = CTEClause(d, "c", _query(d)).to_sql()
         assert "MATERIALIZED" not in sql
 
     def test_with_data_is_refused_by_name_on_every_consumer(self):
@@ -695,7 +695,7 @@ class TestNewlyGatedMasterProbes:
             ({"no_data": True}, "WITH NO DATA"),
         ):
             with pytest.raises(UnsupportedFeatureError) as exc_info:
-                CreateTableAsExpression(d, _table(d), _query(d), **kw).to_sql()
+                CreateTableAsStatement(d, _table(d), _query(d), **kw).to_sql()
             assert exc_info.value.feature_name == feature
             assert exc_info.value.dialect_name == "Snowflake"
         # CREATE MATERIALIZED VIEW refuses through Snowflake's own formatter,
@@ -704,7 +704,7 @@ class TestNewlyGatedMasterProbes:
         # WITH DATA METRIC FUNCTION clause).
         for kw in ({"with_data": True}, {"no_data": True}):
             with pytest.raises(UnsupportedFeatureError) as exc_info:
-                CreateMaterializedViewExpression(
+                CreateMaterializedViewStatement(
                     d, MaterializedView(d, "mv"), _query(d), **kw
                 ).to_sql()
             assert exc_info.value.feature_name == "MATERIALIZED VIEW WITH [NO] DATA"
@@ -713,7 +713,7 @@ class TestNewlyGatedMasterProbes:
         # is refused before the clause is read.
         for kw in ({}, {"with_data": True}, {"no_data": True}):
             with pytest.raises(UnsupportedFeatureError) as exc_info:
-                RefreshMaterializedViewExpression(
+                RefreshMaterializedViewStatement(
                     d, MaterializedView(d, "mv"), **kw
                 ).to_sql()
             assert exc_info.value.feature_name == "REFRESH MATERIALIZED VIEW"
@@ -722,7 +722,7 @@ class TestNewlyGatedMasterProbes:
     def test_truncate_renders_and_its_probe_gates_its_own_formatter(self):
         d = _dialect()
         assert d.supports_truncate() is True
-        sql, _params = TruncateExpression(d, _table(d)).to_sql()
+        sql, _params = TruncateStatement(d, _table(d)).to_sql()
         assert sql == 'TRUNCATE TABLE "t"'
 
         class _NoTruncate(SnowflakeDialect):
@@ -731,18 +731,18 @@ class TestNewlyGatedMasterProbes:
 
         nd = _NoTruncate()
         with pytest.raises(UnsupportedFeatureError) as exc_info:
-            TruncateExpression(nd, _table(nd)).to_sql()
+            TruncateStatement(nd, _table(nd)).to_sql()
         assert exc_info.value.feature_name == "TRUNCATE"
 
     def test_wait_pair_refuses_by_name_on_every_transaction_statement(self):
         d = _dialect()
         for build, feature in (
             (
-                lambda: BeginTransactionExpression(d, wait=True),
+                lambda: BeginTransactionStatement(d, wait=True),
                 "BEGIN TRANSACTION WAIT",
             ),
             (
-                lambda: BeginTransactionExpression(d, no_wait=True),
+                lambda: BeginTransactionStatement(d, no_wait=True),
                 "BEGIN TRANSACTION NO WAIT",
             ),
             (
@@ -782,28 +782,28 @@ class TestGuardIsNotVacuous:
         here; the report lists them as inherited.
         """
         expected = {
-            "CreateSequenceExpression.cycle",
-            "CreateSequenceExpression.order",
-            "CreateSequenceExpression.cache",
-            "AlterSequenceExpression.cycle",
-            "AlterSequenceExpression.order",
-            "AlterSequenceExpression.cache",
+            "CreateSequenceStatement.cycle",
+            "CreateSequenceStatement.order",
+            "CreateSequenceStatement.cache",
+            "AlterSequenceStatement.cycle",
+            "AlterSequenceStatement.order",
+            "AlterSequenceStatement.cache",
             "IdentityClause.cycle",
             "IdentityClause.order",
             "IdentityClause.cache",
-            "DropSchemaExpression.cascade",
-            "DropTableExpression.cascade",
-            "DropViewExpression.cascade",
-            "DropMaterializedViewExpression.cascade",
-            "TruncateExpression.cascade",
-            "TruncateExpression.restart_identity",
-            "CreateTableAsExpression.with_data",
-            "CTEExpression.materialized",
+            "DropSchemaStatement.cascade",
+            "DropTableStatement.cascade",
+            "DropViewStatement.cascade",
+            "DropMaterializedViewStatement.cascade",
+            "TruncateStatement.cascade",
+            "TruncateStatement.restart_identity",
+            "CreateTableAsStatement.with_data",
+            "CTEClause.materialized",
             "SnowflakeUnpivotExpression.include_nulls",
             "SnowflakeCreateFunctionExpression.immutable",
-            "CreateMaterializedViewExpression.with_data",
-            "BeginTransactionExpression.deferrable",
-            "BeginTransactionExpression.wait",
+            "CreateMaterializedViewStatement.with_data",
+            "BeginTransactionStatement.deferrable",
+            "BeginTransactionStatement.wait",
             "SetTransactionExpression.wait",
         }
         covered = {case.case_id for case in PAIR_CASES}
@@ -823,7 +823,7 @@ class TestSentinels:
 
     def test_wrong_expected_sql_is_rejected(self):
         d = _dialect()
-        sql = CreateSequenceExpression(d, Sequence(d, "s"), no_order=True).to_sql()[0]
+        sql = CreateSequenceStatement(d, Sequence(d, "s"), no_order=True).to_sql()[0]
         with pytest.raises(AssertionError):
             assert sql == 'CREATE SEQUENCE "s" ORDER'
 
@@ -831,7 +831,7 @@ class TestSentinels:
         d = _dialect()
         with pytest.raises(AssertionError):
             with pytest.raises(UnsupportedFeatureError) as exc_info:
-                CreateSequenceExpression(d, Sequence(d, "s"), no_cycle=True).to_sql()
+                CreateSequenceStatement(d, Sequence(d, "s"), no_cycle=True).to_sql()
             assert exc_info.value.feature_name == "SEQUENCE ORDER"
 
     def test_wrong_collision_claim_is_rejected(self):
@@ -839,8 +839,8 @@ class TestSentinels:
         d = _dialect()
         with pytest.raises(AssertionError):
             assert (
-                CreateSequenceExpression(d, Sequence(d, "s")).to_sql()[0]
-                == CreateSequenceExpression(d, Sequence(d, "s"), no_order=True).to_sql()[0]
+                CreateSequenceStatement(d, Sequence(d, "s")).to_sql()[0]
+                == CreateSequenceStatement(d, Sequence(d, "s"), no_order=True).to_sql()[0]
             )
 
     def test_wrong_unpivot_default_claim_is_rejected(self):
@@ -864,6 +864,6 @@ class TestSentinels:
 
     def test_wrong_wait_drop_claim_is_rejected(self):
         """The measured defect: WAIT must not be silently dropped to BEGIN."""
-        outcome = _render(lambda: BeginTransactionExpression(_dialect(), wait=True))
+        outcome = _render(lambda: BeginTransactionStatement(_dialect(), wait=True))
         with pytest.raises(AssertionError):
             assert outcome == ("rendered", "BEGIN")
