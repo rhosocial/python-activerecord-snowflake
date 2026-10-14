@@ -51,6 +51,7 @@ from .ilike import SnowflakeILIKEMixin
 from .generated_column import SnowflakeGeneratedColumnMixin
 from .ordered_set_aggregation import SnowflakeOrderedSetAggregationMixin
 from .truncate import SnowflakeTruncateMixin
+from .wildcard import SnowflakeWildcardMixin
 from .schema import SnowflakeSchemaMixin
 from .ddl_database import SnowflakeDatabaseMixin
 from .sequence import SnowflakeSequenceMixin
@@ -96,6 +97,7 @@ __all__ = [
     "SnowflakeGeneratedColumnMixin",
     "SnowflakeOrderedSetAggregationMixin",
     "SnowflakeTruncateMixin",
+    "SnowflakeWildcardMixin",
     "SnowflakeSchemaMixin",
     "SnowflakeDatabaseMixin",
     "SnowflakeSequenceMixin",

@@ -22,6 +22,10 @@ from .types import (
 from .table_options import SnowflakeCreateTableOptions
 from .database import SnowflakeCreateDatabaseExpression
 from .dml import SnowflakeInsertExpression
+from .wildcard import (
+    SnowflakeAllColumnsWildcard,
+    SnowflakeRowCountWildcard,
+)
 from .partition import (
     SnowflakeClusterByClause,
     SnowflakeExternalPartitionClause,
@@ -111,6 +115,8 @@ __all__ = [
     "SnowflakeCreateTableOptions",
     "SnowflakeCreateDatabaseExpression",
     "SnowflakeInsertExpression",
+    "SnowflakeAllColumnsWildcard",
+    "SnowflakeRowCountWildcard",
     "SnowflakeClusterByClause",
     "SnowflakeExternalPartitionClause",
     "SnowflakeIdentifierExpression",

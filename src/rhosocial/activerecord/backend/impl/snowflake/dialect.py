@@ -180,6 +180,7 @@ from .mixins import (
     SnowflakeGeneratedColumnMixin,
     SnowflakeOrderedSetAggregationMixin,
     SnowflakeTruncateMixin,
+    SnowflakeWildcardMixin,
 )
 
 
@@ -230,6 +231,10 @@ class SnowflakeDialect(
     SnowflakeILIKEMixin,
     SnowflakeGeneratedColumnMixin,
     SnowflakeOrderedSetAggregationMixin,
+    # The wildcard split: core gives each asterisk position its own formatter,
+    # and Snowflake spells both of them with an optional filter. Placed before
+    # the core ``ExpressionMixin`` (below) so its overrides win.
+    SnowflakeWildcardMixin,
     # TRIM/LPAD/RPAD/REPEAT are nodes with default formatters. LPAD, RPAD and
     # REPEAT are the shared spellings verbatim on Snowflake, so the generic
     # mixins are the answer for those three; TRIM differs and is overridden by
