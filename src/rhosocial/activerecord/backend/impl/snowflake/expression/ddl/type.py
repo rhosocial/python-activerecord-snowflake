@@ -8,7 +8,7 @@ from rhosocial.activerecord.backend.expression.bases import BaseExpression
 # ``Type`` is the schema object naming a user-defined type; aliased because the
 # TYPE statements name their parameter ``type`` for the core's sake.
 from rhosocial.activerecord.backend.expression.objects import Type as TypeObject
-from rhosocial.activerecord.backend.expression.serialization import ExpressionRegistry
+from rhosocial.activerecord.backend.expression.serialization import register_expression_class
 from rhosocial.activerecord.backend.expression.statements.ddl_type import (
     AlterTypeStatement,
     CreateTypeStatement,
@@ -241,7 +241,7 @@ _EXPRESSION_TYPES = (
     SnowflakeDropTypeExpression,
 )
 for _expression_type in _EXPRESSION_TYPES:
-    ExpressionRegistry.register(_expression_type)
+    register_expression_class(_expression_type)
 
 
 __all__ = [

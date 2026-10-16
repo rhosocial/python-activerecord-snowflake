@@ -11,10 +11,10 @@ from rhosocial.activerecord.backend.dialect.protocols import (
 )
 from rhosocial.activerecord.backend.expression.objects import Type
 from rhosocial.activerecord.backend.expression.serialization import (
-    ExpressionRegistry,
     deserialize,
     deserialize_json,
     deserialize_xml,
+    registered_expression_classes,
     serialize,
     serialize_json,
     serialize_xml,
@@ -407,7 +407,7 @@ def test_udt_expressions_are_explicitly_registered_for_serialization():
 
     for expression_type in expression_types:
         fqn = f"{expression_type.__module__}.{expression_type.__name__}"
-        assert ExpressionRegistry.lookup(fqn) is expression_type
+        assert registered_expression_classes().get(fqn) is expression_type
 
 
 def test_udt_expression_dict_json_and_xml_round_trips():

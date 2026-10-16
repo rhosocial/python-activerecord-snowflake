@@ -51,7 +51,7 @@ type either, it goes ``DataType.to_sql()`` →
 """
 from typing import Any, Optional, TYPE_CHECKING
 
-from rhosocial.activerecord.backend.expression.serialization import ExpressionRegistry
+from rhosocial.activerecord.backend.expression.serialization import register_expression_class
 from rhosocial.activerecord.backend.expression.types._base import DataType
 from rhosocial.activerecord.backend.expression.types.integer import IntegerType
 from rhosocial.activerecord.backend.expression.types.string import VarCharType
@@ -516,4 +516,4 @@ _SNOWFLAKE_DATA_TYPES = (
     SnowflakeUserDefinedType,
 )
 for _data_type in _SNOWFLAKE_DATA_TYPES:
-    ExpressionRegistry.register(_data_type)
+    register_expression_class(_data_type)

@@ -219,8 +219,11 @@ class TestSnowflakeDialectCapabilities:
     def test_supports_set_operation_limit_offset(self, dialect):
         assert dialect.supports_set_operation_limit_offset() is True
 
-    def test_supports_set_operation_for_update(self, dialect):
-        assert dialect.supports_set_operation_for_update() is False
+    # ``supports_set_operation_for_update`` is deliberately absent. It gated the
+    # ``for_update_clause`` trailing parameter the core ``SetOperation`` node used
+    # to carry; that parameter is abolished, so the probe lost its subject and
+    # core no longer declares a default for it. Snowflake's mixin never declared
+    # its own, so there is nothing left to assert.
 
 
 class TestSnowflakeSpecificCapabilities:
