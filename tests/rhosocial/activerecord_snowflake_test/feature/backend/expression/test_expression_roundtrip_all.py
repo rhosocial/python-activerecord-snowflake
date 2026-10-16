@@ -51,14 +51,14 @@ that never found a formatter names the formatting method. The shape of
 How the classes are found
 =========================
 
-``collect_expression_classes`` walks each package. It does **not** read
-``ExpressionRegistry._registry``: that dict is process-global and grows as
-sibling test modules import their own backends, so a matrix built from it would
-cover a different set of classes depending on which files pytest happened to
-import first. ``_auto_register_builtins`` is still called, because deserialising
-a core class needs it registered -- a separate concern from deciding what to
-test -- and :func:`register_all` registers what was collected so a Snowflake
-expression can be found again on the way back.
+``collect_expression_classes`` walks each package. It does **not** read a
+process-global class index: that dict grows as sibling test modules import their
+own backends, so a matrix built from it would cover a different set of classes
+depending on which files pytest happened to import first.
+``auto_register_builtins`` is still called, because deserialising a core class
+needs it registered -- a separate concern from deciding what to test -- and
+:func:`register_all` registers what was collected so a Snowflake expression can
+be found again on the way back.
 
 And when a class cannot be constructed
 =====================================
@@ -107,7 +107,7 @@ from rhosocial.activerecord.backend.expression.objects import (
 )
 from rhosocial.activerecord.backend.expression import graph as graph_mod
 from rhosocial.activerecord.backend.expression.advanced_functions import (
-    CaseFunction,
+    CaseExpression,
     WindowClause,
     WindowDefinition,
     WindowSpecification,
@@ -123,11 +123,14 @@ from rhosocial.activerecord.backend.expression.predicates import (
     LikePredicate,
 )
 from rhosocial.activerecord.backend.expression.query_parts import JoinClause
+from rhosocial.activerecord.backend.expression.operators import ArithmeticOperation
+from rhosocial.activerecord.backend.expression.query_sources import SetOperation
 from rhosocial.activerecord.backend.expression.serialization import (
-    ExpressionRegistry,
+    auto_register_builtins,
     deserialize,
     deserialize_json,
     deserialize_xml,
+    registered_expression_classes,
     serialize,
     serialize_json,
     serialize_xml,
@@ -256,7 +259,7 @@ def _collect_matrix_classes():
     names are keyed by the first name in sorted order, so a class aliased four
     ways is not tested four times.
     """
-    ExpressionRegistry._auto_register_builtins()
+    auto_register_builtins()
     collected: Dict[str, type] = {}
     for package in (SNOWFLAKE_EXPR_PKG, CORE_EXPR_PKG):
         collected.update(collect_expression_classes(package))
@@ -648,10 +651,28 @@ def register_specials():
         lambda d: PassingClause(d, [Column(d, "a")]),
     )
 
-    # -- expressions that need at least one member --------------------------
+    # -- closed word sets: the guess supplies a bare string -------------------
+    # ``op`` on both nodes is a closed set checked at construction, so the
+    # introspective guess ("x" for every str-annotated parameter) raises
+    # ValueError before a formatter is ever reached.
     register_special_constructor(
-        "advanced_functions.CaseFunction",
-        lambda d: CaseFunction(
+        "operators.ArithmeticOperation",
+        lambda d: ArithmeticOperation(d, "add", Column(d, "a"), Column(d, "b")),
+    )
+    register_special_constructor(
+        "query_sources.SetOperation",
+        lambda d: SetOperation(
+            d,
+            op="union",
+            left=QueryStatement(d, select=[Column(d, "id")]),
+            right=QueryStatement(d, select=[Column(d, "id")]),
+        ),
+    )
+
+# -- expressions that need at least one member --------------------------
+    register_special_constructor(
+        "advanced_functions.CaseExpression",
+        lambda d: CaseExpression(
             d, cases=[(_column_predicate(d), Literal(d, 1))], else_result=Literal(d, 0)
         ),
     )
@@ -992,13 +1013,13 @@ UNMODELLED_FORMATTERS = {
     ),
     # --- PIVOT / UNPIVOT as core expressions ------------------------------
     # Snowflake has PIVOT, and renders it -- through ``SnowflakePivotExpression``
-    # and ``SnowflakePivotSupport``. The core ``PivotExpression`` names formatters
-    # this dialect does not declare, because the Snowflake clause is spelled from
-    # different fields.
+    # and ``SnowflakePivotSupport``. The core ``Pivot`` / ``Unpivot`` name
+    # formatters this dialect does not declare, because the Snowflake clause is
+    # spelled from different fields.
     "the core PIVOT / UNPIVOT expressions (Snowflake spells the clause from "
     "SnowflakePivotExpression instead)": (
-        "format_pivot_expression",
-        "format_unpivot_expression",
+        "format_pivot",
+        "format_unpivot",
     ),
     # --- the root of the row-source tree ----------------------------------
     # Every concrete row source declares its own ``format_method`` and overrides
@@ -1533,7 +1554,7 @@ class TestMatrixIntegrity:
         the registry because the registry also holds whatever backends other test
         modules happened to import.
         """
-        ExpressionRegistry._auto_register_builtins()
+        auto_register_builtins()
         expected = set(_collect_matrix_classes())
         assert expected == set(REGISTERED), (
             "the set of classes these packages define changed after collection.\n"
@@ -1580,10 +1601,10 @@ class TestMatrixIntegrity:
         but the registry cannot resolve would round-trip into the wrong thing or
         nothing at all.
         """
-        ExpressionRegistry._auto_register_builtins()
-        unresolved = sorted(set(REGISTERED) - set(ExpressionRegistry._registry))
+        auto_register_builtins()
+        unresolved = sorted(set(REGISTERED) - set(registered_expression_classes()))
         assert not unresolved, (
-            f"the matrix covers classes the registry cannot resolve: {unresolved}"
+            f"the matrix covers classes the index cannot resolve: {unresolved}"
         )
 
     def test_row_sources_are_reached(self, dialect):
@@ -1639,7 +1660,7 @@ class TestMatrixIntegrity:
 
     def test_coverage_report(self, dialect):
         """Surface the matrix's classification, so coverage stays transparent."""
-        ExpressionRegistry._auto_register_builtins()
+        auto_register_builtins()
         tally = {}
         constructible = 0
         for fqn in sorted(REGISTERED):

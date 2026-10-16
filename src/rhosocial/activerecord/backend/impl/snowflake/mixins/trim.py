@@ -17,7 +17,7 @@ alias) is the default's, so only the name and the operand positions differ.
 from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
-    from ...expression.advanced_functions import TrimFunction
+    from ...expression.advanced_functions import TrimExpression
 
 
 class SnowflakeTrimMixin:
@@ -25,7 +25,7 @@ class SnowflakeTrimMixin:
 
     _TRIM_FUNCTIONS = {"BOTH": "TRIM", "LEADING": "LTRIM", "TRAILING": "RTRIM"}
 
-    def format_trim_expression(self, expr: "TrimFunction") -> Tuple[str, Tuple]:
+    def format_trim_expression(self, expr: "TrimExpression") -> Tuple[str, Tuple]:
         """Format a TRIM node in Snowflake's form.
 
         Args:
