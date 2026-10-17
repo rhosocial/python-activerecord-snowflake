@@ -1,6 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/file_format.py
 """SnowflakeFileFormatMixin — file format DDL support."""
 
+from enum import Enum
 from typing import Any, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -54,7 +55,10 @@ class SnowflakeFileFormatMixin:
             parts.append("IF NOT EXISTS")
         parts.append(self.format_identifier(expr.name))
         if expr.type_ is not None:
-            type_value = getattr(expr.type_, "value", expr.type_)
+            # The declared type of ``type_`` admits the enum and the raw
+            # string; the enum's own value is the spelling, read off the
+            # member by name once the kind is known rather than probed for.
+            type_value = expr.type_.value if isinstance(expr.type_, Enum) else expr.type_
             parts.append(f"TYPE = {str(type_value).upper()}")
         for key, value in expr.options.items():
             parts.append(

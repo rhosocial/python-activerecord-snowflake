@@ -1,14 +1,18 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/materialized_view.py
 """SnowflakeMaterializedViewMixin — materialized view DDL support."""
 
-from typing import Any, Tuple, TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression.objects import MaterializedView
 
+from ..expression.ddl.materialized_view import (
+    SnowflakeCreateMaterializedViewExpression,
+)
+
 if TYPE_CHECKING:
-    from ..expression.ddl.materialized_view import (
-        SnowflakeCreateMaterializedViewExpression,
+    from rhosocial.activerecord.backend.expression.statements.ddl_view import (
+        CreateMaterializedViewStatement,
     )
 
 
@@ -103,10 +107,15 @@ class SnowflakeMaterializedViewMixin:
             raise ValueError("CREATE MATERIALIZED VIEW requires a query")
 
         parts = ["CREATE"]
-        if getattr(expr, "or_replace", False):
+        # ``or_replace`` / ``if_not_exists`` / ``cluster_by`` / ``comment``
+        # are the Snowflake expression's own fields: the core statement this
+        # formatter also accepts declares none of them, so the subclass is
+        # asked by name rather than probed for attributes its contract does
+        # not carry.
+        if isinstance(expr, SnowflakeCreateMaterializedViewExpression) and expr.or_replace:
             parts.append("OR REPLACE")
         parts.append("MATERIALIZED VIEW")
-        if getattr(expr, "if_not_exists", False):
+        if isinstance(expr, SnowflakeCreateMaterializedViewExpression) and expr.if_not_exists:
             parts.append("IF NOT EXISTS")
         # The statement already holds the named view, so it renders itself
         # through its own format_materialized_view_object rather than through
@@ -119,14 +128,14 @@ class SnowflakeMaterializedViewMixin:
             cols = ", ".join(self.format_identifier(col) for col in column_aliases)
             parts.append(f"({cols})")
 
-        cluster_by = getattr(expr, "cluster_by", None)
-        if cluster_by:
-            cols = ", ".join(self.format_identifier(col) for col in cluster_by)
-            parts.append(f"CLUSTER BY ({cols})")
-
-        comment = getattr(expr, "comment", None)
-        if comment is not None:
-            parts.append(f"COMMENT = '{self._escape_sql_string(comment)}'")
+        if isinstance(expr, SnowflakeCreateMaterializedViewExpression):
+            if expr.cluster_by:
+                cols = ", ".join(
+                    self.format_identifier(col) for col in expr.cluster_by
+                )
+                parts.append(f"CLUSTER BY ({cols})")
+            if expr.comment is not None:
+                parts.append(f"COMMENT = '{self._escape_sql_string(expr.comment)}'")
 
         # Snowflake has no WITH [NO] DATA: the view is created empty and filled
         # in the background. An explicit request for either spelling was refused
@@ -134,13 +143,15 @@ class SnowflakeMaterializedViewMixin:
         parts.extend(["AS", query_sql])
         return " ".join(parts), ()
 
-    def _materialized_view_query_sql(self, expr: Any):
+    def _materialized_view_query_sql(self, expr: "CreateMaterializedViewStatement"):
         """Return the defining query as SQL text, or None when absent.
 
-        Snowflake's own expression carries a raw ``as_query`` string; the core
-        expression carries a ``QueryStatement``.
+        Snowflake's own expression coerces the query from either vocabulary
+        but stores it in the core ``query`` field, so the declared field is
+        read directly: the core statement declares it too, and a Snowflake
+        expression may hold ``None`` when no query was given.
         """
-        query = getattr(expr, "query", None)
+        query = expr.query
         if query is None:
             return None
         if isinstance(query, str):

@@ -3,6 +3,8 @@
 
 from typing import Tuple, TYPE_CHECKING
 
+from ..expression.dml import SnowflakeInsertExpression
+
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.statements import (
         InsertStatement,
@@ -26,8 +28,12 @@ class SnowflakeDMLMixin:
     ) -> Tuple[str, tuple]:
         """Format an INSERT statement, honouring the ``overwrite`` option.
 
-        When ``getattr(expr, "overwrite", False)`` is truthy the statement is
-        rendered as ``INSERT OVERWRITE INTO ...``.
+        When the statement is a :class:`SnowflakeInsertExpression` whose
+        ``overwrite`` field is truthy it is rendered as
+        ``INSERT OVERWRITE INTO ...``; any other INSERT keeps the core
+        rendering. The flag belongs to the Snowflake expression alone -- the
+        core ``InsertStatement`` declares no such field -- so the subclass is
+        asked by name rather than probed for the attribute.
 
         Args:
             expr: :class:`InsertStatement`.
@@ -36,7 +42,7 @@ class SnowflakeDMLMixin:
             Tuple of (SQL string, params tuple).
 
         """
-        if getattr(expr, "overwrite", False):
+        if isinstance(expr, SnowflakeInsertExpression) and expr.overwrite:
             return self.format_insert_overwrite_statement(expr)
         return super().format_insert_statement(expr)
 

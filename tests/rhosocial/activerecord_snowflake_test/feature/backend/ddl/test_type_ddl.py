@@ -23,6 +23,7 @@ from rhosocial.activerecord.backend.expression.statements.ddl_type import (
     AlterTypeStatement,
     CreateTypeStatement,
     DropTypeStatement,
+    TypeAlterAction,
     TypeDefinition,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
@@ -345,7 +346,21 @@ def test_alter_type_rejects_multiple_or_unknown_actions():
     )
     with pytest.raises(UnsupportedFeatureError, match="multiple ALTER TYPE actions"):
         expression.to_sql()
-    with pytest.raises(UnsupportedFeatureError, match="ALTER TYPE action"):
+
+    class UnsupportedAction(TypeAlterAction):
+        """A well-formed action whose kind this dialect never registered."""
+
+        action_kind = "test.unsupported"
+
+    with pytest.raises(
+        UnsupportedFeatureError, match=r"ALTER TYPE action test\.unsupported"
+    ):
+        dialect.format_type_alter_action(UnsupportedAction(dialect))
+
+    # The kind is a declared field of the contract, read directly now: an
+    # input that is not a TypeAlterAction at all surfaces the missing
+    # attribute instead of the old probe's class-name fallback.
+    with pytest.raises(AttributeError, match="action_kind"):
         dialect.format_type_alter_action(object())
 
 

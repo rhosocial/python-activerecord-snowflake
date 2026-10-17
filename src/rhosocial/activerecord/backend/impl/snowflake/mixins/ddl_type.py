@@ -14,6 +14,8 @@ from rhosocial.activerecord.backend.expression.statements.ddl_type import (
 )
 
 from ..expression.ddl.type import (
+    SnowflakeCreateTypeExpression,
+    SnowflakeDropTypeExpression,
     SnowflakeObjectTypeDefinition,
     SnowflakeScalarTypeDefinition,
     SnowflakeSetTypeCommentAction,
@@ -163,8 +165,11 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
         if expr.if_not_exists:
             parts.append("IF NOT EXISTS")
         parts.extend((self._format_type_name(expr), definition_sql))
-        comment = getattr(expr, "comment", None)
-        if comment is not None:
+        # The ``COMMENT`` qualifier is Snowflake's own; the core statement
+        # carries no such field, so the subclass that declares it is asked
+        # by name rather than probed for.
+        if isinstance(expr, SnowflakeCreateTypeExpression) and expr.comment is not None:
+            comment = expr.comment
             if not isinstance(comment, str):
                 raise TypeError("Snowflake TYPE comment must be a string")
             parts.extend(("COMMENT", "=", self.format_literal(comment)))
@@ -205,10 +210,16 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
         self._require_type_support("DROP TYPE")
         if expr.if_exists:
             raise UnsupportedFeatureError(self.name, "DROP TYPE IF EXISTS")
-        if getattr(expr, "cascade", False):
-            raise UnsupportedFeatureError(self.name, "DROP TYPE CASCADE")
-        if getattr(expr, "restrict", False):
-            raise UnsupportedFeatureError(self.name, "DROP TYPE RESTRICT")
+        # ``cascade`` / ``restrict`` are declared only by this backend's
+        # expression, which refuses either spelling at construction time and
+        # pins both fields to False; the render-time refusal stays as the
+        # second gate rather than silently trusting the first. The core
+        # statement has no such fields, so a plain one renders the bare form.
+        if isinstance(expr, SnowflakeDropTypeExpression):
+            if expr.cascade:
+                raise UnsupportedFeatureError(self.name, "DROP TYPE CASCADE")
+            if expr.restrict:
+                raise UnsupportedFeatureError(self.name, "DROP TYPE RESTRICT")
         return f"DROP TYPE {self._format_type_name(expr)}", ()
 
     def format_type_definition(
@@ -240,7 +251,7 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
             return f"AS OBJECT({', '.join(field_sql)})", tuple(field_params)
         raise UnsupportedFeatureError(
             self.name,
-            f"TYPE definition {getattr(expr, 'definition_kind', type(expr).__name__)}",
+            f"TYPE definition {expr.definition_kind}",
         )
 
     def format_snowflake_type_field(
@@ -262,7 +273,7 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
             return "UNSET COMMENT", ()
         raise UnsupportedFeatureError(
             self.name,
-            f"ALTER TYPE action {getattr(expr, 'action_kind', type(expr).__name__)}",
+            f"ALTER TYPE action {expr.action_kind}",
         )
 
 

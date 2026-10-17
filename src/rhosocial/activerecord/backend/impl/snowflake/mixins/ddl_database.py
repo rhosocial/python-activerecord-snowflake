@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Tuple, TYPE_CHECKING
 
-from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression.objects import Database
+
+from ..expression.database import SnowflakeCreateDatabaseExpression
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.statements.ddl_database import (
@@ -101,15 +102,17 @@ class SnowflakeDatabaseMixin:
         parts = ["CREATE"]
         if expr.or_replace:
             parts.append("OR REPLACE")
-        if getattr(expr, "transient", False):
+        # ``TRANSIENT`` and ``CLONE`` are Snowflake's own grammar; the core
+        # statement documents that they live on this backend's subclass, so
+        # the subclass is asked by name rather than probed for.
+        if isinstance(expr, SnowflakeCreateDatabaseExpression) and expr.transient:
             parts.append("TRANSIENT")
         parts.append("DATABASE")
         if expr.if_not_exists:
             parts.append("IF NOT EXISTS")
         parts.append(expr.database.to_sql()[0])
-        clone_source = getattr(expr, "clone", None)
-        if clone_source:
-            parts.append(f"CLONE {self.format_identifier(clone_source)}")
+        if isinstance(expr, SnowflakeCreateDatabaseExpression) and expr.clone:
+            parts.append(f"CLONE {self.format_identifier(expr.clone)}")
         if expr.comment:
             escaped_comment = expr.comment.replace("'", "''")
             parts.append(f"COMMENT = '{escaped_comment}'")
