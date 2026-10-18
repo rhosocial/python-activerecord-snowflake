@@ -83,7 +83,9 @@ maintainers hold. If that ever stops being true this file will fail to import
 the dialect, not skip quietly.
 """
 
+import datetime
 import inspect
+import uuid
 from typing import Dict
 
 import pytest
@@ -117,7 +119,17 @@ from rhosocial.activerecord.backend.expression.advanced_functions import (
 from rhosocial.activerecord.backend.expression.collation import CollateFunction
 from rhosocial.activerecord.backend.expression.core import Column, Literal
 from rhosocial.activerecord.backend.expression.datetime import (
+    ExtractFieldExpression,
     TemporalOptionsExpression,
+    _ExtractBase,
+)
+from rhosocial.activerecord.backend.expression.functions.string import (
+    ChrFunction,
+    LeftFunction,
+    OverlayExpression,
+    RightFunction,
+    SpaceFunction,
+    SubstringExpression,
 )
 from rhosocial.activerecord.backend.expression.predicates import ComparisonPredicate
 from rhosocial.activerecord.backend.expression.predicates import (
@@ -127,6 +139,15 @@ from rhosocial.activerecord.backend.expression.predicates import (
 from rhosocial.activerecord.backend.expression.query_parts import JoinClause
 from rhosocial.activerecord.backend.expression.operators import ArithmeticOperation
 from rhosocial.activerecord.backend.expression.query_sources import SetOperation
+from rhosocial.activerecord.backend.expression.values import (
+    BinaryValue,
+    BooleanValue,
+    DateValue,
+    StringValue,
+    TimeValue,
+    TimestampValue,
+    UUIDValue,
+)
 from rhosocial.activerecord.backend.expression.serialization import (
     default_registry,
     deserialize,
@@ -840,20 +861,113 @@ def register_specials():
             d, _table_obj(d), dml.ValuesSource(d, [[Literal(d, 1)]])
         ),
     )
-    # CUSTOM. Its ``raw`` slot exists to carry the SQL type name and defaults
-    # to the empty string, which the filler skips and the class refuses while
-    # constructing. Handed a real name it builds and renders, so it is a
-    # constructor rather than a skip -- and for that same reason it is absent
-    # from LEGITIMATE_NON_RENDERS, which would pin a rendering nothing could
-    # ask for.
+    # CUSTOM. Its ``raw`` slot carries the SQL type name; core made it a
+    # required keyword-only parameter (the empty-string default this factory
+    # used to lean on let a type with no name through, so there is no default
+    # left for the filler to skip). Handed a real name it builds and renders,
+    # so it is a constructor rather than a skip -- and for that same reason
+    # it is absent from LEGITIMATE_NON_RENDERS, which would pin a rendering
+    # nothing could ask for.
     def _custom_type(dialect):
         from rhosocial.activerecord.backend.expression.types.custom import (
             CustomType,
         )
 
-        return CustomType(dialect, "VARCHAR")
+        return CustomType(dialect, raw="VARCHAR")
 
     register_special_constructor("types.custom.CustomType", _custom_type)
+
+    # -- the typed value nodes: the guess cannot know a host value ----------
+    #
+    # The twelve hold host values, and the guess hands the value parameter a
+    # 1. Five of the kinds take that as it comes: NULL carries no value,
+    # Integer and Float are numbers, and Decimal and Interval normalise an
+    # int into their host types. The other seven refuse it -- there is no
+    # path from an int to bytes, bool, str, date, time, datetime or UUID --
+    # so each gets a real host value here and renders through the same bind
+    # path the five do: a placeholder and the host value, which is what a
+    # data position is.
+    register_special_constructor(
+        "values.BinaryValue", lambda d: BinaryValue(d, b"\x01\x02")
+    )
+    register_special_constructor(
+        "values.BooleanValue", lambda d: BooleanValue(d, True)
+    )
+    register_special_constructor(
+        "values.StringValue", lambda d: StringValue(d, "x")
+    )
+    register_special_constructor(
+        "values.DateValue",
+        lambda d: DateValue(d, datetime.date(2026, 10, 18)),
+    )
+    register_special_constructor(
+        "values.TimeValue",
+        lambda d: TimeValue(d, datetime.time(10, 3, 56)),
+    )
+    register_special_constructor(
+        "values.TimestampValue",
+        lambda d: TimestampValue(d, datetime.datetime(2026, 10, 18, 10, 3, 56)),
+    )
+    register_special_constructor(
+        "values.UUIDValue",
+        lambda d: UUIDValue(
+            d, uuid.UUID("c73d9175-0a1d-48c6-8d30-df165461328b")
+        ),
+    )
+
+    # -- the extract family's new member and the shape it shares ------------
+    #
+    # ExtractFieldExpression is the field-named spelling (``YEAR(ts)``) the
+    # value wave split out of ExtractExpression; ``_ExtractBase`` is the
+    # field-and-source shape both spellings share. The guess cannot supply
+    # the field: its "x" is not a datetime field, and the class normalises
+    # the field before storing it. A real field over a column source is what
+    # both are constructed from, and both render through the same
+    # ``format_extract_expression`` the two classed spellings already did.
+    register_special_constructor(
+        "datetime.ExtractFieldExpression",
+        lambda d: ExtractFieldExpression(d, "YEAR", Column(d, "created_at")),
+    )
+    register_special_constructor(
+        "datetime._ExtractBase",
+        lambda d: _ExtractBase(d, "YEAR", Column(d, "created_at")),
+    )
+
+    # -- the scalar string set: counts are ints, the guess's filler is not --
+    #
+    # Each of these normalises its count operands through IntegerValue, and
+    # the guess hands a parameter it cannot classify the string "x" --
+    # ``IntegerValue takes a int, not a str``. Real operands make each one
+    # render the spelling Snowflake documents: CHR, LEFT, RIGHT, SPACE,
+    # SUBSTRING (Snowflake's SUBSTR alias), OVERLAY.
+    register_special_constructor(
+        "functions.string.ChrFunction",
+        lambda d: ChrFunction(d, 65),
+    )
+    register_special_constructor(
+        "functions.string.LeftFunction",
+        lambda d: LeftFunction(d, Column(d, "name"), 3),
+    )
+    register_special_constructor(
+        "functions.string.RightFunction",
+        lambda d: RightFunction(d, Column(d, "name"), 3),
+    )
+    register_special_constructor(
+        "functions.string.SpaceFunction",
+        lambda d: SpaceFunction(d, 4),
+    )
+    register_special_constructor(
+        "functions.string.SubstringExpression",
+        lambda d: SubstringExpression(
+            d, Column(d, "name"), Literal(d, 2), Literal(d, 3)
+        ),
+    )
+    register_special_constructor(
+        "functions.string.OverlayExpression",
+        lambda d: OverlayExpression(
+            d, Column(d, "name"), Literal(d, "ab"), Literal(d, 2), Literal(d, 3)
+        ),
+    )
 
 
 register_specials()
@@ -892,9 +1006,6 @@ UNCONSTRUCTIBLE = (
     # constraint_name must be a non-empty string`, because the defaulted
     # ``constraint_name`` stays None).
     "rhosocial.activerecord.backend.expression.statements.ddl_alter.AlterConstraint",
-    # VALIDATE CONSTRAINT. The same shape: the required ``name`` is keyword-only
-    # behind a defaulted positional.
-    "rhosocial.activerecord.backend.expression.statements.ddl_alter.ValidateConstraint",
     # ADD DOMAIN CHECK. Widens a ``SQLPredicate`` into a ``DomainCheckConstraint``
     # and needs one. The guess supplies a bare *string*: the annotation names a
     # ``DomainCheckConstraint``, whose ``\bDomain\b`` fragment does not match
@@ -907,10 +1018,6 @@ UNCONSTRUCTIBLE = (
     # be an ``UnsupportedFeatureError`` whatever it was built from. Building it
     # would buy no assertion.
     "rhosocial.activerecord.backend.expression.statements.ddl_domain.AddDomainCheckAction",
-    # ENUM type. Its ``values`` list is keyword-only behind a defaulted
-    # positional, so the constructor skips it and the type declares no members
-    # (``ValueError: EnumType requires values``).
-    "rhosocial.activerecord.backend.expression.types.enum_.EnumType",
     # The three UUID nodes refuse in __init__, not in to_sql(): Snowflake
     # spells no UUID SQL, so the answer is the same for every argument and no
     # registered constructor can change it. Measured with valid arguments --
@@ -968,11 +1075,17 @@ UNMODELLED_FORMATTERS = {
         "format_passing_clause",
     ),
     # --- SQL/PGQ property graphs: no graph tables, no MATCH ---------------
+    # ``format_edge_table_definition`` arrived when core split the edge table's
+    # declaration out of ``EdgeTable`` into its own ``EdgeTableDefinition``
+    # node, which took the formatter need with it: the matrix's classes now
+    # ask for the definition node's method alone, and ``format_edge_table``
+    # is no longer named by anything. The refusal itself is the one Snowflake
+    # has always given -- no property graphs, no MATCH.
     "SQL/PGQ property graphs (Snowflake has no GRAPH_TABLE and no Cypher)": (
         "format_alter_property_graph_statement",
         "format_create_property_graph_statement",
         "format_drop_property_graph_statement",
-        "format_edge_table",
+        "format_edge_table_definition",
         "format_graph_columns_clause",
         "format_graph_edge",
         "format_graph_table_expression",
@@ -1134,6 +1247,18 @@ LEGITIMATE_NON_RENDERS = {
         NotImplementedError,
         _NO_FORMAT_METHOD_NAME,
     ),
+    # The shared base of the declared-result annotations (``as_text()`` and
+    # its siblings). Unlike the roots above it *names* a formatter -- the
+    # concrete annotations all render through ``format_declared_result`` --
+    # but it carries no surface of its own, and that surface is where the
+    # alias the formatter reads comes from. So the base constructs and its
+    # render dies on the missing attribute, which is a fact about the base
+    # and not about the dialect: the concrete annotations are the renderable
+    # nodes, and each renders by delegating to the source it annotates.
+    "rhosocial.activerecord.backend.expression.declared._Annotation": (
+        AttributeError,
+        "has no attribute 'alias'",
+    ),
     "rhosocial.activerecord.backend.expression.bases.SQLValue": (
         NotImplementedError,
         _NO_FORMAT_METHOD_NAME,
@@ -1272,6 +1397,14 @@ LEGITIMATE_NON_RENDERS = {
         _NO_GENERIC_TYPE,
     ),
     "rhosocial.activerecord.backend.expression.types.datetime_.IntervalType": (
+        TypeError,
+        _NO_GENERIC_TYPE,
+    ),
+    # ENUM. MySQL/MariaDB native; core suggests text elsewhere, and this
+    # dialect's dispatcher says which spelling to use instead -- the refusal
+    # names VarCharType. It became reachable when the constructor started
+    # supplying a real values list.
+    "rhosocial.activerecord.backend.expression.types.enum_.EnumType": (
         TypeError,
         _NO_GENERIC_TYPE,
     ),
