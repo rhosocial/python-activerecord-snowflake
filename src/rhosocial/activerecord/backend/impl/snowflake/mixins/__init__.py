@@ -52,6 +52,7 @@ from .generated_column import SnowflakeGeneratedColumnMixin
 from .ordered_set_aggregation import SnowflakeOrderedSetAggregationMixin
 from .truncate import SnowflakeTruncateMixin
 from .wildcard import SnowflakeWildcardMixin
+from .typed_value import SnowflakeTypedValueMixin
 from .schema import SnowflakeSchemaMixin
 from .ddl_database import SnowflakeDatabaseMixin
 from .sequence import SnowflakeSequenceMixin
@@ -98,6 +99,7 @@ __all__ = [
     "SnowflakeOrderedSetAggregationMixin",
     "SnowflakeTruncateMixin",
     "SnowflakeWildcardMixin",
+    "SnowflakeTypedValueMixin",
     "SnowflakeSchemaMixin",
     "SnowflakeDatabaseMixin",
     "SnowflakeSequenceMixin",

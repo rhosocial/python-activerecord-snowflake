@@ -106,6 +106,7 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     TableMixin,
     TransactionControlMixin,
     TruncateMixin,
+    TypedValueMixin,
     UpsertMixin,
     ViewMixin,
     WindowFunctionMixin,
@@ -181,6 +182,7 @@ from .mixins import (
     SnowflakeOrderedSetAggregationMixin,
     SnowflakeTruncateMixin,
     SnowflakeWildcardMixin,
+    SnowflakeTypedValueMixin,
 )
 
 
@@ -245,6 +247,14 @@ class SnowflakeDialect(
     RpadMixin,
     SnowflakeTruncateMixin,
     SnowflakeColumnTypeMixin,
+    # Value literals: Snowflake's tier-2 spellings ahead of the base's
+    # tier-1 rendering and its tier-2 refusals. The pair sits where sqlite's
+    # does -- ahead of the generic mixins so the composed order resolves
+    # format_binary_value and format_uuid_value to the local spellings;
+    # INTERVAL stays with the base's explicit failure, which is the
+    # documented answer for this engine.
+    SnowflakeTypedValueMixin,
+    TypedValueMixin,
     # New Mixins (shared by all modern backends)
     PredicateMixin,
     ILIKEMixin,
