@@ -17,9 +17,13 @@ class SnowflakeCollationMixin:
 
     def validate_collation_name(self, expr: "CollateFunction") -> str:
         """Validate Snowflake collation specs and return their SQL representation."""
-        if expr.collation_options:
-            unsupported = ", ".join(sorted(expr.collation_options))
-            raise UnsupportedFeatureError(self.name, f"COLLATE options: {unsupported}")
+        # A schema-qualified collation is the one option the core node still
+        # carries; Snowflake's collation specs are spec strings like 'en-ci'
+        # and are never schema-qualified, so the option is refused rather than
+        # rendered. Core replaced the former open ``**collation_options`` bag
+        # with this named parameter, so the refusal names it directly.
+        if expr.schema:
+            raise UnsupportedFeatureError(self.name, "COLLATE options: schema")
         from ..collation import validate_snowflake_collation_name
         spec = validate_snowflake_collation_name(expr.collation_name, getattr(self, "version", None))
         return f"'{self._escape_sql_string(spec)}'"

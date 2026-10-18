@@ -55,10 +55,12 @@ How the classes are found
 process-global class index: that dict grows as sibling test modules import their
 own backends, so a matrix built from it would cover a different set of classes
 depending on which files pytest happened to import first.
-``auto_register_builtins`` is still called, because deserialising a core class
-needs it registered -- a separate concern from deciding what to test -- and
-:func:`register_all` registers what was collected so a Snowflake expression can
-be found again on the way back.
+Reading is a separate concern from deciding what to test: deserialising a
+Snowflake kind needs it in the registry the read goes through, and the
+framework's default registry holds only the packages the framework itself
+ships -- nothing registers this backend's classes on import. What the walk
+collected is therefore assembled into that registry at module level, so a
+Snowflake expression can be found again on the way back.
 
 And when a class cannot be constructed
 =====================================
@@ -126,11 +128,10 @@ from rhosocial.activerecord.backend.expression.query_parts import JoinClause
 from rhosocial.activerecord.backend.expression.operators import ArithmeticOperation
 from rhosocial.activerecord.backend.expression.query_sources import SetOperation
 from rhosocial.activerecord.backend.expression.serialization import (
-    auto_register_builtins,
+    default_registry,
     deserialize,
     deserialize_json,
     deserialize_xml,
-    registered_expression_classes,
     serialize,
     serialize_json,
     serialize_xml,
@@ -227,11 +228,12 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.show import (
     SnowflakeShowObjectType,
     SnowflakeShowScope,
 )
-from rhosocial.activerecord.testsuite.utils.expression import (
+from expression_roundtrip_harness import (
     assert_params_equal,
     collect_expression_classes,
     make_instance,
     register_all,
+    register_enums_and_dataclasses,
     register_special_constructor,
 )
 
@@ -259,7 +261,6 @@ def _collect_matrix_classes():
     names are keyed by the first name in sorted order, so a class aliased four
     ways is not tested four times.
     """
-    auto_register_builtins()
     collected: Dict[str, type] = {}
     for package in (SNOWFLAKE_EXPR_PKG, CORE_EXPR_PKG):
         collected.update(collect_expression_classes(package))
@@ -275,9 +276,17 @@ def _collect_matrix_classes():
 
 
 REGISTERED = _collect_matrix_classes()
-# Deserialising a Snowflake expression needs it registered; nothing registers
-# this package's classes on import.
+# Deserialising a Snowflake expression needs its kind in the registry the read
+# goes through, and the framework's default registry holds only the packages
+# the framework itself ships -- nothing registers this backend's classes on
+# import. This file is the reader, so it assembles what it collected into that
+# default: every deserialize below then resolves every kind the matrix names.
+# A kind two classes claim raises here, at assembly time, rather than
+# resolving to the wrong class somewhere inside a round-trip. The package's
+# enums ride inside artifacts under their short class names, which the
+# whitelist resolves separately, so they are registered beside the classes.
 register_all(REGISTERED)
+register_enums_and_dataclasses(SNOWFLAKE_EXPR_PKG)
 
 
 # ---------------------------------------------------------------------------
@@ -752,7 +761,10 @@ def register_specials():
         lambda d: XMLConcatExpression(d, [Literal(d, "a"), Literal(d, "b")]),
     )
     register_special_constructor(
-        "types.array.ArrayType", lambda d: ArrayType(d, VarCharType(d, 10))
+        # element_type is keyword-only on the core class: a positional call
+        # is the pre-keyword spelling and no longer constructs.
+        "types.array.ArrayType",
+        lambda d: ArrayType(d, element_type=VarCharType(d, 10)),
     )
 
     # -- a value the guess cannot know ---------------------------------------
@@ -1029,6 +1041,19 @@ UNMODELLED_FORMATTERS = {
     "the TableSource root (every concrete row source overrides its formatter; the "
     "root carries nothing but an alias and is never rendered)": (
         "format_table_source",
+    ),
+    # --- the root of the typed-value tree ----------------------------------
+    # Same shape one tree over: every concrete value class declares its
+    # ``kind_name`` and so its own ``format_method``; the base declares none,
+    # so the method it asks for is the empty ``format_`` and no dialect could
+    # ever declare that. Not a Snowflake gap -- the root of a tree is never
+    # renderable anywhere -- so it is named rather than treated as a missing
+    # feature. The twelve concrete kinds render through
+    # ``SnowflakeTypedValueMixin`` / ``TypedValueMixin`` and are registered in
+    # their own right by the matrix's verdict tables.
+    "the TypedValue root (every concrete value kind declares its own formatter; "
+    "the root carries no kind of its own and is never rendered)": (
+        "format_",
     ),
 }
 
@@ -1554,7 +1579,6 @@ class TestMatrixIntegrity:
         the registry because the registry also holds whatever backends other test
         modules happened to import.
         """
-        auto_register_builtins()
         expected = set(_collect_matrix_classes())
         assert expected == set(REGISTERED), (
             "the set of classes these packages define changed after collection.\n"
@@ -1597,14 +1621,18 @@ class TestMatrixIntegrity:
     def test_every_covered_class_is_registered_for_deserialization(self):
         """A class in the matrix can be found again when deserializing.
 
-        Deserialisation looks the class up by name, so a class the matrix renders
-        but the registry cannot resolve would round-trip into the wrong thing or
-        nothing at all.
+        Deserialisation resolves a kind through the registry this file
+        assembled at import, so a class the matrix renders but that registry
+        cannot resolve would round-trip into nothing at all. Assembly would
+        already have raised on a kind two classes claim; this pins that every
+        collected class's own kind is in the registry at all.
         """
-        auto_register_builtins()
-        unresolved = sorted(set(REGISTERED) - set(registered_expression_classes()))
+        kinds = set(default_registry().node_kinds())
+        unresolved = sorted(
+            fqn for fqn, cls in REGISTERED.items() if cls.kind() not in kinds
+        )
         assert not unresolved, (
-            f"the matrix covers classes the index cannot resolve: {unresolved}"
+            f"the matrix covers classes the registry cannot resolve: {unresolved}"
         )
 
     def test_row_sources_are_reached(self, dialect):
@@ -1660,7 +1688,6 @@ class TestMatrixIntegrity:
 
     def test_coverage_report(self, dialect):
         """Surface the matrix's classification, so coverage stays transparent."""
-        auto_register_builtins()
         tally = {}
         constructible = 0
         for fqn in sorted(REGISTERED):

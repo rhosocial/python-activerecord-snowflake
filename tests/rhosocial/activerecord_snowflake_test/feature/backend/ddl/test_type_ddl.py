@@ -11,10 +11,10 @@ from rhosocial.activerecord.backend.dialect.protocols import (
 )
 from rhosocial.activerecord.backend.expression.objects import Type
 from rhosocial.activerecord.backend.expression.serialization import (
+    default_registry,
     deserialize,
     deserialize_json,
     deserialize_xml,
-    registered_expression_classes,
     serialize,
     serialize_json,
     serialize_xml,
@@ -60,6 +60,43 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.types import (
 
 def _dialect(version=(10, 8, 0)):
     return SnowflakeDialect(version=version)
+
+
+#: Every expression class this backend's type DDL defines. Deserialising one
+#: of these kinds needs it in the registry the read goes through, and the
+#: framework's default registry holds only the packages the framework itself
+#: ships -- nothing registers this backend's classes on import any more. This
+#: file is the reader, so it assembles the classes it round-trips into that
+#: registry once; the resolution test below then pins the assembly.
+_SNOWFLAKE_TYPE_EXPRESSIONS = (
+    SnowflakeVarcharType,
+    SnowflakeNumberType,
+    SnowflakeFloatType,
+    SnowflakeBooleanType,
+    SnowflakeTimestampLtzType,
+    SnowflakeTimestampNtzType,
+    SnowflakeTimestampTzType,
+    SnowflakeDateType,
+    SnowflakeTimeType,
+    SnowflakeBinaryType,
+    SnowflakeVariantType,
+    SnowflakeObjectType,
+    SnowflakeArrayType,
+    SnowflakeGeographyType,
+    SnowflakeGeometryType,
+    SnowflakeUserDefinedType,
+    SnowflakeTypeField,
+    SnowflakeScalarTypeDefinition,
+    SnowflakeObjectTypeDefinition,
+    SnowflakeSetTypeCommentAction,
+    SnowflakeUnsetTypeCommentAction,
+    SnowflakeCreateTypeExpression,
+    SnowflakeAlterTypeExpression,
+    SnowflakeDropTypeExpression,
+)
+
+for _cls in _SNOWFLAKE_TYPE_EXPRESSIONS:
+    default_registry().register_node(_cls)
 
 
 def _snowflake_data_types(dialect):
@@ -392,37 +429,18 @@ def test_drop_type_has_no_if_exists_cascade_or_restrict():
         expression.to_sql()
 
 
-def test_udt_expressions_are_explicitly_registered_for_serialization():
-    expression_types = (
-        SnowflakeVarcharType,
-        SnowflakeNumberType,
-        SnowflakeFloatType,
-        SnowflakeBooleanType,
-        SnowflakeTimestampLtzType,
-        SnowflakeTimestampNtzType,
-        SnowflakeTimestampTzType,
-        SnowflakeDateType,
-        SnowflakeTimeType,
-        SnowflakeBinaryType,
-        SnowflakeVariantType,
-        SnowflakeObjectType,
-        SnowflakeArrayType,
-        SnowflakeGeographyType,
-        SnowflakeGeometryType,
-        SnowflakeUserDefinedType,
-        SnowflakeTypeField,
-        SnowflakeScalarTypeDefinition,
-        SnowflakeObjectTypeDefinition,
-        SnowflakeSetTypeCommentAction,
-        SnowflakeUnsetTypeCommentAction,
-        SnowflakeCreateTypeExpression,
-        SnowflakeAlterTypeExpression,
-        SnowflakeDropTypeExpression,
-    )
+def test_udt_expressions_resolve_through_the_readers_registry():
+    """Every type-DDL class answers to its kind in the assembled registry.
 
-    for expression_type in expression_types:
-        fqn = f"{expression_type.__module__}.{expression_type.__name__}"
-        assert registered_expression_classes().get(fqn) is expression_type
+    Deserialisation resolves a kind, never a dotted name, so what a reader
+    gets back is decided by ``kind()`` -- derived from the class name -- and
+    by the assembly at module import. A kind two classes claim would have
+    raised there; this pins that each class's own kind resolves to the class
+    itself.
+    """
+    registry = default_registry()
+    for expression_type in _SNOWFLAKE_TYPE_EXPRESSIONS:
+        assert registry.resolve_node(expression_type.kind()) is expression_type
 
 
 def test_udt_expression_dict_json_and_xml_round_trips():

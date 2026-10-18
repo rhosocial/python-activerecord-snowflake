@@ -97,12 +97,6 @@ class TestSnowflakeCollationExpression:
         with pytest.raises(Exception, match="COLLATE options: schema"):
             expr.to_sql()
 
-    def test_rejects_keyword_collation(self, dialect):
-        expr = Column(dialect, "name").collate("upper", keyword=True)
-
-        with pytest.raises(Exception, match="COLLATE options: keyword"):
-            expr.to_sql()
-
     def test_rejects_unsupported_collation(self, dialect):
         expr = Column(dialect, "name").collate("unknown-ci")
 

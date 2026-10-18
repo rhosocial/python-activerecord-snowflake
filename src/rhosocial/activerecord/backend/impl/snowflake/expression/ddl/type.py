@@ -8,7 +8,6 @@ from rhosocial.activerecord.backend.expression.bases import BaseExpression
 # ``Type`` is the schema object naming a user-defined type; aliased because the
 # TYPE statements name their parameter ``type`` for the core's sake.
 from rhosocial.activerecord.backend.expression.objects import Type as TypeObject
-from rhosocial.activerecord.backend.expression.serialization import register_expression_class
 from rhosocial.activerecord.backend.expression.statements.ddl_type import (
     AlterTypeStatement,
     CreateTypeStatement,
@@ -230,18 +229,10 @@ class SnowflakeDropTypeExpression(DropTypeStatement):
         self.restrict = False
 
 
-_EXPRESSION_TYPES = (
-    SnowflakeTypeField,
-    SnowflakeScalarTypeDefinition,
-    SnowflakeObjectTypeDefinition,
-    SnowflakeSetTypeCommentAction,
-    SnowflakeUnsetTypeCommentAction,
-    SnowflakeCreateTypeExpression,
-    SnowflakeAlterTypeExpression,
-    SnowflakeDropTypeExpression,
-)
-for _expression_type in _EXPRESSION_TYPES:
-    register_expression_class(_expression_type)
+# No registration loop, for the reason ``expression/types.py`` gives at its
+# tail: serializing needs no registry and reading is the reader's assembly.
+# The classes stay exported below; a reader that wants their kinds in a
+# registry registers them itself.
 
 
 __all__ = [

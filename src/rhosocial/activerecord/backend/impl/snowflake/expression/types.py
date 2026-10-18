@@ -49,9 +49,8 @@ inherit from, no mixins, and no diamond edges: rendering never happens on a
 type either, it goes ``DataType.to_sql()`` →
 ``dialect.format_data_type(self)`` → ``format_data_type_<name>``.
 """
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
-from rhosocial.activerecord.backend.expression.serialization import register_expression_class
 from rhosocial.activerecord.backend.expression.types._base import DataType
 from rhosocial.activerecord.backend.expression.types.integer import IntegerType
 from rhosocial.activerecord.backend.expression.types.string import VarCharType
@@ -496,24 +495,10 @@ class SnowflakeUserDefinedType(DataType):
 
     PARAMETERS = ("database_name", "schema_name", "type_name",)
 
-_SNOWFLAKE_DATA_TYPES = (
-    SnowflakeVarcharType,
-    SnowflakeNumberType,
-    SnowflakeFloatType,
-    SnowflakeBooleanType,
-    SnowflakeTimestampLtzType,
-    SnowflakeTimestampNtzType,
-    SnowflakeTimestampTzType,
-    SnowflakeDateType,
-    SnowflakeTimeType,
-    SnowflakeBinaryType,
-    SnowflakeUuidType,
-    SnowflakeVariantType,
-    SnowflakeObjectType,
-    SnowflakeArrayType,
-    SnowflakeGeographyType,
-    SnowflakeGeometryType,
-    SnowflakeUserDefinedType,
-)
-for _data_type in _SNOWFLAKE_DATA_TYPES:
-    register_expression_class(_data_type)
+# No registration loop. Serializing needs no registry -- a node reports its
+# own kind -- and reading is the reader's assembly: the framework's default
+# registry holds only the packages the framework itself ships, so a reader
+# that wants one of these kinds registers it into a registry of its own
+# (see ``registry.ExpressionRegistry``). Import-time self-registration would
+# promise a readability no reader asked for, and there is no global class
+# index left to register into.
