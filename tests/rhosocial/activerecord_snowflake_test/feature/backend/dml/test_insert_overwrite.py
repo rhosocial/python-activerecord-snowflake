@@ -103,3 +103,47 @@ class TestSnowflakeInsertOverwrite:
             'INSERT OVERWRITE INTO "t"  VALUES (%s, %s), (%s, %s)'
         )
         assert params == (1, "a", 2, "b")
+
+
+class TestBareHostValueCellsBindThroughDelegation:
+    """VALUES cells may be bare host values; the override delegates, so they bind.
+
+    Core collects the expression-versus-host-value judgment in one place, and
+    ``SnowflakeDMLMixin.format_insert_statement`` delegates both of its paths
+    to the core renderer -- the plain path outright, the overwrite path by
+    rewriting the prefix of what the core renderer produced. A bare scalar
+    cell must therefore bind behind %s exactly as a ``Literal`` cell does, on
+    both paths, without the prefix rewrite disturbing the parameters.
+    """
+
+    def test_plain_insert_binds_bare_cells(self, dialect):
+        expr = InsertStatement(
+            dialect,
+            into=Table(dialect, "t"),
+            source=ValuesSource(dialect, [[1, "a"], [2, "b"]]),
+            columns=["id", "name"],
+        )
+        sql, params = expr.to_sql()
+        assert sql == 'INSERT INTO "t" ("id", "name") VALUES (%s, %s), (%s, %s)'
+        assert params == (1, "a", 2, "b")
+
+    def test_overwrite_insert_binds_bare_cells(self, dialect):
+        expr = SnowflakeInsertExpression(
+            dialect,
+            into=Table(dialect, "t"),
+            source=ValuesSource(dialect, [[1, "a"], [2, "b"]]),
+            overwrite=True,
+        )
+        sql, params = expr.to_sql()
+        assert sql == 'INSERT OVERWRITE INTO "t"  VALUES (%s, %s), (%s, %s)'
+        assert params == (1, "a", 2, "b")
+
+    def test_mixed_cells_bind_in_written_order(self, dialect):
+        expr = InsertStatement(
+            dialect,
+            into=Table(dialect, "t"),
+            source=ValuesSource(dialect, [[Literal(dialect, 3), "c"]]),
+        )
+        sql, params = expr.to_sql()
+        assert sql == 'INSERT INTO "t"  VALUES (%s, %s)'
+        assert params == (3, "c")
