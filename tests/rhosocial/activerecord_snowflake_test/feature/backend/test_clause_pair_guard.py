@@ -38,7 +38,7 @@ signature*: ``("rendered", sql)``, ``("refused", feature_name)``, or
   clause, not a collision between two answers; the guard still requires the
   refusal to differ from "neither".
 
-Mandatory pairs (``AlterConstraint.enforced`` / ``not_enforced``) have no
+Mandatory pairs (``AlterConstraintAction.enforced`` / ``not_enforced``) have no
 "neither" state at all: the action *is* the keyword. They are guarded by
 :class:`MandatoryPairCase`, which requires "neither" and "both" to raise
 ``ValueError`` and each requested spelling to be answered (rendered or refused
@@ -61,7 +61,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Callable, Optional, Sequence, Tuple
+from typing import Callable, Optional, Tuple
 
 import pytest
 
@@ -76,7 +76,7 @@ from rhosocial.activerecord.backend.expression.objects import (
 )
 from rhosocial.activerecord.backend.expression.query_sources import CTEClause
 from rhosocial.activerecord.backend.expression.statements.ddl_alter import (
-    AlterConstraint,
+    AlterConstraintAction,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_schema import (
     DropSchemaStatement,
@@ -594,13 +594,13 @@ class MandatoryPairCase:
 
 MANDATORY_CASES: Tuple[MandatoryPairCase, ...] = (
     MandatoryPairCase(
-        "AlterConstraint.enforced",
-        lambda d, **kw: AlterConstraint(
+        "AlterConstraintAction.enforced",
+        lambda d, **kw: AlterConstraintAction(
             d, "c", constraint_kind=TableCheckConstraint, **kw
         ),
         "enforced",
         "not_enforced",
-        "AlterConstraint requires exactly one of",
+        "AlterConstraintAction requires exactly one of",
         ("refused", "ALTER CONSTRAINT ENFORCED/NOT ENFORCED"),
         ("refused", "ALTER CONSTRAINT ENFORCED/NOT ENFORCED"),
         note=(
@@ -811,7 +811,7 @@ class TestGuardIsNotVacuous:
             f"pairs in scope but not guarded: {sorted(expected - covered)}; "
             f"guarded but not in scope: {sorted(covered - expected)}"
         )
-        assert {case.case_id for case in MANDATORY_CASES} == {"AlterConstraint.enforced"}
+        assert {case.case_id for case in MANDATORY_CASES} == {"AlterConstraintAction.enforced"}
 
 
 class TestSentinels:

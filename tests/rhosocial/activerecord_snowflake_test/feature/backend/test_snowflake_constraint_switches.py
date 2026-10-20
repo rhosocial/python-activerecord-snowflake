@@ -532,11 +532,11 @@ class TestModifierSpellingsAreRefusedByName:
     def test_not_valid_spelling_is_refused(self, dialect):
         """``NOT VALID`` is not Snowflake syntax, and the probe keeps it out."""
         from rhosocial.activerecord.backend.expression.statements import (
-            AddTableConstraint,
+            AddTableConstraintAction,
             ConstraintValidation,
         )
 
-        action = AddTableConstraint(
+        action = AddTableConstraintAction(
             dialect,
             TableConstraint(
                 dialect,
@@ -556,12 +556,12 @@ class TestModifierSpellingsAreRefusedByName:
 
     def test_alter_constraint_enforcement_is_refused_by_name(self, dialect):
         from rhosocial.activerecord.backend.expression.statements import (
-            AlterConstraint,
+            AlterConstraintAction,
         )
 
         for flag in ("enforced", "not_enforced"):
             with pytest.raises(UnsupportedFeatureError) as exc_info:
-                AlterConstraint(
+                AlterConstraintAction(
                     dialect,
                     constraint_name="ck",
                     constraint_kind=TableCheckConstraint,
@@ -571,11 +571,11 @@ class TestModifierSpellingsAreRefusedByName:
 
     def test_validate_constraint_has_no_standalone_statement(self, dialect):
         from rhosocial.activerecord.backend.expression.statements import (
-            ValidateConstraint,
+            ValidateConstraintAction,
         )
 
         with pytest.raises(UnsupportedFeatureError) as exc_info:
-            ValidateConstraint(dialect, constraint_name="ck").to_sql()
+            ValidateConstraintAction(dialect, constraint_name="ck").to_sql()
         assert "VALIDATE CONSTRAINT" in str(exc_info.value)
 
     def test_add_column_if_not_exists_restriction_is_kind_based(self, dialect):
@@ -590,7 +590,7 @@ class TestModifierSpellingsAreRefusedByName:
             ColumnDefinition,
         )
         from rhosocial.activerecord.backend.expression.statements.ddl_alter import (
-            AddColumn,
+            AddColumnAction,
         )
         from rhosocial.activerecord.backend.expression.types import IntegerType
 
@@ -608,7 +608,7 @@ class TestModifierSpellingsAreRefusedByName:
                 constraints=[ColumnConstraint(dialect, branch=branch)],
             )
             with pytest.raises(UnsupportedFeatureError):
-                AddColumn(dialect, column, if_not_exists=True).to_sql()
+                AddColumnAction(dialect, column, if_not_exists=True).to_sql()
 
         allowed = ColumnDefinition(
             dialect,
@@ -616,5 +616,5 @@ class TestModifierSpellingsAreRefusedByName:
             IntegerType(dialect),
             constraints=[ColumnConstraint(dialect, branch=ColumnNotNullConstraint(dialect))],
         )
-        sql, _ = AddColumn(dialect, allowed, if_not_exists=True).to_sql()
+        sql, _ = AddColumnAction(dialect, allowed, if_not_exists=True).to_sql()
         assert sql == 'ADD COLUMN IF NOT EXISTS "c" INTEGER NOT NULL'

@@ -16,9 +16,9 @@ from rhosocial.activerecord.backend.expression.statements import (
     ColumnNotNullConstraint,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_alter import (
-    AddColumn,
-    DropColumn,
-    DropTableConstraint,
+    AddColumnAction,
+    DropColumnAction,
+    DropTableConstraintAction,
 )
 from rhosocial.activerecord.backend.expression.types import TextType, VarCharType
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
@@ -38,7 +38,7 @@ class TestSnowflakeAlterTableModifierCapabilities:
 
 class TestSnowflakeAddColumnIfNotExists:
     def test_if_not_exists_renders_qualifier(self, dialect):
-        action = AddColumn(
+        action = AddColumnAction(
             dialect,
             ColumnDefinition(dialect, "content", TextType(dialect)),
             if_not_exists=True,
@@ -48,7 +48,7 @@ class TestSnowflakeAddColumnIfNotExists:
         assert params == ()
 
     def test_if_not_exists_with_not_null_allowed(self, dialect):
-        action = AddColumn(
+        action = AddColumnAction(
             dialect,
             ColumnDefinition(
                 dialect,
@@ -67,7 +67,7 @@ class TestSnowflakeAddColumnIfNotExists:
         assert params == ()
 
     def test_if_not_exists_with_default_raises(self, dialect):
-        action = AddColumn(
+        action = AddColumnAction(
             dialect,
             ColumnDefinition(
                 dialect,
@@ -85,7 +85,7 @@ class TestSnowflakeAddColumnIfNotExists:
             action.to_sql()
 
     def test_none_renders_plain_form(self, dialect):
-        action = AddColumn(dialect, ColumnDefinition(dialect, "content", TextType(dialect)))
+        action = AddColumnAction(dialect, ColumnDefinition(dialect, "content", TextType(dialect)))
         sql, params = action.to_sql()
         assert 'ADD COLUMN "content" VARCHAR(16777216)' == sql
         assert "IF NOT EXISTS" not in sql
@@ -94,13 +94,13 @@ class TestSnowflakeAddColumnIfNotExists:
 
 class TestSnowflakeDropColumnIfExists:
     def test_if_exists_renders_qualifier(self, dialect):
-        action = DropColumn(dialect, column_name="x", if_exists=True)
+        action = DropColumnAction(dialect, column_name="x", if_exists=True)
         sql, params = action.to_sql()
         assert 'DROP COLUMN IF EXISTS "x"' == sql
         assert params == ()
 
     def test_none_renders_plain_form(self, dialect):
-        action = DropColumn(dialect, column_name="x")
+        action = DropColumnAction(dialect, column_name="x")
         sql, params = action.to_sql()
         assert 'DROP COLUMN "x"' == sql
         assert "IF EXISTS" not in sql
@@ -109,14 +109,14 @@ class TestSnowflakeDropColumnIfExists:
 
 class TestSnowflakeDropConstraint:
     def test_if_exists_raises(self, dialect):
-        action = DropTableConstraint(
+        action = DropTableConstraintAction(
             dialect, constraint_name="fk", if_exists=True
         )
         with pytest.raises(UnsupportedFeatureError):
             action.to_sql()
 
     def test_none_renders_plain_form(self, dialect):
-        action = DropTableConstraint(dialect, constraint_name="fk")
+        action = DropTableConstraintAction(dialect, constraint_name="fk")
         sql, params = action.to_sql()
         assert 'DROP CONSTRAINT "fk"' == sql
         assert "IF EXISTS" not in sql

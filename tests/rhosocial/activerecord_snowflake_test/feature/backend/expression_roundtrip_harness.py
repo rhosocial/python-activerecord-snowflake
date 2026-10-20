@@ -36,13 +36,14 @@ from typing import Any, Callable, Dict, Type
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
 # Annotation fragments that mean "this parameter names a relation object".
-# Word boundaries matter: ``TableConstraint`` and ``AddTableConstraint`` are
-# constraint actions, not relations, and a substring test would hand them a
+# Word boundaries matter: ``TableConstraint`` and ``AddTableConstraintAction``
+# are constraint actions, not relations, and a substring test would hand them a
 # Table. ``SchemaObject`` is the base every catalogue object shares, so an
 # annotation naming it wants an object too.
 _MENTIONS_RELATION = re.compile(
     r"\b(Table|View|MaterializedView|Index|Sequence|Type|Domain|Function|Trigger"
-    r"|Schema|Database|RelationObject|SchemaObject|NodeTable|EdgeTable)\b"
+    r"|Schema|Database|RelationObject|SchemaObject|NodeTable|EdgeTable"
+    r"|EdgeTableDefinition)\b"
 )
 
 # An INSERT's data source. It is an expression now, so it needs a real one --
@@ -196,9 +197,18 @@ def _placeholder_for(param: inspect.Parameter, dialect: Any = None):
 
 
 def _literal(dialect):
+    """An inline literal, for a parameter that wants a value expression.
+
+    Inline rather than bound, for the same reason :func:`_comparison` builds
+    an inline comparison: a value the matrix constructs has to render in
+    both positions it can occupy -- a DQL/DML slot, where a bound value is
+    fine, and a DDL condition (``CHECK`` / generated columns / partial
+    indexes), which accepts no bind parameters at all since core stopped
+    lifting binding literals. The inline spelling is valid SQL in both.
+    """
     from rhosocial.activerecord.backend.expression.core import Literal
 
-    return Literal(dialect, 1)
+    return Literal(dialect, 1, inline=True)
 
 
 def _function_call(dialect):
@@ -216,10 +226,22 @@ def _function_call(dialect):
 
 
 def _comparison(dialect):
-    from rhosocial.activerecord.backend.expression.core import Column
+    """A predicate comparing a column with an inline literal.
+
+    The literal is written inline rather than bound because a predicate the
+    matrix builds has to render in **both** positions a predicate can occupy:
+    a DQL condition, where a bound value is fine, and a DDL condition
+    (``CHECK`` / partial-index ``WHERE`` / generated columns), which accepts
+    no bind parameters at all and -- since core stopped lifting binding
+    literals to the inline form -- refuses one. The inline spelling is valid
+    in both, so one helper serves every consumer.
+    """
+    from rhosocial.activerecord.backend.expression.core import Column, Literal
     from rhosocial.activerecord.backend.expression.predicates import ComparisonPredicate
 
-    return ComparisonPredicate(dialect, "=", Column(dialect, "a"), _literal(dialect))
+    return ComparisonPredicate(
+        dialect, "=", Column(dialect, "a"), Literal(dialect, 1, inline=True)
+    )
 
 
 def _try_construct(cls, dialect):
@@ -332,7 +354,7 @@ def special_constructors():
         "graph.GraphVertex": _graph_vertex,
         "graph.GraphEdge": _graph_edge,
         "graph.VertexTable": _node_table,
-        "graph.EdgeTable": _edge_table,
+        "graph.EdgeTableDefinition": _edge_table,
         "graph.GraphTableExpression": _graph_table_expr,
         "graph.CreatePropertyGraphStatement": _create_property_graph_expr,
         "graph.DropPropertyGraphStatement": _drop_property_graph_expr,
@@ -671,12 +693,12 @@ def _node_table(dialect):
 
 def _edge_table(dialect):
     """A graph edge table declaration."""
-    from rhosocial.activerecord.backend.expression.graph import EdgeTable
+    from rhosocial.activerecord.backend.expression.graph import EdgeTableDefinition
     from rhosocial.activerecord.backend.expression.objects import (
         EdgeTable as EdgeTableObject,
     )
 
-    return EdgeTable(dialect, EdgeTableObject(dialect, "e"), ["s"], ["d"])
+    return EdgeTableDefinition(dialect, EdgeTableObject(dialect, "e"), ["s"], ["d"])
 
 
 def _graph_vertex(dialect):
@@ -849,16 +871,16 @@ def _update_expr(dialect):
 
 def _alter_table_expr(dialect):
     from rhosocial.activerecord.backend.expression.statements.ddl_alter import (
-        AddColumn,
+        AddColumnAction,
         AlterTableStatement,
-        DropColumn,
+        DropColumnAction,
     )
 
     column = _column_definition(dialect)
     return AlterTableStatement(
         dialect,
         table=_table(dialect, "t"),
-        actions=[DropColumn(dialect, "a"), AddColumn(dialect, column=column)],
+        actions=[DropColumnAction(dialect, "a"), AddColumnAction(dialect, column=column)],
     )
 
 
@@ -1001,57 +1023,6 @@ def register_all(classes: Dict[str, Type[BaseExpression]]) -> None:
         registry.register_node(cls)
 
 
-def register_enums_and_dataclasses(package_path: str) -> None:
-    """Register a package's enums and dataclasses into the same whitelist.
-
-    An artifact encodes an enum member as ``[short class name, member]`` and
-    the reader resolves that name through the registry's enum table -- no
-    ``importlib`` by name (untrusted input, §4.11.4), so a backend enum that
-    was never registered refuses to read back. Core populates its own enums
-    and dataclasses; a backend package's are exactly as privileged as a
-    third-party plugin's, which is to say they are registered, not discovered.
-    Same ownership filters as core's own populator: the class must be defined
-    in the module being walked.
-    """
-    import dataclasses
-    import enum as _enum
-    import importlib
-    import pkgutil
-
-    from rhosocial.activerecord.backend.expression.registry import RegistryError
-    from rhosocial.activerecord.backend.expression.serialization import default_registry
-
-    registry = default_registry()
-    pkg = importlib.import_module(package_path)
-    if hasattr(pkg, "__path__"):
-        modnames = [
-            m for _, m, _ in pkgutil.walk_packages(
-                path=pkg.__path__, prefix=package_path + ".", onerror=lambda x: None
-            )
-        ]
-    else:
-        modnames = [package_path]
-    for modname in modnames:
-        try:
-            mod = importlib.import_module(modname)
-        except Exception:
-            continue
-        for name in dir(mod):
-            obj = getattr(mod, name, None)
-            if not isinstance(obj, type) or obj.__module__ != modname:
-                continue
-            if issubclass(obj, _enum.Enum):
-                try:
-                    registry.register_enum(obj)
-                except RegistryError:
-                    pass
-            elif dataclasses.is_dataclass(obj):
-                try:
-                    registry.register_dataclass(obj)
-                except RegistryError:
-                    pass
-
-
 def assert_params_equal(a: Any, b: Any, path: str = "params") -> None:
     """Deep-compare two get_params() outputs, treating nested BaseExpression
     instances as structurally equal and nested dataclasses as recursively compared.
@@ -1128,7 +1099,6 @@ __all__ = [
     "collect_expression_classes",
     "make_instance",
     "register_all",
-    "register_enums_and_dataclasses",
     "register_special_constructor",
     "roundtrip_expression",
     "sql_consistent",

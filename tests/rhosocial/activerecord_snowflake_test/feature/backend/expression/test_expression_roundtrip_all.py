@@ -83,9 +83,7 @@ maintainers hold. If that ever stops being true this file will fail to import
 the dialect, not skip quietly.
 """
 
-import datetime
 import inspect
-import uuid
 from typing import Dict
 
 import pytest
@@ -132,6 +130,7 @@ from rhosocial.activerecord.backend.expression.functions.string import (
     SubstringExpression,
 )
 from rhosocial.activerecord.backend.expression.predicates import ComparisonPredicate
+from rhosocial.activerecord.backend.expression.predicates import LikeOperator
 from rhosocial.activerecord.backend.expression.predicates import (
     ILikePredicate,
     LikePredicate,
@@ -139,15 +138,6 @@ from rhosocial.activerecord.backend.expression.predicates import (
 from rhosocial.activerecord.backend.expression.query_parts import JoinClause
 from rhosocial.activerecord.backend.expression.operators import ArithmeticOperation
 from rhosocial.activerecord.backend.expression.query_sources import SetOperation
-from rhosocial.activerecord.backend.expression.values import (
-    BinaryValue,
-    BooleanValue,
-    DateValue,
-    StringValue,
-    TimeValue,
-    TimestampValue,
-    UUIDValue,
-)
 from rhosocial.activerecord.backend.expression.serialization import (
     default_registry,
     deserialize,
@@ -254,7 +244,6 @@ from expression_roundtrip_harness import (
     collect_expression_classes,
     make_instance,
     register_all,
-    register_enums_and_dataclasses,
     register_special_constructor,
 )
 
@@ -307,7 +296,6 @@ REGISTERED = _collect_matrix_classes()
 # enums ride inside artifacts under their short class names, which the
 # whitelist resolves separately, so they are registered beside the classes.
 register_all(REGISTERED)
-register_enums_and_dataclasses(SNOWFLAKE_EXPR_PKG)
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +350,16 @@ def _integer_column(dialect, name="col"):
 
 def register_specials():
     """Replace every introspective guess that would cost a real assertion."""
+    # -- the predicate the whole file is built on ----------------------------
+    # ``op`` normalises through the operator enum at construction, so the
+    # guess's bare ``"x"`` is refused there and the class reported as
+    # unbuildable. Two columns over a table is the shape every DDL position
+    # wants as well: it renders with no bind parameters at all.
+    register_special_constructor(
+        "predicates.ComparisonPredicate",
+        lambda d: _column_predicate(d),
+    )
+
 
     # -- the FROM side -------------------------------------------------------
     register_special_constructor(
@@ -438,8 +436,8 @@ def register_specials():
         ),
     )
     register_special_constructor(
-        "statements.ddl_alter.DropIndex",
-        lambda d: ddl_alter.DropIndex(d, Index(d, "i")),
+        "statements.ddl_alter.DropIndexAction",
+        lambda d: ddl_alter.DropIndexAction(d, Index(d, "i")),
     )
 
     # -- schemas, sequences, databases, domains, types -----------------------
@@ -636,26 +634,63 @@ def register_specials():
         lambda d: ReferencesClause(d, Table(d, "other"), ["b"]),
     )
     register_special_constructor(
-        "statements.ddl_alter.AddColumn",
-        lambda d: ddl_alter.AddColumn(d, _integer_column(d)),
+        "statements.ddl_alter.AddColumnAction",
+        lambda d: ddl_alter.AddColumnAction(d, _integer_column(d)),
     )
     register_special_constructor(
-        "statements.ddl_alter.ModifyColumn",
-        lambda d: ddl_alter.ModifyColumn(d, _integer_column(d)),
+        "statements.ddl_alter.ModifyColumnAction",
+        lambda d: ddl_alter.ModifyColumnAction(d, _integer_column(d)),
     )
     register_special_constructor(
-        "statements.ddl_alter.AddIndex",
-        lambda d: ddl_alter.AddIndex(d, IndexDefinition(d, "i", ["a"])),
+        "statements.ddl_alter.AddIndexAction",
+        lambda d: ddl_alter.AddIndexAction(d, IndexDefinition(d, "i", ["a"])),
     )
     register_special_constructor(
-        "statements.ddl_alter.AddTableConstraint",
-        lambda d: ddl_alter.AddTableConstraint(
+        "statements.ddl_alter.AddTableConstraintAction",
+        lambda d: ddl_alter.AddTableConstraintAction(
             d,
             TableConstraint(
                 d, branch=TablePrimaryKeyConstraint(d, ["a"]), name="c"
             ),
         ),
     )
+
+    # -- declared-result annotations ----------------------------------------
+    # An annotation renders what it annotates, and ``format_declared_result``
+    # reads an alias off both the source and the annotation itself. The ten
+    # surface classes each gain one through their value-type base, so they
+    # render; the shared base ``_Annotation`` declares no alias and the
+    # formatter reads one anyway, which is pinned in LEGITIMATE_NON_RENDERS
+    # rather than papered over here. One aliasable source serves the base and
+    # every surface class. The guess hands the slot a ``Literal`` (from its
+    # "Expression"-shaped annotation), and a literal is the one thing in the
+    # tree with nothing to name.
+    from rhosocial.activerecord.backend.expression import declared as declared_mod
+    from rhosocial.activerecord.backend.expression.core import FunctionCall
+
+    def _aliasable_source(d):
+        return FunctionCall(d, "FUNC", niladic=True)
+
+    register_special_constructor(
+        "declared._Annotation",
+        lambda d: declared_mod._Annotation(d, _aliasable_source(d)),
+    )
+    for _name in (
+        "ArrayAnnotation",
+        "BinaryAnnotation",
+        "BooleanAnnotation",
+        "IntegerAnnotation",
+        "JSONAnnotation",
+        "NumberAnnotation",
+        "TemporalAnnotation",
+        "TextAnnotation",
+        "UUIDAnnotation",
+        "XMLAnnotation",
+    ):
+        register_special_constructor(
+            f"declared.{_name}",
+            lambda d, _n=_name: getattr(declared_mod, _n)(d, _aliasable_source(d)),
+        )
 
     # -- predicates whose operands are value nodes --------------------------
     # A LIKE/ILIKE operand is a value node, and the introspective guess fills
@@ -665,7 +700,7 @@ def register_specials():
     # copied rather than re-derived from the failure.
     register_special_constructor(
         "predicates.LikePredicate",
-        lambda d: LikePredicate(d, "LIKE", Column(d, "a"), Literal(d, "%x%")),
+        lambda d: LikePredicate(d, LikeOperator.LIKE, Column(d, "a"), Literal(d, "%x%")),
     )
     register_special_constructor(
         "predicates.ILikePredicate",
@@ -877,43 +912,15 @@ def register_specials():
 
     register_special_constructor("types.custom.CustomType", _custom_type)
 
-    # -- the typed value nodes: the guess cannot know a host value ----------
+    # -- the one value node needs no constructor ----------------------------
     #
-    # The twelve hold host values, and the guess hands the value parameter a
-    # 1. Five of the kinds take that as it comes: NULL carries no value,
-    # Integer and Float are numbers, and Decimal and Interval normalise an
-    # int into their host types. The other seven refuse it -- there is no
-    # path from an int to bytes, bool, str, date, time, datetime or UUID --
-    # so each gets a real host value here and renders through the same bind
-    # path the five do: a placeholder and the host value, which is what a
-    # data position is.
-    register_special_constructor(
-        "values.BinaryValue", lambda d: BinaryValue(d, b"\x01\x02")
-    )
-    register_special_constructor(
-        "values.BooleanValue", lambda d: BooleanValue(d, True)
-    )
-    register_special_constructor(
-        "values.StringValue", lambda d: StringValue(d, "x")
-    )
-    register_special_constructor(
-        "values.DateValue",
-        lambda d: DateValue(d, datetime.date(2026, 10, 18)),
-    )
-    register_special_constructor(
-        "values.TimeValue",
-        lambda d: TimeValue(d, datetime.time(10, 3, 56)),
-    )
-    register_special_constructor(
-        "values.TimestampValue",
-        lambda d: TimestampValue(d, datetime.datetime(2026, 10, 18, 10, 3, 56)),
-    )
-    register_special_constructor(
-        "values.UUIDValue",
-        lambda d: UUIDValue(
-            d, uuid.UUID("c73d9175-0a1d-48c6-8d30-df165461328b")
-        ),
-    )
+    # A literal carries ``value`` and ``inline`` and nothing else. Its kind is
+    # read off the host value rather than declared, so the guess's "x" is a
+    # real ``string_value`` and the row is a real one; the other kinds are the
+    # same node with a different host value, which is what
+    # ``expression/test_snowflake_literal_values.py`` pins per kind. There is
+    # no class per kind left to register here, and no inline position either:
+    # the matrix exercises the bind path a data position takes.
 
     # -- the extract family's new member and the shape it shares ------------
     #
@@ -1005,7 +1012,7 @@ UNCONSTRUCTIBLE = (
     # them and the class refuses an incomplete action (`ValueError:
     # constraint_name must be a non-empty string`, because the defaulted
     # ``constraint_name`` stays None).
-    "rhosocial.activerecord.backend.expression.statements.ddl_alter.AlterConstraint",
+    "rhosocial.activerecord.backend.expression.statements.ddl_alter.AlterConstraintAction",
     # ADD DOMAIN CHECK. Widens a ``SQLPredicate`` into a ``DomainCheckConstraint``
     # and needs one. The guess supplies a bare *string*: the annotation names a
     # ``DomainCheckConstraint``, whose ``\bDomain\b`` fragment does not match
@@ -1154,19 +1161,6 @@ UNMODELLED_FORMATTERS = {
     "the TableSource root (every concrete row source overrides its formatter; the "
     "root carries nothing but an alias and is never rendered)": (
         "format_table_source",
-    ),
-    # --- the root of the typed-value tree ----------------------------------
-    # Same shape one tree over: every concrete value class declares its
-    # ``kind_name`` and so its own ``format_method``; the base declares none,
-    # so the method it asks for is the empty ``format_`` and no dialect could
-    # ever declare that. Not a Snowflake gap -- the root of a tree is never
-    # renderable anywhere -- so it is named rather than treated as a missing
-    # feature. The twelve concrete kinds render through
-    # ``SnowflakeTypedValueMixin`` / ``TypedValueMixin`` and are registered in
-    # their own right by the matrix's verdict tables.
-    "the TypedValue root (every concrete value kind declares its own formatter; "
-    "the root carries no kind of its own and is never rendered)": (
-        "format_",
     ),
 }
 
@@ -1371,12 +1365,13 @@ LEGITIMATE_NON_RENDERS = {
     ),
     # ---- the root of the type tree: incomplete rather than unsupported ----
     # Every concrete type declares its own generic ``name``, which is what
-    # ``format_data_type`` dispatches on; the root declares none. TypeError, not
-    # UnsupportedFeatureError, because the class is incomplete rather than the
-    # dialect being unable.
+    # ``format_data_type`` dispatches on; the root declares none, so the
+    # dispatcher is asked for ``format_data_type_None`` and refuses by name.
+    # TypeError, not UnsupportedFeatureError, because the class is incomplete
+    # rather than the dialect being unable.
     "rhosocial.activerecord.backend.expression.types._base.DataType": (
         TypeError,
-        "does not declare a valid generic type name",
+        _NO_GENERIC_TYPE,
     ),
     # ---- generic types Snowflake spells differently -----------------------
     # Snowflake's data types carry their own names (``snowflake_varchar``,
@@ -1421,6 +1416,249 @@ LEGITIMATE_NON_RENDERS = {
         _NO_GENERIC_TYPE,
     ),
 }
+
+
+# ---------------------------------------------------------------------------
+# The artifact gap: a parameter core's writer or reader cannot carry
+# ---------------------------------------------------------------------------
+#
+# Every class is written and read back through the three channels -- dict,
+# JSON and XML -- because an artifact that only survives one of them is an
+# artifact with three incantations instead of one shape. What fails is core's
+# own layer, and it fails in four distinguishable ways:
+#
+# * **the writer refuses the parameter** -- ``encode_artifact`` asks
+#   ``LiteralKind.of`` what kind a value belongs to, and that vocabulary is the
+#   closed set of *value* types. A dataclass, an enum that does not inherit
+#   ``str``, a host object is not in it and is refused by name. Every channel
+#   fails, including dict, because the failure is on the write.
+# * **the constructor refuses its own wire form** -- the JSON and XML channels
+#   write the member's *value*, a plain string, and the constructor answers
+#   "must be a <Enum>". The artifact is unreadable by the node that produced it.
+# * **the constructor does not normalise on read** -- same write, same read,
+#   and the value survives while the host type does not: the parameter comes
+#   back as a ``str`` where an enum member went in. ``assert_params_equal``
+#   reports it as a type mismatch naming the member type.
+# * **the XML channel spells a ``str``-enum member as ``str(member)``** --
+#   ``"DateTimeField.YEAR"`` rather than ``"year"`` -- so the reader hands the
+#   constructor a word that is neither a member's value nor a member's name and
+#   the normaliser refuses it. Only that channel fails.
+#
+# The writer and the reader are core's, so no row here can be fixed from a
+# backend repository. Each row pins exactly the channel(s) that fail and the
+# witness they fail with, so that the day core fixes one,
+# ``test_pinned_serialization_gap_really_fails`` reports the row as stale and
+# it is deleted. A class that starts failing *without* a row fails its own
+# assertion instead.
+#
+# This backend's own enums cannot appear in the first three blocks: they
+# inherit ``str`` and their constructors normalise the word back through
+# ``expression/coercion.as_member``, which is why no row names a
+# ``Snowflake*`` enum.
+#
+# Shape: ``fqn -> (channels, witness)``. ``channels`` is the tuple, in
+# ``("dict", "json", "xml")`` order, of the channels that cannot round-trip;
+# every channel not named must round-trip. ``witness`` is either a
+# ``(exception type, message fragment)`` pair -- the channel raises it -- or a
+# string, which is the fragment of the parameter comparison the channel fails
+# instead.
+SERIALIZATION_GAP = {
+    # ---- the writer refuses the parameter (all three channels) -------------
+    "rhosocial.activerecord.backend.expression.graph.GraphTableExpression": (
+        ("dict", "json", "xml"),
+        (TypeError, "GraphColumn is not one of the value kinds"),
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.ColumnGeneratedConstraint": (
+        ("dict", "json", "xml"),
+        (TypeError, "GeneratedColumnType is not one of the value kinds"),
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.ForeignKeyConstraint": (
+        ("dict", "json", "xml"),
+        (TypeError, "ReferentialAction is not one of the value kinds"),
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_trigger.CreateTriggerStatement": (
+        ("dict", "json", "xml"),
+        (TypeError, "TriggerEvent is not one of the value kinds"),
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_view.CreateViewStatement": (
+        ("dict", "json", "xml"),
+        (TypeError, "ViewOptions is not one of the value kinds"),
+    ),
+    "rhosocial.activerecord.backend.expression.xml.XMLAttributesExpression": (
+        ("dict", "json", "xml"),
+        (TypeError, "XMLAttribute is not one of the value kinds"),
+    ),
+    "rhosocial.activerecord.backend.expression.xml.XMLForestExpression": (
+        ("dict", "json", "xml"),
+        (TypeError, "XMLForestItem is not one of the value kinds"),
+    ),
+    # ---- the constructor refuses its own wire form (json and xml) ----------
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.CreateTableCloneStatement": (
+        ("json", "xml"),
+        (TypeError, "mode must be a CreateTableCloneMode"),
+    ),
+    # ---- the constructor does not normalise on read (json and xml) ---------
+    # The value survives and the host type does not, so the witness is the
+    # comparison the harness reports rather than an exception.
+    "rhosocial.activerecord.backend.expression.graph.GraphEdge": (
+        ("json", "xml"),
+        "type mismatch str vs GraphEdgeDirection",
+    ),
+    "rhosocial.activerecord.backend.expression.graph.QuantifiedPath": (
+        ("json", "xml"),
+        "type mismatch str vs GraphEdgeDirection",
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_database.AlterDatabaseStatement": (
+        ("json", "xml"),
+        "type mismatch str vs AlterDatabaseAction",
+    ),
+    "rhosocial.activerecord.backend.expression.statements.dml.MergeAction": (
+        ("json", "xml"),
+        "type mismatch str vs MergeActionType",
+    ),
+    "rhosocial.activerecord.backend.expression.statements.dml.MergeStatement": (
+        ("json", "xml"),
+        "type mismatch str vs MergeActionType",
+    ),
+    "rhosocial.activerecord.backend.expression.xml.XMLParseExpression": (
+        ("json", "xml"),
+        "type mismatch str vs XMLParseDocumentType",
+    ),
+    "rhosocial.activerecord.backend.expression.xml.XMLSerializeExpression": (
+        ("json", "xml"),
+        "type mismatch str vs XMLSerializeDocumentType",
+    ),
+    # ---- the XML channel spells a str-enum member as str(member) -----------
+    # ``DateTimeField`` and ``IntervalUnit`` are str-enums, so JSON writes the
+    # value and round-trips. The XML writer calls ``str()`` on the member and
+    # gets the repr-shaped spelling back, which the normaliser refuses.
+    "rhosocial.activerecord.backend.expression.datetime.DatePartExpression": (
+        ("xml",),
+        (ValueError, "unsupported datetime field: 'DateTimeField.YEAR'"),
+    ),
+    "rhosocial.activerecord.backend.expression.datetime.DateTruncExpression": (
+        ("xml",),
+        (ValueError, "unsupported datetime field: 'DateTimeField.YEAR'"),
+    ),
+    "rhosocial.activerecord.backend.expression.datetime.ExtractExpression": (
+        ("xml",),
+        (ValueError, "unsupported datetime field: 'DateTimeField.YEAR'"),
+    ),
+    "rhosocial.activerecord.backend.expression.datetime.ExtractFieldExpression": (
+        ("xml",),
+        (ValueError, "unsupported datetime field: 'DateTimeField.YEAR'"),
+    ),
+    "rhosocial.activerecord.backend.expression.datetime._ExtractBase": (
+        ("xml",),
+        (ValueError, "unsupported datetime field: 'DateTimeField.YEAR'"),
+    ),
+    "rhosocial.activerecord.backend.expression.datetime.DateTimeAddExpression": (
+        ("xml",),
+        (ValueError, "unsupported interval unit: 'IntervalUnit.DAY'"),
+    ),
+    "rhosocial.activerecord.backend.expression.datetime.DateTimeDiffExpression": (
+        ("xml",),
+        (ValueError, "unsupported interval unit: 'IntervalUnit.DAY'"),
+    ),
+    "rhosocial.activerecord.backend.expression.datetime.DateTimeSubtractExpression": (
+        ("xml",),
+        (ValueError, "unsupported interval unit: 'IntervalUnit.DAY'"),
+    ),
+    "rhosocial.activerecord.backend.expression.datetime.IntervalExpression": (
+        ("xml",),
+        (ValueError, "unsupported interval unit: 'IntervalUnit.DAY'"),
+    ),
+}
+
+_CHANNELS = ("dict", "json", "xml")
+
+
+def _restore_channel(channel, instance, dialect):
+    """Serialize *instance* and read it back through one channel."""
+    if channel == "dict":
+        return deserialize(serialize(instance), dialect)
+    if channel == "json":
+        return deserialize_json(serialize_json(instance), dialect)
+    return deserialize_xml(serialize_xml(instance), dialect)
+
+
+def _run_channel(fqn, channel, instance, dialect):
+    """One channel's round-trip, as an outcome a caller can classify.
+
+    Returns ``("ok", restored)``, ``("raises", exception)`` or
+    ``("degrades", message)``. A channel that is not named in a class's
+    :data:`SERIALIZATION_GAP` row must return the first; a channel that is
+    named must return one of the other two, and the row's witness says which
+    and what it must look like.
+    """
+    try:
+        restored = _restore_channel(channel, instance, dialect)
+    except Exception as exc:  # noqa: BLE001 -- classified by the caller
+        return "raises", exc
+    try:
+        assert_params_equal(restored.get_params(), instance.get_params(), fqn)
+    except AssertionError as exc:
+        return "degrades", str(exc)
+    return "ok", restored
+
+
+def _assert_roundtrip_or_gap(fqn, instance, dialect):
+    """Assert all three channels, against the pinned gap table.
+
+    Returns ``{channel: restored}`` for the channels that round-tripped. A
+    channel whose class has no pinned gap must round-trip, and a pinned
+    channel must fail exactly the way its witness says -- so neither a new
+    failure nor a stale row can pass quietly.
+    """
+    gap = SERIALIZATION_GAP.get(fqn)
+    restored_ok = {}
+    failing = []
+    for channel in _CHANNELS:
+        outcome, detail = _run_channel(fqn, channel, instance, dialect)
+        if outcome == "ok":
+            restored_ok[channel] = detail
+            continue
+        failing.append(channel)
+        what = (
+            f"raised {type(detail).__name__}: {detail}"
+            if outcome == "raises"
+            else f"lost a parameter type: {detail}"
+        )
+        assert gap is not None, (
+            f"{fqn}: the {channel} channel {what}, and the class is not in "
+            f"SERIALIZATION_GAP. If core's writer or reader learned to carry "
+            f"the parameter, the row is no longer needed; if it has not, the "
+            f"class needs a row naming the channel and the witness."
+        )
+        channels, witness = gap
+        assert channel in channels, (
+            f"{fqn}: the {channel} channel failed but the pinned gap names "
+            f"{channels}. Either the pin is wrong about which channels fail, or "
+            f"core's behaviour changed and the row must be re-measured."
+        )
+        if isinstance(witness, tuple):
+            expected_type, fragment = witness
+            assert outcome == "raises", (
+                f"{fqn}: the pinned gap says the {channel} channel raises "
+                f"{expected_type.__name__} saying {fragment!r}, but it {what}."
+            )
+            assert type(detail) is expected_type and fragment in str(detail), (
+                f"{fqn}: the {channel} channel was pinned to raise "
+                f"{expected_type.__name__} saying {fragment!r}, but it {what}."
+            )
+        else:
+            assert outcome == "degrades" and witness in str(detail), (
+                f"{fqn}: the pinned gap says the {channel} channel loses the "
+                f"parameter type reported as {witness!r}, but it {what}."
+            )
+    if gap is not None:
+        channels, _witness = gap
+        assert set(failing) == set(channels), (
+            f"{fqn}: the pinned gap names {channels} as the channels that fail, "
+            f"but {failing} failed. A row that names a channel which now works "
+            f"is stale and must go."
+        )
+    return restored_ok
 
 
 # ---------------------------------------------------------------------------
@@ -1505,11 +1743,17 @@ def assert_sql_roundtrip_classified(fqn, instance, dialect):
         )
 
     expected_sql, expected_params = rendered
-    for channel, decoded in (
-        ("dict", deserialize(serialize(instance), dialect)),
-        ("json", deserialize_json(serialize_json(instance), dialect)),
-        ("xml", deserialize_xml(serialize_xml(instance), dialect)),
-    ):
+    # Only the channels that carry this class's parameters intact can be asked
+    # for SQL: a channel that loses a parameter type or refuses it on the write
+    # is already recorded in ``SERIALIZATION_GAP``, and re-deriving SQL from a
+    # node whose parameter never arrived would fail for the pinned reason
+    # instead of asserting anything about the rendering.
+    gap = SERIALIZATION_GAP.get(fqn)
+    whole = set(_CHANNELS) - set(gap[0] if gap else ())
+    for channel in _CHANNELS:
+        if channel not in whole:
+            continue
+        decoded = _restore_channel(channel, instance, dialect)
         decoded_sql, decoded_params = decoded.to_sql()
         assert decoded_sql == expected_sql, (
             f"{fqn}: {channel} round-trip changed the SQL.\n"
@@ -1574,17 +1818,15 @@ class TestExpressionRoundtripAll:
     """All constructible expression classes round-trip through all encodings."""
 
     def test_get_params_roundtrip_across_encodings(self, expr_case, dialect):
+        """Every parameter survives all three channels -- or its gap is pinned.
+
+        A channel that fails for a class with no row in
+        :data:`SERIALIZATION_GAP` fails here, and so does a row that names a
+        channel which now round-trips. See the table's comment for what the
+        rows are and whose defect they record.
+        """
         fqn, instance = expr_case
-        original = instance.get_params()
-
-        restored_dict = deserialize(serialize(instance), dialect)
-        assert_params_equal(restored_dict.get_params(), original, fqn)
-
-        restored_json = deserialize_json(serialize_json(instance), dialect)
-        assert_params_equal(restored_json.get_params(), original, fqn)
-
-        restored_xml = deserialize_xml(serialize_xml(instance), dialect)
-        assert_params_equal(restored_xml.get_params(), original, fqn)
+        _assert_roundtrip_or_gap(fqn, instance, dialect)
 
     def test_to_sql_roundtrip_classified(self, expr_case, dialect):
         """A render must survive the round-trip; a non-render must be classified."""
@@ -1642,6 +1884,52 @@ class TestMatrixIntegrity:
         assert not unknown, (
             f"LEGITIMATE_NON_RENDERS names uncollected classes: {sorted(unknown)}"
         )
+        unknown = set(SERIALIZATION_GAP) - collected
+        assert not unknown, (
+            f"SERIALIZATION_GAP names uncollected classes: {sorted(unknown)}"
+        )
+
+    def test_pinned_serialization_gap_really_fails(self, dialect):
+        """Each gap row still fails, on the channels it names, for that reason.
+
+        Without this, a row could sit in the table for a class that now
+        round-trips perfectly well, and the artifact coverage it claims to
+        describe would be a stale statement rather than a measurement. The day
+        core's writer or reader fixes one of these, this test says so and the
+        row is deleted.
+        """
+        for fqn, (channels, witness) in SERIALIZATION_GAP.items():
+            instance, source = make_instance(REGISTERED[fqn], dialect)
+            assert instance is not None, (
+                f"{fqn} is pinned in SERIALIZATION_GAP but could not be "
+                f"constructed ({source})"
+            )
+            for channel in _CHANNELS:
+                outcome, detail = _run_channel(fqn, channel, instance, dialect)
+                if channel not in channels:
+                    assert outcome == "ok", (
+                        f"{fqn}: the {channel} channel is not named in the gap "
+                        f"row, so it must round-trip, but it "
+                        f"{'raised' if outcome == 'raises' else 'degraded'}: {detail}"
+                    )
+                    continue
+                assert outcome != "ok", (
+                    f"{fqn}: the gap row says the {channel} channel fails, but "
+                    f"it round-tripped. Core may have fixed it -- delete the row."
+                )
+                if isinstance(witness, tuple):
+                    expected_type, fragment = witness
+                    assert type(detail) is expected_type and fragment in str(detail), (
+                        f"{fqn}: the {channel} channel was pinned to raise "
+                        f"{expected_type.__name__} saying {fragment!r}, but it "
+                        f"raised {type(detail).__name__}: {detail}"
+                    )
+                else:
+                    assert outcome == "degrades" and witness in str(detail), (
+                        f"{fqn}: the {channel} channel was pinned to lose the "
+                        f"parameter type reported as {witness!r}, but it "
+                        f"{outcome}: {detail}"
+                    )
 
     def test_unmodelled_formatter_list_is_exact(self, dialect):
         """Pin the unmodelled-formatter table against what the dialect really lacks.
@@ -1844,3 +2132,5 @@ class TestMatrixIntegrity:
             print(f"  not modelled: {feature} ({len(methods)} formatters)")
         for fqn in sorted(LEGITIMATE_NON_RENDERS):
             print(f"  non-render: {fqn}")
+        for fqn, (channels, _witness) in sorted(SERIALIZATION_GAP.items()):
+            print(f"  artifact gap: {fqn} ({', '.join(channels)})")

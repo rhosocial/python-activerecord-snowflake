@@ -350,9 +350,9 @@ class SnowflakeCapabilityMixin:
 
     def alter_column_type_action(self, old_col, new_col):
         """Build the in-place type-change action (MODIFY COLUMN)."""
-        from rhosocial.activerecord.backend.expression.statements.ddl_alter import ModifyColumn
+        from rhosocial.activerecord.backend.expression.statements.ddl_alter import ModifyColumnAction
 
-        return ModifyColumn(self, column=new_col)
+        return ModifyColumnAction(self, column=new_col)
 
     def format_modify_column_action(self, action) -> Tuple[str, tuple]:
         """Render Snowflake ALTER TABLE ... MODIFY COLUMN <col> <type>.
