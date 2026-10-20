@@ -103,10 +103,11 @@ def pytest_load_initial_conftests(args, early_config, parser):
     # An explicit ``-p no:xdist`` is a caller asking for serial. Injecting
     # ``-n`` then would be worse than useless: the option would be unknown and
     # the run would die in argument parsing.
-    if any(
-        arg in ("-pno:xdist", "-p", "no:xdist") for arg in args
-    ) or "no:xdist" in args:
-        return
+    for index, arg in enumerate(args):
+        if arg == "-p" and index + 1 < len(args) and args[index + 1] == "no:xdist":
+            return
+        if arg == "-pno:xdist" or arg == "--no-xdist":
+            return
 
     targets = []
     skip_next = False

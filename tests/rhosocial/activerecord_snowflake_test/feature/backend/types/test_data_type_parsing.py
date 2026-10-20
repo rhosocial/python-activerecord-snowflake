@@ -524,9 +524,10 @@ class TestParseRoundTripSweep:
         return registry
 
     def test_every_rendered_type_parses_back_coherently(self, registry):
-        from rhosocial.activerecord.testsuite.utils.parse_contract import (
-            parse_roundtrip_failures,
-        )
+        # The sweep is vendored beside the matrix: the testsuite deleted its
+        # shared one together with its round-trip harness, when round-trip
+        # coverage moved to each backend (mysql did the same).
+        from expression_roundtrip_harness import parse_roundtrip_failures
         from rhosocial.activerecord.backend.impl.snowflake.dialect import (
             SnowflakeDialect as _SweepDialect,
         )

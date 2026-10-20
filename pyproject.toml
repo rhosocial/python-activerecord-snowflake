@@ -79,6 +79,11 @@ namespaces = true
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q -p plugins.expression_xdist"
+# ``tests`` on the path so the repository-local plugins under ``tests/plugins``
+# are importable by name from ``addopts``. CI runs pytest without setting
+# PYTHONPATH, and a plugin registered with ``-p`` is imported by pytest itself
+# before any conftest can arrange the path.
+pythonpath = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = [

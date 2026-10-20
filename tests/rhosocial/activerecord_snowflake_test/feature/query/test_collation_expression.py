@@ -8,6 +8,7 @@ import os
 import pytest
 
 from rhosocial.activerecord.backend.expression import Column, Literal
+from rhosocial.activerecord.backend.expression.collation import collate
 from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
 from rhosocial.activerecord.backend.impl.snowflake.collation import SnowflakeCollation
 from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
@@ -84,7 +85,11 @@ class TestSnowflakeCollationExpression:
         assert params == ()
 
     def test_literal_collate_preserves_parameter_binding(self, dialect):
-        expr = Literal(dialect, "Alice").collate(SnowflakeCollation.EN_CI)
+        # A Literal is a value node and carries no operation surface of its own
+        # (rules §4.3), so COLLATE is composed with the collate factory over
+        # the literal rather than as a chain on it. The binding is unchanged:
+        # the factory defers to the wrapped node's own inline decision.
+        expr = collate(Literal(dialect, "Alice"), SnowflakeCollation.EN_CI)
 
         sql, params = expr.to_sql()
 
