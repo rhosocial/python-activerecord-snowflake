@@ -15,6 +15,8 @@ from typing import Optional, Tuple, Union, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
+from .coercion import as_member
+
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
@@ -26,23 +28,35 @@ __all__ = [
 ]
 
 
-class SnowflakeSampleForm(Enum):
+class SnowflakeSampleForm(str, Enum):
     """Syntactic form of the sampling clause.
 
     SAMPLE:       the ``SAMPLE`` keyword.
     TABLESAMPLE:  the ``TABLESAMPLE`` keyword (synonym of ``SAMPLE``).
     """
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     SAMPLE = "SAMPLE"
     TABLESAMPLE = "TABLESAMPLE"
 
 
-class SnowflakeSamplingMethod(Enum):
+class SnowflakeSamplingMethod(str, Enum):
     """Sampling method used by TABLESAMPLE.
 
     BERNOULLI:  row-level sampling, each row is selected independently.
     SYSTEM:     block-level sampling, faster but less statistically uniform.
     """
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     BERNOULLI = "BERNOULLI"
     SYSTEM = "SYSTEM"
@@ -70,10 +84,10 @@ class SnowflakeSampleExpression(BaseExpression):
         seed: Optional[int] = None,
     ):
         super().__init__(dialect)
-        self.form = form
+        self.form = as_member(SnowflakeSampleForm, form, parameter="form")
         self.count = count
         self.is_percent = is_percent
-        self.sampling_method = sampling_method
+        self.sampling_method = as_member(SnowflakeSamplingMethod, sampling_method, parameter="sampling_method")
         self.seed = seed
 
     def to_sql(self) -> "Tuple[str, tuple]":

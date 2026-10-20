@@ -20,6 +20,8 @@ from typing import List, Optional, Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
+from ..coercion import as_member
+
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
@@ -33,7 +35,7 @@ __all__ = [
 ]
 
 
-class SnowflakeAlterTaskMode(Enum):
+class SnowflakeAlterTaskMode(str, Enum):
     """ALTER TASK action modes.
 
     RESUME:      resume a suspended task.
@@ -42,6 +44,12 @@ class SnowflakeAlterTaskMode(Enum):
     REMOVE_AFTER: remove predecessor task dependencies.
     SET:         change task properties (warehouse, schedule).
     """
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     RESUME = "RESUME"
     SUSPEND = "SUSPEND"
@@ -150,7 +158,7 @@ class SnowflakeAlterTaskExpression(BaseExpression):
     ):
         super().__init__(dialect)
         self.name = name
-        self.mode = mode
+        self.mode = as_member(SnowflakeAlterTaskMode, mode, parameter="mode")
         self.if_exists = if_exists
         self.after = after
         self.warehouse = warehouse

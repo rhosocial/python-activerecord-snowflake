@@ -17,6 +17,8 @@ from typing import Any, Optional, Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
+from ..coercion import as_member
+
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
@@ -29,7 +31,7 @@ __all__ = [
 ]
 
 
-class SnowflakeAlterWarehouseMode(Enum):
+class SnowflakeAlterWarehouseMode(str, Enum):
     """ALTER WAREHOUSE action modes.
 
     SUSPEND: shut down (suspend) the warehouse.
@@ -37,6 +39,12 @@ class SnowflakeAlterWarehouseMode(Enum):
     SET:     change one or more warehouse properties.
     RENAME:  rename the warehouse.
     """
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     SUSPEND = "SUSPEND"
     RESUME = "RESUME"
@@ -137,7 +145,7 @@ class SnowflakeAlterWarehouseExpression(BaseExpression):
     ):
         super().__init__(dialect)
         self.name = name
-        self.mode = mode
+        self.mode = as_member(SnowflakeAlterWarehouseMode, mode, parameter="mode")
         self.new_name = new_name
         self.warehouse_size = warehouse_size
         self.max_cluster_count = max_cluster_count

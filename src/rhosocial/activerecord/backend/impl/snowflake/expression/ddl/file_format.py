@@ -30,8 +30,14 @@ __all__ = [
 ]
 
 
-class SnowflakeFileFormatType(Enum):
+class SnowflakeFileFormatType(str, Enum):
     """Supported FILE FORMAT type values."""
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     CSV = "CSV"
     JSON = "JSON"

@@ -15,6 +15,8 @@ from typing import Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
+from ..coercion import as_member
+
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
@@ -25,8 +27,14 @@ __all__ = [
 ]
 
 
-class SnowflakeUndropObjectType(Enum):
+class SnowflakeUndropObjectType(str, Enum):
     """Object kinds supported by UNDROP."""
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     TABLE = "TABLE"
     SCHEMA = "SCHEMA"
@@ -51,7 +59,7 @@ class SnowflakeUndropExpression(BaseExpression):
     ):
         super().__init__(dialect)
         self.name = name
-        self.object_type = object_type
+        self.object_type = as_member(SnowflakeUndropObjectType, object_type, parameter="object_type")
 
     def to_sql(self) -> "Tuple[str, tuple]":
         """Generate UNDROP SQL statement.

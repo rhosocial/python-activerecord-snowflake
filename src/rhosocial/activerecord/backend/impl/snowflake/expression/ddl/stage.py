@@ -19,6 +19,8 @@ from typing import Any, List, Optional, Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
+from ..coercion import as_member
+
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
@@ -32,12 +34,18 @@ __all__ = [
 ]
 
 
-class SnowflakeCopyIntoMode(Enum):
+class SnowflakeCopyIntoMode(str, Enum):
     """COPY INTO direction modes.
 
     LOAD:   COPY INTO <table> FROM @<stage> — load data into a table.
     UNLOAD: COPY INTO @<stage> FROM <table> — unload data from a table.
     """
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     LOAD = "LOAD"
     UNLOAD = "UNLOAD"
@@ -215,7 +223,7 @@ class SnowflakeCopyIntoExpression(BaseExpression):
         single: Optional[bool] = None,
     ):
         super().__init__(dialect)
-        self.mode = mode
+        self.mode = as_member(SnowflakeCopyIntoMode, mode, parameter="mode")
         self.table = table
         self.stage = stage
         self.files = files

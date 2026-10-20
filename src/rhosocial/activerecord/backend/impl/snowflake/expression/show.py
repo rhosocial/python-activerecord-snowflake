@@ -16,6 +16,8 @@ from typing import Optional, Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
+from .coercion import as_member
+
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
@@ -27,8 +29,14 @@ __all__ = [
 ]
 
 
-class SnowflakeShowObjectType(Enum):
+class SnowflakeShowObjectType(str, Enum):
     """Object types supported by the SHOW command."""
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     TABLES = "TABLES"
     VIEWS = "VIEWS"
@@ -48,8 +56,14 @@ class SnowflakeShowObjectType(Enum):
     COLUMNS = "COLUMNS"
 
 
-class SnowflakeShowScope(Enum):
+class SnowflakeShowScope(str, Enum):
     """Namespace scope for the SHOW ``IN`` clause."""
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     ACCOUNT = "ACCOUNT"
     DATABASE = "DATABASE"
@@ -78,8 +92,8 @@ class SnowflakeShowExpression(BaseExpression):
         limit: Optional[int] = None,
     ):
         super().__init__(dialect)
-        self.object_type = object_type
-        self.in_scope = in_scope
+        self.object_type = as_member(SnowflakeShowObjectType, object_type, parameter="object_type")
+        self.in_scope = as_member(SnowflakeShowScope, in_scope, parameter="in_scope")
         self.in_name = in_name
         self.like = like
         self.limit = limit

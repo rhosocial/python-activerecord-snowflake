@@ -20,6 +20,8 @@ from typing import List, Optional, Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
+from ..coercion import as_member
+
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
@@ -34,8 +36,14 @@ __all__ = [
 ]
 
 
-class SnowflakeRoutineLanguage(Enum):
+class SnowflakeRoutineLanguage(str, Enum):
     """Supported routine implementation languages."""
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     SQL = "SQL"
     JAVASCRIPT = "JAVASCRIPT"
@@ -44,15 +52,27 @@ class SnowflakeRoutineLanguage(Enum):
     SCALA = "SCALA"
 
 
-class SnowflakeRoutineExecuteAs(Enum):
+class SnowflakeRoutineExecuteAs(str, Enum):
     """EXECUTE AS privilege context for routines."""
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     CALLER = "CALLER"
     OWNER = "OWNER"
 
 
-class SnowflakeRoutineType(Enum):
+class SnowflakeRoutineType(str, Enum):
     """Routine kinds accepted by DROP PROCEDURE / FUNCTION."""
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     PROCEDURE = "PROCEDURE"
     FUNCTION = "FUNCTION"
@@ -90,8 +110,8 @@ class SnowflakeCreateProcedureExpression(BaseExpression):
         self.or_replace = or_replace
         self.args = args or []
         self.returns = returns
-        self.language = language
-        self.execute_as = execute_as
+        self.language = as_member(SnowflakeRoutineLanguage, language, parameter="language")
+        self.execute_as = as_member(SnowflakeRoutineExecuteAs, execute_as, parameter="execute_as")
         self.body = body
         self.comment = comment
 
@@ -149,10 +169,12 @@ class SnowflakeCreateFunctionExpression(BaseExpression):
         self.or_replace = or_replace
         self.args = args or []
         self.returns = returns
-        self.language = language
+        self.language = as_member(SnowflakeRoutineLanguage, language, parameter="language")
         self.immutable = immutable
         self.volatile = volatile
-        self.execute_as = execute_as
+        self.execute_as = as_member(
+            SnowflakeRoutineExecuteAs, execute_as, parameter="execute_as"
+        )
         self.body = body
         self.comment = comment
 
@@ -185,7 +207,7 @@ class SnowflakeDropRoutineExpression(BaseExpression):
     ):
         super().__init__(dialect)
         self.name = name
-        self.routine_type = routine_type
+        self.routine_type = as_member(SnowflakeRoutineType, routine_type, parameter="routine_type")
         self.if_exists = if_exists
 
     def to_sql(self) -> "Tuple[str, tuple]":
