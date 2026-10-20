@@ -106,7 +106,6 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     TableMixin,
     TransactionControlMixin,
     TruncateMixin,
-    TypedValueMixin,
     UpsertMixin,
     ViewMixin,
     WindowFunctionMixin,
@@ -182,11 +181,19 @@ from .mixins import (
     SnowflakeOrderedSetAggregationMixin,
     SnowflakeTruncateMixin,
     SnowflakeWildcardMixin,
-    SnowflakeTypedValueMixin,
+    SnowflakeLiteralValueMixin,
 )
 
 
 class SnowflakeDialect(
+    # Ahead of ``SQLDialectBase``, unlike every other mixin here. Those add
+    # methods the base does not have, so their position is a readability
+    # choice; this one overrides ``format_literal``, and a mixin placed after
+    # the class it overrides never wins. It resolves Snowflake's two tier-2
+    # spellings -- binary and UUID -- and leaves the base's portable forms and
+    # the literal-construction protocol to it. INTERVAL has no branch there on
+    # purpose, so the base's explicit failure is the answer.
+    SnowflakeLiteralValueMixin,
     SQLDialectBase,
     RelationSourceMixin,
     # The whole naming side, stated once: which namespace levels a name may
@@ -247,14 +254,6 @@ class SnowflakeDialect(
     RpadMixin,
     SnowflakeTruncateMixin,
     SnowflakeColumnTypeMixin,
-    # Value literals: Snowflake's tier-2 spellings ahead of the base's
-    # tier-1 rendering and its tier-2 refusals. The pair sits where sqlite's
-    # does -- ahead of the generic mixins so the composed order resolves
-    # format_binary_value and format_uuid_value to the local spellings;
-    # INTERVAL stays with the base's explicit failure, which is the
-    # documented answer for this engine.
-    SnowflakeTypedValueMixin,
-    TypedValueMixin,
     # New Mixins (shared by all modern backends)
     PredicateMixin,
     ILIKEMixin,
