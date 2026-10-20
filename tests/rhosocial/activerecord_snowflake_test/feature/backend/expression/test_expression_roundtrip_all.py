@@ -1425,13 +1425,13 @@ LEGITIMATE_NON_RENDERS = {
 # Every class is written and read back through the three channels -- dict,
 # JSON and XML -- because an artifact that only survives one of them is an
 # artifact with three incantations instead of one shape. What fails is core's
-# own layer, and it fails in four distinguishable ways:
+# own layer, and it fails in three distinguishable ways:
 #
 # * **the writer refuses the parameter** -- ``encode_artifact`` asks
 #   ``LiteralKind.of`` what kind a value belongs to, and that vocabulary is the
-#   closed set of *value* types. A dataclass, an enum that does not inherit
-#   ``str``, a host object is not in it and is refused by name. Every channel
-#   fails, including dict, because the failure is on the write.
+#   closed set of *value* types. A dataclass is not in it and is refused by
+#   name. Every channel fails, including dict, because the failure is on the
+#   write.
 # * **the constructor refuses its own wire form** -- the JSON and XML channels
 #   write the member's *value*, a plain string, and the constructor answers
 #   "must be a <Enum>". The artifact is unreadable by the node that produced it.
@@ -1439,19 +1439,28 @@ LEGITIMATE_NON_RENDERS = {
 #   and the value survives while the host type does not: the parameter comes
 #   back as a ``str`` where an enum member went in. ``assert_params_equal``
 #   reports it as a type mismatch naming the member type.
-# * **the XML channel spells a ``str``-enum member as ``str(member)``** --
-#   ``"DateTimeField.YEAR"`` rather than ``"year"`` -- so the reader hands the
-#   constructor a word that is neither a member's value nor a member's name and
-#   the normaliser refuses it. Only that channel fails.
+#
+# A fourth block used to be here: the XML channel spelled a ``str``-enum member
+# as ``str(member)`` -- ``"DateTimeField.YEAR"`` rather than ``"year"`` -- so
+# the reader handed the constructor a word that is neither a member's value nor
+# a member's name. That was the missing ``__str__ = str.__str__`` on nine
+# ``(str, Enum)`` declarations in core, and core has since added it; the nine
+# datetime/interval rows it produced are gone, and every one of those classes
+# now round-trips through all three channels. For the same reason the bare
+# ``Enum`` spellings that made the writer reject an enum outright
+# (``GeneratedColumnType``, ``ReferentialAction``, ``TriggerEvent`` and the
+# rest) are ``(str, Enum)`` now, so three rows moved from "the writer refuses"
+# to "the constructor does not normalise", which is what they measure today.
 #
 # The writer and the reader are core's, so no row here can be fixed from a
 # backend repository. Each row pins exactly the channel(s) that fail and the
 # witness they fail with, so that the day core fixes one,
 # ``test_pinned_serialization_gap_really_fails`` reports the row as stale and
 # it is deleted. A class that starts failing *without* a row fails its own
-# assertion instead.
+# assertion instead. When the last row goes, this table, its guards and the
+# branches that read it go with it.
 #
-# This backend's own enums cannot appear in the first three blocks: they
+# This backend's own enums cannot appear in any of the three blocks: they
 # inherit ``str`` and their constructors normalise the word back through
 # ``expression/coercion.as_member``, which is why no row names a
 # ``Snowflake*`` enum.
@@ -1467,18 +1476,6 @@ SERIALIZATION_GAP = {
     "rhosocial.activerecord.backend.expression.graph.GraphTableExpression": (
         ("dict", "json", "xml"),
         (TypeError, "GraphColumn is not one of the value kinds"),
-    ),
-    "rhosocial.activerecord.backend.expression.statements.ddl_table.ColumnGeneratedConstraint": (
-        ("dict", "json", "xml"),
-        (TypeError, "GeneratedColumnType is not one of the value kinds"),
-    ),
-    "rhosocial.activerecord.backend.expression.statements.ddl_table.ForeignKeyConstraint": (
-        ("dict", "json", "xml"),
-        (TypeError, "ReferentialAction is not one of the value kinds"),
-    ),
-    "rhosocial.activerecord.backend.expression.statements.ddl_trigger.CreateTriggerStatement": (
-        ("dict", "json", "xml"),
-        (TypeError, "TriggerEvent is not one of the value kinds"),
     ),
     "rhosocial.activerecord.backend.expression.statements.ddl_view.CreateViewStatement": (
         ("dict", "json", "xml"),
@@ -1500,6 +1497,18 @@ SERIALIZATION_GAP = {
     # ---- the constructor does not normalise on read (json and xml) ---------
     # The value survives and the host type does not, so the witness is the
     # comparison the harness reports rather than an exception.
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.ColumnGeneratedConstraint": (
+        ("json", "xml"),
+        "type mismatch str vs GeneratedColumnType",
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.ForeignKeyConstraint": (
+        ("json", "xml"),
+        "type mismatch str vs ReferentialAction",
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_trigger.CreateTriggerStatement": (
+        ("json", "xml"),
+        "type mismatch str vs TriggerTiming",
+    ),
     "rhosocial.activerecord.backend.expression.graph.GraphEdge": (
         ("json", "xml"),
         "type mismatch str vs GraphEdgeDirection",
@@ -1527,46 +1536,6 @@ SERIALIZATION_GAP = {
     "rhosocial.activerecord.backend.expression.xml.XMLSerializeExpression": (
         ("json", "xml"),
         "type mismatch str vs XMLSerializeDocumentType",
-    ),
-    # ---- the XML channel spells a str-enum member as str(member) -----------
-    # ``DateTimeField`` and ``IntervalUnit`` are str-enums, so JSON writes the
-    # value and round-trips. The XML writer calls ``str()`` on the member and
-    # gets the repr-shaped spelling back, which the normaliser refuses.
-    "rhosocial.activerecord.backend.expression.datetime.DatePartExpression": (
-        ("xml",),
-        (ValueError, "unsupported datetime field: 'DateTimeField.YEAR'"),
-    ),
-    "rhosocial.activerecord.backend.expression.datetime.DateTruncExpression": (
-        ("xml",),
-        (ValueError, "unsupported datetime field: 'DateTimeField.YEAR'"),
-    ),
-    "rhosocial.activerecord.backend.expression.datetime.ExtractExpression": (
-        ("xml",),
-        (ValueError, "unsupported datetime field: 'DateTimeField.YEAR'"),
-    ),
-    "rhosocial.activerecord.backend.expression.datetime.ExtractFieldExpression": (
-        ("xml",),
-        (ValueError, "unsupported datetime field: 'DateTimeField.YEAR'"),
-    ),
-    "rhosocial.activerecord.backend.expression.datetime._ExtractBase": (
-        ("xml",),
-        (ValueError, "unsupported datetime field: 'DateTimeField.YEAR'"),
-    ),
-    "rhosocial.activerecord.backend.expression.datetime.DateTimeAddExpression": (
-        ("xml",),
-        (ValueError, "unsupported interval unit: 'IntervalUnit.DAY'"),
-    ),
-    "rhosocial.activerecord.backend.expression.datetime.DateTimeDiffExpression": (
-        ("xml",),
-        (ValueError, "unsupported interval unit: 'IntervalUnit.DAY'"),
-    ),
-    "rhosocial.activerecord.backend.expression.datetime.DateTimeSubtractExpression": (
-        ("xml",),
-        (ValueError, "unsupported interval unit: 'IntervalUnit.DAY'"),
-    ),
-    "rhosocial.activerecord.backend.expression.datetime.IntervalExpression": (
-        ("xml",),
-        (ValueError, "unsupported interval unit: 'IntervalUnit.DAY'"),
     ),
 }
 
