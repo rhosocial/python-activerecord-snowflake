@@ -9,6 +9,8 @@ from typing import ClassVar, Dict, Any, Optional
 
 from pydantic import Field
 
+from ..expression.sequence import SnowflakeNextvalExpression
+
 
 class SnowflakePKMixin:
     """Snowflake Sequence-based integer primary key Mixin.
@@ -46,8 +48,15 @@ class SnowflakePKMixin:
             backend = self.__class__.backend()
             if backend is not None:
                 seq_name = self.__class__._snowflake_sequence_name
+                # The statement is built by the node and rendered by the
+                # dialect -- this layer collects a name and reads back a value,
+                # it does not spell SQL. ``backend.dialect`` is the instance the
+                # connection was opened with, so the node and the executor agree
+                # on the dialect by construction.
                 result = backend.execute(
-                    f"SELECT {seq_name}.NEXTVAL AS next_id", ()
+                    *SnowflakeNextvalExpression(
+                        backend.dialect, seq_name, alias="next_id"
+                    ).to_sql()
                 )
                 if result.data and len(result.data) > 0:
                     next_id = result.data[0].get("NEXT_ID") or result.data[0].get("next_id")

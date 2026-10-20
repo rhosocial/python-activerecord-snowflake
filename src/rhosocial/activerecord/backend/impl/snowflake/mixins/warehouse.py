@@ -11,6 +11,9 @@ if TYPE_CHECKING:
         SnowflakeCreateWarehouseExpression,
         SnowflakeDropWarehouseExpression,
     )
+    from ..expression.ddl.warehouse_options import (
+        SnowflakeWarehouseOptionsExpression,
+    )
 
 
 class SnowflakeWarehouseMixin:
@@ -19,6 +22,47 @@ class SnowflakeWarehouseMixin:
     def supports_warehouse(self) -> bool:
         """Snowflake supports virtual warehouses."""
         return True
+
+    def format_warehouse_options_expression(
+        self, expr: "SnowflakeWarehouseOptionsExpression"
+    ) -> Tuple[str, tuple]:
+        """Render the shared warehouse property set as ``KEY = value`` tokens.
+
+        The same nine properties appear on ``CREATE WAREHOUSE`` and on
+        ``ALTER WAREHOUSE ... SET``, in the same spelling, so they are rendered
+        once here and the two statements ask for this clause. A property left
+        ``None`` is omitted rather than written as a default -- the server's own
+        default is the answer, and inventing one would silently override it.
+
+        ``AUTO_SUSPEND`` takes a number of seconds *or* the ``FALSE`` / ``TRUE``
+        keyword, which is why it is the one property whose value decides its
+        own spelling; Snowflake documents both forms.
+
+        https://docs.snowflake.com/en/sql-reference/sql/create-warehouse
+        https://docs.snowflake.com/en/sql-reference/sql/alter-warehouse
+        """
+        parts: list[str] = []
+        if expr.warehouse_size is not None:
+            parts.append(f"WAREHOUSE_SIZE = {self.format_literal(expr.warehouse_size)}")
+        if expr.max_cluster_count is not None:
+            parts.append(f"MAX_CLUSTER_COUNT = {int(expr.max_cluster_count)}")
+        if expr.min_cluster_count is not None:
+            parts.append(f"MIN_CLUSTER_COUNT = {int(expr.min_cluster_count)}")
+        if expr.scaling_policy is not None:
+            parts.append(f"SCALING_POLICY = {self.format_literal(expr.scaling_policy)}")
+        if expr.auto_suspend is not None:
+            if isinstance(expr.auto_suspend, bool):
+                parts.append(f"AUTO_SUSPEND = {str(expr.auto_suspend).upper()}")
+            else:
+                parts.append(f"AUTO_SUSPEND = {int(expr.auto_suspend)}")
+        if expr.auto_resume is not None:
+            parts.append(f"AUTO_RESUME = {str(bool(expr.auto_resume)).upper()}")
+        if expr.initially_suspended is not None:
+            value = str(bool(expr.initially_suspended)).upper()
+            parts.append(f"INITIALLY_SUSPENDED = {value}")
+        if expr.comment is not None:
+            parts.append(f"COMMENT = {self.format_literal(expr.comment)}")
+        return " ".join(parts), ()
 
     def format_create_warehouse_statement(
         self, expr: "SnowflakeCreateWarehouseExpression"

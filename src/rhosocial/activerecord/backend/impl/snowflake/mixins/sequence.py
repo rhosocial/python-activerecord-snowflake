@@ -47,6 +47,7 @@ if TYPE_CHECKING:  # pragma: no cover
         CreateSequenceStatement,
         DropSequenceStatement,
     )
+    from ..expression.sequence import SnowflakeNextvalExpression
 
 
 class SnowflakeSequenceMixin:
@@ -379,6 +380,25 @@ class SnowflakeSequenceMixin:
                 )
             parts.append("ORDER" if expr.order else "NOORDER")
         return " ".join(parts), ()
+
+    def format_snowflake_nextval_expression(
+        self, expr: "SnowflakeNextvalExpression"
+    ) -> Tuple[str, tuple]:
+        """Render ``<sequence>.NEXTVAL [AS <alias>]``.
+
+        Snowflake reads a sequence's next value as a *pseudo-column* on the
+        sequence (``seq.nextval``), not through the SQL-standard
+        ``NEXT VALUE FOR`` and not through PostgreSQL's ``nextval('seq')``
+        function form. The sequence name goes through
+        :meth:`format_identifier`, so a quoted or namespaced name is written
+        once, in the one place that knows how.
+
+        https://docs.snowflake.com/en/sql-reference/functions/nextval
+        """
+        sql = f"{self.format_identifier(expr.sequence)}.NEXTVAL"
+        if expr.alias:
+            sql = f"{sql} AS {self.format_identifier(expr.alias)}"
+        return sql, ()
 
 
 __all__ = ["SnowflakeSequenceMixin"]
