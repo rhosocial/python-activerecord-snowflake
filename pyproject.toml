@@ -79,11 +79,11 @@ namespaces = true
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q -p plugins.expression_xdist"
-# ``tests`` on the path so the repository-local plugins under ``tests/plugins``
-# are importable by name from ``addopts``. CI runs pytest without setting
-# PYTHONPATH, and a plugin registered with ``-p`` is imported by pytest itself
-# before any conftest can arrange the path.
-pythonpath = ["tests"]
+# The plugin is addressed as ``plugins.expression_xdist`` because CI puts
+# ``tests`` itself on ``PYTHONPATH`` (``export PYTHONPATH=src:tests``), which is
+# also what makes the package layout under ``tests/`` importable. Adding
+# ``tests`` here as well would arrange a *different* root, and the plugin would
+# not resolve at all -- which is what Python 3.8's unit-only leg reported.
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = [
