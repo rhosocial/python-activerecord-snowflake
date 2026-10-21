@@ -98,9 +98,7 @@ class SnowflakeTableModifierMixin:
         generic core rendering emits); the column-level form stays bare and
         is rendered by the generic ``format_column_definition``.
         """
-        from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
-
-        escaped = SQLDialectBase._escape_sql_string(comment)
+        escaped = self._escape_sql_string(comment)
         return f"COMMENT = '{escaped}'", ()
 
     def supports_create_table_like(self) -> bool:
