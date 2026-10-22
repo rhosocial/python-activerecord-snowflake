@@ -62,11 +62,11 @@ class SnowflakeFileFormatMixin:
             parts.append(f"TYPE = {str(type_value).upper()}")
         for key, value in expr.options.items():
             parts.append(
-                f"{key} = {_format_ff_value(value, self._escape_sql_string)}"
+                f"{key} = {_format_ff_value(value, self.escape_sql_string)}"
             )
         if expr.comment is not None:
             parts.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         return " ".join(parts), ()
 
@@ -87,11 +87,11 @@ class SnowflakeFileFormatMixin:
         options: list[str] = []
         for key, value in expr.options.items():
             options.append(
-                f"{key} = {_format_ff_value(value, self._escape_sql_string)}"
+                f"{key} = {_format_ff_value(value, self.escape_sql_string)}"
             )
         if expr.comment is not None:
             options.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         if not options:
             raise ValueError("ALTER FILE FORMAT SET requires a property")

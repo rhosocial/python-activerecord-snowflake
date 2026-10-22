@@ -65,7 +65,7 @@ class SnowflakeStreamMixin:
             parts.append(f"COPY_GRANTS = {str(bool(expr.copy_grants)).upper()}")
         if expr.comment is not None:
             parts.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         return " ".join(parts), ()
 

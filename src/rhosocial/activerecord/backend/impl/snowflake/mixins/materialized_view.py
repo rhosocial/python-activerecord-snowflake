@@ -135,7 +135,7 @@ class SnowflakeMaterializedViewMixin:
                 )
                 parts.append(f"CLUSTER BY ({cols})")
             if expr.comment is not None:
-                parts.append(f"COMMENT = '{self._escape_sql_string(expr.comment)}'")
+                parts.append(f"COMMENT = '{self.escape_sql_string(expr.comment)}'")
 
         # Snowflake has no WITH [NO] DATA: the view is created empty and filled
         # in the background. An explicit request for either spelling was refused

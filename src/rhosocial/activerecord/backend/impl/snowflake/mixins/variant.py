@@ -43,4 +43,7 @@ class SnowflakeVariantMixin:
             Tuple of (SQL string, empty params tuple).
 
         """
-        return f'{expr.column}:{expr.path}::{expr.target_type}', ()
+        from rhosocial.activerecord.backend.expression.types import DataType
+
+        target_sql, _ = DataType.as_type(self, expr.target_type).to_sql()
+        return f'{expr.column}:{expr.path}::{target_sql}', ()

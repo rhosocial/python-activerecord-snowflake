@@ -31,7 +31,7 @@ class SnowflakeShowMixin:
         """
         parts = ["SHOW", expr.object_type.value]
         if expr.like is not None:
-            parts.append(f"LIKE '{self._escape_sql_string(expr.like)}'")
+            parts.append(f"LIKE '{self.escape_sql_string(expr.like)}'")
         if expr.in_scope is not None:
             clause = f"IN {expr.in_scope.value}"
             if expr.in_name:

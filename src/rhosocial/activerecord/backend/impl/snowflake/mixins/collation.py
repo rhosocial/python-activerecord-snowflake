@@ -26,7 +26,7 @@ class SnowflakeCollationMixin:
             raise UnsupportedFeatureError(self.name, "COLLATE options: schema")
         from ..collation import validate_snowflake_collation_name
         spec = validate_snowflake_collation_name(expr.collation_name, getattr(self, "version", None))
-        return f"'{self._escape_sql_string(spec)}'"
+        return f"'{self.escape_sql_string(spec)}'"
 
     def format_column_attribute(self, attr) -> Tuple[str, tuple]:
         """Snowflake requires a quoted collation specification on a column."""
@@ -35,7 +35,7 @@ class SnowflakeCollationMixin:
 
         if isinstance(attr, CollationAttribute):
             spec = validate_snowflake_collation_name(attr.name, getattr(self, "version", None))
-            return f" COLLATE '{self._escape_sql_string(spec)}'", ()
+            return f" COLLATE '{self.escape_sql_string(spec)}'", ()
         return super().format_column_attribute(attr)
 
 

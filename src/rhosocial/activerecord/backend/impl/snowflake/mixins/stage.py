@@ -44,12 +44,12 @@ class SnowflakeStageMixin:
         parts = [f"COPY INTO {expr.table} FROM @{expr.stage}"]
         if expr.files:
             files = ", ".join(
-                f"'{self._escape_sql_string(name)}'" for name in expr.files
+                f"'{self.escape_sql_string(name)}'" for name in expr.files
             )
             parts.append(f"FILES = ({files})")
         if expr.pattern is not None:
             parts.append(
-                f"PATTERN = '{self._escape_sql_string(expr.pattern)}'"
+                f"PATTERN = '{self.escape_sql_string(expr.pattern)}'"
             )
         if expr.file_format is not None:
             ff = expr.file_format
@@ -65,7 +65,7 @@ class SnowflakeStageMixin:
                 parts.append(f"FILE_FORMAT = ({ff})")
         if expr.on_error is not None:
             parts.append(
-                f"ON_ERROR = '{self._escape_sql_string(expr.on_error)}'"
+                f"ON_ERROR = '{self.escape_sql_string(expr.on_error)}'"
             )
         if expr.force is not None:
             parts.append(f"FORCE = {str(bool(expr.force)).upper()}")
@@ -74,7 +74,7 @@ class SnowflakeStageMixin:
         if expr.validation_mode is not None:
             parts.append(
                 f"VALIDATION_MODE = "
-                f"'{self._escape_sql_string(expr.validation_mode)}'"
+                f"'{self.escape_sql_string(expr.validation_mode)}'"
             )
         return " ".join(parts), ()
 
@@ -127,7 +127,7 @@ class SnowflakeStageMixin:
         parts.append(self.format_identifier(expr.name))
         options = []
         if expr.url is not None:
-            options.append(f"URL = '{self._escape_sql_string(expr.url)}'")
+            options.append(f"URL = '{self.escape_sql_string(expr.url)}'")
         if expr.storage_integration is not None:
             options.append(
                 f"STORAGE_INTEGRATION = "
@@ -144,7 +144,7 @@ class SnowflakeStageMixin:
                 for key, value in enc.items():
                     if isinstance(value, str):
                         items.append(
-                            f"{key} = '{self._escape_sql_string(value)}'"
+                            f"{key} = '{self.escape_sql_string(value)}'"
                         )
                     else:
                         items.append(f"{key} = {str(value).upper()}")
@@ -178,7 +178,7 @@ class SnowflakeStageMixin:
                 f"FILE_FORMAT = {self.format_identifier(expr.file_format)}"
             )
         if expr.url is not None:
-            options.append(f"URL = '{self._escape_sql_string(expr.url)}'")
+            options.append(f"URL = '{self.escape_sql_string(expr.url)}'")
         if expr.storage_integration is not None:
             options.append(
                 f"STORAGE_INTEGRATION = "
@@ -186,7 +186,7 @@ class SnowflakeStageMixin:
             )
         if expr.comment is not None:
             options.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         if not options:
             raise ValueError("ALTER STAGE SET requires at least one property")

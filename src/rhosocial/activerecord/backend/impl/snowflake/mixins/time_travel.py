@@ -77,7 +77,7 @@ class SnowflakeTimeTravelMixin:
         kind = str(kind).upper()
         if kind == "OFFSET":
             return f"{clause}(OFFSET => {int(value)})"
-        escaped = self._escape_sql_string(str(value))
+        escaped = self.escape_sql_string(str(value))
         return f"{clause}({kind} => '{escaped}')"
 
     def format_temporal_options(

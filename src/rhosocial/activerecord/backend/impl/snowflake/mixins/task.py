@@ -53,10 +53,10 @@ class SnowflakeTaskMixin:
         if expr.using_cron is not None:
             cron = f"USING CRON {expr.using_cron}"
             if expr.timezone is not None:
-                cron += f" {self._escape_sql_string(str(expr.timezone))}"
+                cron += f" {self.escape_sql_string(str(expr.timezone))}"
             schedule = f"SCHEDULE = '{cron}'"
         elif expr.schedule is not None:
-            value = self._escape_sql_string(str(expr.schedule))
+            value = self.escape_sql_string(str(expr.schedule))
             schedule = f"SCHEDULE = '{value}'"
         if schedule:
             parts.append(schedule)
@@ -67,7 +67,7 @@ class SnowflakeTaskMixin:
             )
         if expr.comment is not None:
             parts.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         if expr.after:
             after = ", ".join(self.format_identifier(t) for t in expr.after)
@@ -128,10 +128,10 @@ class SnowflakeTaskMixin:
         if expr.using_cron is not None:
             cron = f"USING CRON {expr.using_cron}"
             if expr.timezone is not None:
-                cron += f" {self._escape_sql_string(str(expr.timezone))}"
+                cron += f" {self.escape_sql_string(str(expr.timezone))}"
             schedule = f"SCHEDULE = '{cron}'"
         elif expr.schedule is not None:
-            value = self._escape_sql_string(str(expr.schedule))
+            value = self.escape_sql_string(str(expr.schedule))
             schedule = f"SCHEDULE = '{value}'"
         if schedule:
             options.append(schedule)

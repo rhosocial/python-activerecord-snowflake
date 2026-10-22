@@ -85,7 +85,7 @@ class SnowflakeWarehouseMixin:
         if expr.warehouse_size is not None:
             options.append(
                 f"WAREHOUSE_SIZE = "
-                f"'{self._escape_sql_string(expr.warehouse_size)}'"
+                f"'{self.escape_sql_string(expr.warehouse_size)}'"
             )
         if expr.max_cluster_count is not None:
             options.append(f"MAX_CLUSTER_COUNT = {int(expr.max_cluster_count)}")
@@ -94,7 +94,7 @@ class SnowflakeWarehouseMixin:
         if expr.scaling_policy is not None:
             options.append(
                 f"SCALING_POLICY = "
-                f"'{self._escape_sql_string(expr.scaling_policy)}'"
+                f"'{self.escape_sql_string(expr.scaling_policy)}'"
             )
         if expr.auto_suspend is not None:
             if isinstance(expr.auto_suspend, bool):
@@ -112,7 +112,7 @@ class SnowflakeWarehouseMixin:
             )
         if expr.comment is not None:
             options.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         if options:
             parts.append("WITH")
@@ -156,7 +156,7 @@ class SnowflakeWarehouseMixin:
         if expr.warehouse_size is not None:
             options.append(
                 f"WAREHOUSE_SIZE = "
-                f"'{self._escape_sql_string(expr.warehouse_size)}'"
+                f"'{self.escape_sql_string(expr.warehouse_size)}'"
             )
         if expr.max_cluster_count is not None:
             options.append(f"MAX_CLUSTER_COUNT = {int(expr.max_cluster_count)}")
@@ -165,7 +165,7 @@ class SnowflakeWarehouseMixin:
         if expr.scaling_policy is not None:
             options.append(
                 f"SCALING_POLICY = "
-                f"'{self._escape_sql_string(expr.scaling_policy)}'"
+                f"'{self.escape_sql_string(expr.scaling_policy)}'"
             )
         if expr.auto_suspend is not None:
             if isinstance(expr.auto_suspend, bool):
@@ -178,7 +178,7 @@ class SnowflakeWarehouseMixin:
             )
         if expr.comment is not None:
             options.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         if not options:
             raise ValueError(

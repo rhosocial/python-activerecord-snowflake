@@ -52,15 +52,15 @@ class SnowflakePipeMixin:
             )
         if expr.aws_sns_topic is not None:
             parts.append(
-                f"AWS_SNS_TOPIC = '{self._escape_sql_string(expr.aws_sns_topic)}'"
+                f"AWS_SNS_TOPIC = '{self.escape_sql_string(expr.aws_sns_topic)}'"
             )
         if expr.integration is not None:
             parts.append(
-                f"INTEGRATION = '{self._escape_sql_string(expr.integration)}'"
+                f"INTEGRATION = '{self.escape_sql_string(expr.integration)}'"
             )
         if expr.comment is not None:
             parts.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         parts.extend(["AS", str(expr.copy_sql)])
         return " ".join(parts), ()
@@ -90,7 +90,7 @@ class SnowflakePipeMixin:
         if mode is SnowflakeAlterPipeMode.REFRESH:
             parts.append("REFRESH")
             if expr.modified_after is not None:
-                value = self._escape_sql_string(str(expr.modified_after))
+                value = self.escape_sql_string(str(expr.modified_after))
                 parts.append(f"MODIFIED_AFTER => '{value}'")
             return " ".join(parts), ()
         if mode is SnowflakeAlterPipeMode.PAUSE:
@@ -107,7 +107,7 @@ class SnowflakePipeMixin:
             )
         if expr.comment is not None:
             options.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         if not options:
             raise ValueError("ALTER PIPE SET requires at least one property")
