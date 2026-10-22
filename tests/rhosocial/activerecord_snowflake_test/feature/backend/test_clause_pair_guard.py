@@ -103,7 +103,7 @@ from rhosocial.activerecord.backend.expression.statements.ddl_view import (
 from rhosocial.activerecord.backend.expression.statements.dql import QueryStatement
 from rhosocial.activerecord.backend.expression.transaction import (
     BeginTransactionStatement,
-    SetTransactionExpression,
+    SetTransactionStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.routine import (
@@ -482,8 +482,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         ),
     ),
     PairCase(
-        "SetTransactionExpression.wait",
-        lambda d, **kw: SetTransactionExpression(d, **kw),
+        "SetTransactionStatement.wait",
+        lambda d, **kw: SetTransactionStatement(d, **kw),
         "wait",
         "no_wait",
         ("rendered", ""),
@@ -746,11 +746,11 @@ class TestNewlyGatedMasterProbes:
                 "BEGIN TRANSACTION NO WAIT",
             ),
             (
-                lambda: SetTransactionExpression(d, wait=True),
+                lambda: SetTransactionStatement(d, wait=True),
                 "SET TRANSACTION WAIT",
             ),
             (
-                lambda: SetTransactionExpression(d, no_wait=True),
+                lambda: SetTransactionStatement(d, no_wait=True),
                 "SET TRANSACTION NO WAIT",
             ),
         ):
@@ -804,7 +804,7 @@ class TestGuardIsNotVacuous:
             "CreateMaterializedViewStatement.with_data",
             "BeginTransactionStatement.deferrable",
             "BeginTransactionStatement.wait",
-            "SetTransactionExpression.wait",
+            "SetTransactionStatement.wait",
         }
         covered = {case.case_id for case in PAIR_CASES}
         assert expected == covered, (

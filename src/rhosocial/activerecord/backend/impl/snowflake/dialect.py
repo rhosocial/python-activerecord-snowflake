@@ -16,7 +16,7 @@ from typing import Any, Tuple, TYPE_CHECKING
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.transaction import (
         BeginTransactionStatement,
-        SetTransactionExpression,
+        SetTransactionStatement,
     )
 
 from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
@@ -473,7 +473,7 @@ class SnowflakeDialect(
             )
         return super().format_begin_transaction_statement(expr)
 
-    def format_set_transaction(self, expr: "SetTransactionExpression") -> Tuple[str, tuple]:
+    def format_set_transaction(self, expr: "SetTransactionStatement") -> Tuple[str, tuple]:
         """Format SET TRANSACTION statement for Snowflake.
 
         Snowflake only supports READ COMMITTED isolation level, so
