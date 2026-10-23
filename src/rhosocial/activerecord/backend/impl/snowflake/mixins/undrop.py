@@ -4,7 +4,7 @@
 from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..expression.ddl.undrop import SnowflakeUndropExpression
+    from ..expression.ddl.undrop import SnowflakeUndropStatement
 
 
 class SnowflakeUndropMixin:
@@ -15,12 +15,12 @@ class SnowflakeUndropMixin:
         return True
 
     def format_undrop_statement(
-        self, expr: "SnowflakeUndropExpression"
+        self, expr: "SnowflakeUndropStatement"
     ) -> Tuple[str, tuple]:
         """Format UNDROP statement.
 
         Args:
-            expr: :class:`SnowflakeUndropExpression`.
+            expr: :class:`SnowflakeUndropStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).

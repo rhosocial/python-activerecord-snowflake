@@ -8,10 +8,10 @@ import pytest
 
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.warehouse import (
-    SnowflakeCreateWarehouseExpression,
-    SnowflakeAlterWarehouseExpression,
+    SnowflakeCreateWarehouseStatement,
+    SnowflakeAlterWarehouseStatement,
     SnowflakeAlterWarehouseMode,
-    SnowflakeDropWarehouseExpression,
+    SnowflakeDropWarehouseStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.warehouse_options import (
     SnowflakeWarehouseOptionsExpression,
@@ -21,7 +21,7 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.variant import (
     SnowflakeVariantCastExpression,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.undrop import (
-    SnowflakeUndropExpression,
+    SnowflakeUndropStatement,
     SnowflakeUndropObjectType,
 )
 
@@ -32,15 +32,15 @@ def dialect():
 
 
 class TestCreateWarehouseExpression:
-    """Tests for SnowflakeCreateWarehouseExpression."""
+    """Tests for SnowflakeCreateWarehouseStatement."""
 
     def test_create_warehouse_basic(self, dialect):
-        expr = SnowflakeCreateWarehouseExpression(dialect, "my_wh")
+        expr = SnowflakeCreateWarehouseStatement(dialect, "my_wh")
         sql, _ = expr.to_sql()
         assert sql == 'CREATE WAREHOUSE "my_wh"'
 
     def test_create_warehouse_with_options(self, dialect):
-        expr = SnowflakeCreateWarehouseExpression(
+        expr = SnowflakeCreateWarehouseStatement(
             dialect,
             "my_wh",
             or_replace=True,
@@ -59,17 +59,17 @@ class TestCreateWarehouseExpression:
 
 
 class TestAlterWarehouseExpression:
-    """Tests for SnowflakeAlterWarehouseExpression."""
+    """Tests for SnowflakeAlterWarehouseStatement."""
 
     def test_alter_warehouse_suspend(self, dialect):
-        expr = SnowflakeAlterWarehouseExpression(
+        expr = SnowflakeAlterWarehouseStatement(
             dialect, "my_wh", mode=SnowflakeAlterWarehouseMode.SUSPEND
         )
         sql, _ = expr.to_sql()
         assert sql == 'ALTER WAREHOUSE "my_wh" SUSPEND'
 
     def test_alter_warehouse_set(self, dialect):
-        expr = SnowflakeAlterWarehouseExpression(
+        expr = SnowflakeAlterWarehouseStatement(
             dialect,
             "my_wh",
             mode=SnowflakeAlterWarehouseMode.SET,
@@ -80,15 +80,15 @@ class TestAlterWarehouseExpression:
 
 
 class TestDropWarehouseExpression:
-    """Tests for SnowflakeDropWarehouseExpression."""
+    """Tests for SnowflakeDropWarehouseStatement."""
 
     def test_drop_warehouse_basic(self, dialect):
-        expr = SnowflakeDropWarehouseExpression(dialect, "my_wh")
+        expr = SnowflakeDropWarehouseStatement(dialect, "my_wh")
         sql, _ = expr.to_sql()
         assert sql == 'DROP WAREHOUSE "my_wh"'
 
     def test_drop_warehouse_if_exists(self, dialect):
-        expr = SnowflakeDropWarehouseExpression(
+        expr = SnowflakeDropWarehouseStatement(
             dialect, "my_wh", if_exists=True
         )
         sql, _ = expr.to_sql()
@@ -163,15 +163,15 @@ class TestVariantCastExpression:
 
 
 class TestUndropExpression:
-    """Tests for SnowflakeUndropExpression."""
+    """Tests for SnowflakeUndropStatement."""
 
     def test_undrop_table(self, dialect):
-        expr = SnowflakeUndropExpression(dialect, "my_table")
+        expr = SnowflakeUndropStatement(dialect, "my_table")
         sql, _ = expr.to_sql()
         assert sql == 'UNDROP TABLE "my_table"'
 
     def test_undrop_schema(self, dialect):
-        expr = SnowflakeUndropExpression(
+        expr = SnowflakeUndropStatement(
             dialect, "my_schema", object_type=SnowflakeUndropObjectType.SCHEMA
         )
         sql, _ = expr.to_sql()

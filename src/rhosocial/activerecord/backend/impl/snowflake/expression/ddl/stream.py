@@ -25,8 +25,8 @@ if TYPE_CHECKING:
 
 __all__ = [
     "SnowflakeStreamObjectType",
-    "SnowflakeCreateStreamExpression",
-    "SnowflakeDropStreamExpression",
+    "SnowflakeCreateStreamStatement",
+    "SnowflakeDropStreamStatement",
 ]
 
 
@@ -51,7 +51,7 @@ class SnowflakeStreamObjectType(str, Enum):
     STAGE = "STAGE"
 
 
-class SnowflakeCreateStreamExpression(BaseExpression):
+class SnowflakeCreateStreamStatement(BaseExpression):
     """Snowflake CREATE [OR REPLACE] STREAM statement expression.
 
     Attributes:
@@ -111,7 +111,7 @@ class SnowflakeCreateStreamExpression(BaseExpression):
         return self.dialect.format_create_stream_statement(self)
 
 
-class SnowflakeDropStreamExpression(BaseExpression):
+class SnowflakeDropStreamStatement(BaseExpression):
     """Snowflake DROP STREAM statement expression.
 
     Attributes:

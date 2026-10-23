@@ -37,11 +37,11 @@ if TYPE_CHECKING:
 
 
 __all__ = [
-    "SnowflakeCreateMaterializedViewExpression",
+    "SnowflakeCreateMaterializedViewStatement",
 ]
 
 
-class SnowflakeCreateMaterializedViewExpression(CreateMaterializedViewStatement):
+class SnowflakeCreateMaterializedViewStatement(CreateMaterializedViewStatement):
     """Snowflake CREATE [OR REPLACE] MATERIALIZED VIEW statement expression.
 
     Accepts both the Snowflake field names (``name`` / ``as_query`` /

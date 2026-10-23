@@ -7,9 +7,9 @@ from ..expression.ddl.warehouse import SnowflakeAlterWarehouseMode
 
 if TYPE_CHECKING:
     from ..expression.ddl.warehouse import (
-        SnowflakeAlterWarehouseExpression,
-        SnowflakeCreateWarehouseExpression,
-        SnowflakeDropWarehouseExpression,
+        SnowflakeAlterWarehouseStatement,
+        SnowflakeCreateWarehouseStatement,
+        SnowflakeDropWarehouseStatement,
     )
     from ..expression.ddl.warehouse_options import (
         SnowflakeWarehouseOptionsExpression,
@@ -65,12 +65,12 @@ class SnowflakeWarehouseMixin:
         return " ".join(parts), ()
 
     def format_create_warehouse_statement(
-        self, expr: "SnowflakeCreateWarehouseExpression"
+        self, expr: "SnowflakeCreateWarehouseStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE WAREHOUSE statement.
 
         Args:
-            expr: :class:`SnowflakeCreateWarehouseExpression`.
+            expr: :class:`SnowflakeCreateWarehouseStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -120,7 +120,7 @@ class SnowflakeWarehouseMixin:
         return " ".join(parts), ()
 
     def format_alter_warehouse_statement(
-        self, expr: "SnowflakeAlterWarehouseExpression"
+        self, expr: "SnowflakeAlterWarehouseStatement"
     ) -> Tuple[str, tuple]:
         """Format ALTER WAREHOUSE statement.
 
@@ -128,7 +128,7 @@ class SnowflakeWarehouseMixin:
         based on :attr:`expr.mode`.
 
         Args:
-            expr: :class:`SnowflakeAlterWarehouseExpression`.
+            expr: :class:`SnowflakeAlterWarehouseStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -189,12 +189,12 @@ class SnowflakeWarehouseMixin:
         return " ".join(parts), ()
 
     def format_drop_warehouse_statement(
-        self, expr: "SnowflakeDropWarehouseExpression"
+        self, expr: "SnowflakeDropWarehouseStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP WAREHOUSE statement.
 
         Args:
-            expr: :class:`SnowflakeDropWarehouseExpression`.
+            expr: :class:`SnowflakeDropWarehouseStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).

@@ -13,17 +13,17 @@ from rhosocial.activerecord.backend.impl.snowflake.protocols import (
     SnowflakeTaskSupport,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
-    SnowflakeAlterPipeExpression,
+    SnowflakeAlterPipeStatement,
     SnowflakeAlterPipeMode,
-    SnowflakeAlterTaskExpression,
+    SnowflakeAlterTaskStatement,
     SnowflakeAlterTaskMode,
-    SnowflakeCreatePipeExpression,
-    SnowflakeCreateStreamExpression,
-    SnowflakeCreateTaskExpression,
-    SnowflakeDropPipeExpression,
-    SnowflakeDropStreamExpression,
-    SnowflakeDropTaskExpression,
-    SnowflakeExecuteTaskExpression,
+    SnowflakeCreatePipeStatement,
+    SnowflakeCreateStreamStatement,
+    SnowflakeCreateTaskStatement,
+    SnowflakeDropPipeStatement,
+    SnowflakeDropStreamStatement,
+    SnowflakeDropTaskStatement,
+    SnowflakeExecuteTaskStatement,
     SnowflakeStreamObjectType,
 )
 
@@ -47,7 +47,7 @@ class TestSnowflakeCreateStream:
     """CREATE [OR REPLACE] STREAM statement generation."""
 
     def test_create_stream_basic(self, dialect):
-        expr = SnowflakeCreateStreamExpression(
+        expr = SnowflakeCreateStreamStatement(
             dialect, "my_stream", object_name="t"
         )
         sql, params = expr.to_sql()
@@ -55,7 +55,7 @@ class TestSnowflakeCreateStream:
         assert params == ()
 
     def test_create_stream_or_replace_append_only(self, dialect):
-        expr = SnowflakeCreateStreamExpression(
+        expr = SnowflakeCreateStreamStatement(
             dialect,
             "my_stream",
             or_replace=True,
@@ -70,7 +70,7 @@ class TestSnowflakeCreateStream:
         )
 
     def test_create_stream_insert_only_on_view(self, dialect):
-        expr = SnowflakeCreateStreamExpression(
+        expr = SnowflakeCreateStreamStatement(
             dialect,
             "my_stream",
             object_type=SnowflakeStreamObjectType.VIEW,
@@ -83,7 +83,7 @@ class TestSnowflakeCreateStream:
         )
 
     def test_create_stream_on_external_table(self, dialect):
-        expr = SnowflakeCreateStreamExpression(
+        expr = SnowflakeCreateStreamStatement(
             dialect,
             "my_stream",
             object_type=SnowflakeStreamObjectType.EXTERNAL_TABLE,
@@ -93,7 +93,7 @@ class TestSnowflakeCreateStream:
         assert sql == 'CREATE STREAM "my_stream" ON EXTERNAL TABLE "et"'
 
     def test_create_stream_time_travel_at(self, dialect):
-        expr = SnowflakeCreateStreamExpression(
+        expr = SnowflakeCreateStreamStatement(
             dialect,
             "my_stream",
             object_name="t",
@@ -106,7 +106,7 @@ class TestSnowflakeCreateStream:
         )
 
     def test_create_stream_time_travel_before_offset(self, dialect):
-        expr = SnowflakeCreateStreamExpression(
+        expr = SnowflakeCreateStreamStatement(
             dialect,
             "my_stream",
             object_name="t",
@@ -118,18 +118,18 @@ class TestSnowflakeCreateStream:
         )
 
     def test_create_stream_requires_object_name(self, dialect):
-        expr = SnowflakeCreateStreamExpression(dialect, "my_stream")
+        expr = SnowflakeCreateStreamStatement(dialect, "my_stream")
         with pytest.raises(ValueError):
             expr.to_sql()
 
     def test_drop_stream(self, dialect):
-        expr = SnowflakeDropStreamExpression(dialect, "my_stream")
+        expr = SnowflakeDropStreamStatement(dialect, "my_stream")
         sql, params = expr.to_sql()
         assert sql == 'DROP STREAM "my_stream"'
         assert params == ()
 
     def test_drop_stream_if_exists(self, dialect):
-        expr = SnowflakeDropStreamExpression(dialect, "my_stream", if_exists=True)
+        expr = SnowflakeDropStreamStatement(dialect, "my_stream", if_exists=True)
         sql, _ = expr.to_sql()
         assert sql == 'DROP STREAM IF EXISTS "my_stream"'
 
@@ -148,7 +148,7 @@ class TestSnowflakeCreateTask:
     """CREATE [OR REPLACE] TASK statement generation."""
 
     def test_create_task_basic(self, dialect):
-        expr = SnowflakeCreateTaskExpression(
+        expr = SnowflakeCreateTaskStatement(
             dialect, "my_task", sql="INSERT INTO archive SELECT * FROM my_stream"
         )
         sql, params = expr.to_sql()
@@ -159,7 +159,7 @@ class TestSnowflakeCreateTask:
         assert params == ()
 
     def test_create_task_schedule_interval(self, dialect):
-        expr = SnowflakeCreateTaskExpression(
+        expr = SnowflakeCreateTaskStatement(
             dialect,
             "my_task",
             warehouse="my_wh",
@@ -173,7 +173,7 @@ class TestSnowflakeCreateTask:
         )
 
     def test_create_task_using_cron_with_timezone(self, dialect):
-        expr = SnowflakeCreateTaskExpression(
+        expr = SnowflakeCreateTaskStatement(
             dialect,
             "my_task",
             using_cron="0 0 * * *",
@@ -187,7 +187,7 @@ class TestSnowflakeCreateTask:
         )
 
     def test_create_task_when_condition(self, dialect):
-        expr = SnowflakeCreateTaskExpression(
+        expr = SnowflakeCreateTaskStatement(
             dialect,
             "my_task",
             when="SYSTEM$STREAM_HAS_DATA('my_stream')",
@@ -200,7 +200,7 @@ class TestSnowflakeCreateTask:
         )
 
     def test_create_task_after_dependencies(self, dialect):
-        expr = SnowflakeCreateTaskExpression(
+        expr = SnowflakeCreateTaskStatement(
             dialect,
             "my_task",
             after=["another_task", "third_task"],
@@ -213,7 +213,7 @@ class TestSnowflakeCreateTask:
         )
 
     def test_create_task_or_replace(self, dialect):
-        expr = SnowflakeCreateTaskExpression(
+        expr = SnowflakeCreateTaskStatement(
             dialect, "my_task", or_replace=True, sql="SELECT 1"
         )
         sql, _ = expr.to_sql()
@@ -224,7 +224,7 @@ class TestSnowflakeAlterTask:
     """ALTER TASK RESUME / SUSPEND / ADD AFTER / REMOVE AFTER generation."""
 
     def test_alter_task_resume(self, dialect):
-        expr = SnowflakeAlterTaskExpression(
+        expr = SnowflakeAlterTaskStatement(
             dialect, "my_task", mode=SnowflakeAlterTaskMode.RESUME
         )
         sql, params = expr.to_sql()
@@ -232,14 +232,14 @@ class TestSnowflakeAlterTask:
         assert params == ()
 
     def test_alter_task_suspend(self, dialect):
-        expr = SnowflakeAlterTaskExpression(
+        expr = SnowflakeAlterTaskStatement(
             dialect, "my_task", mode=SnowflakeAlterTaskMode.SUSPEND
         )
         sql, _ = expr.to_sql()
         assert sql == 'ALTER TASK "my_task" SUSPEND'
 
     def test_alter_task_add_after(self, dialect):
-        expr = SnowflakeAlterTaskExpression(
+        expr = SnowflakeAlterTaskStatement(
             dialect,
             "my_task",
             mode=SnowflakeAlterTaskMode.ADD_AFTER,
@@ -249,7 +249,7 @@ class TestSnowflakeAlterTask:
         assert sql == 'ALTER TASK "my_task" ADD AFTER "another_task"'
 
     def test_alter_task_remove_after(self, dialect):
-        expr = SnowflakeAlterTaskExpression(
+        expr = SnowflakeAlterTaskStatement(
             dialect,
             "my_task",
             mode=SnowflakeAlterTaskMode.REMOVE_AFTER,
@@ -259,7 +259,7 @@ class TestSnowflakeAlterTask:
         assert sql == 'ALTER TASK "my_task" REMOVE AFTER "another_task"'
 
     def test_alter_task_set_warehouse(self, dialect):
-        expr = SnowflakeAlterTaskExpression(
+        expr = SnowflakeAlterTaskStatement(
             dialect,
             "my_task",
             mode=SnowflakeAlterTaskMode.SET,
@@ -269,14 +269,14 @@ class TestSnowflakeAlterTask:
         assert sql == 'ALTER TASK "my_task" SET WAREHOUSE = "other_wh"'
 
     def test_alter_task_add_after_without_tasks_raises(self, dialect):
-        expr = SnowflakeAlterTaskExpression(
+        expr = SnowflakeAlterTaskStatement(
             dialect, "my_task", mode=SnowflakeAlterTaskMode.ADD_AFTER
         )
         with pytest.raises(ValueError):
             expr.to_sql()
 
     def test_alter_task_set_without_property_raises(self, dialect):
-        expr = SnowflakeAlterTaskExpression(
+        expr = SnowflakeAlterTaskStatement(
             dialect, "my_task", mode=SnowflakeAlterTaskMode.SET
         )
         with pytest.raises(ValueError):
@@ -287,23 +287,23 @@ class TestSnowflakeExecuteTask:
     """EXECUTE TASK statement generation."""
 
     def test_execute_task(self, dialect):
-        expr = SnowflakeExecuteTaskExpression(dialect, "my_task")
+        expr = SnowflakeExecuteTaskStatement(dialect, "my_task")
         sql, params = expr.to_sql()
         assert sql == 'EXECUTE TASK "my_task"'
         assert params == ()
 
     def test_execute_task_retry_last(self, dialect):
-        expr = SnowflakeExecuteTaskExpression(dialect, "my_task", retry_last=True)
+        expr = SnowflakeExecuteTaskStatement(dialect, "my_task", retry_last=True)
         sql, _ = expr.to_sql()
         assert sql == 'EXECUTE TASK "my_task" RETRY LAST'
 
     def test_drop_task(self, dialect):
-        expr = SnowflakeDropTaskExpression(dialect, "my_task")
+        expr = SnowflakeDropTaskStatement(dialect, "my_task")
         sql, _ = expr.to_sql()
         assert sql == 'DROP TASK "my_task"'
 
     def test_drop_task_if_exists(self, dialect):
-        expr = SnowflakeDropTaskExpression(dialect, "my_task", if_exists=True)
+        expr = SnowflakeDropTaskStatement(dialect, "my_task", if_exists=True)
         sql, _ = expr.to_sql()
         assert sql == 'DROP TASK IF EXISTS "my_task"'
 
@@ -322,7 +322,7 @@ class TestSnowflakeCreatePipe:
     """CREATE [OR REPLACE] PIPE statement generation."""
 
     def test_create_pipe_basic(self, dialect):
-        expr = SnowflakeCreatePipeExpression(
+        expr = SnowflakeCreatePipeStatement(
             dialect, "my_pipe", copy_sql="COPY INTO t FROM @stage"
         )
         sql, params = expr.to_sql()
@@ -330,7 +330,7 @@ class TestSnowflakeCreatePipe:
         assert params == ()
 
     def test_create_pipe_auto_ingest(self, dialect):
-        expr = SnowflakeCreatePipeExpression(
+        expr = SnowflakeCreatePipeStatement(
             dialect,
             "my_pipe",
             or_replace=True,
@@ -344,7 +344,7 @@ class TestSnowflakeCreatePipe:
         )
 
     def test_create_pipe_error_integration(self, dialect):
-        expr = SnowflakeCreatePipeExpression(
+        expr = SnowflakeCreatePipeStatement(
             dialect,
             "my_pipe",
             error_integration="my_err_int",
@@ -357,7 +357,7 @@ class TestSnowflakeCreatePipe:
         )
 
     def test_create_pipe_requires_copy_sql(self, dialect):
-        expr = SnowflakeCreatePipeExpression(dialect, "my_pipe")
+        expr = SnowflakeCreatePipeStatement(dialect, "my_pipe")
         with pytest.raises(ValueError):
             expr.to_sql()
 
@@ -366,7 +366,7 @@ class TestSnowflakeAlterPipe:
     """ALTER PIPE REFRESH / SET / PAUSE / RESUME generation."""
 
     def test_alter_pipe_refresh(self, dialect):
-        expr = SnowflakeAlterPipeExpression(
+        expr = SnowflakeAlterPipeStatement(
             dialect, "my_pipe", mode=SnowflakeAlterPipeMode.REFRESH
         )
         sql, params = expr.to_sql()
@@ -374,7 +374,7 @@ class TestSnowflakeAlterPipe:
         assert params == ()
 
     def test_alter_pipe_set_paused(self, dialect):
-        expr = SnowflakeAlterPipeExpression(
+        expr = SnowflakeAlterPipeStatement(
             dialect,
             "my_pipe",
             mode=SnowflakeAlterPipeMode.SET,
@@ -386,32 +386,32 @@ class TestSnowflakeAlterPipe:
         )
 
     def test_alter_pipe_pause(self, dialect):
-        expr = SnowflakeAlterPipeExpression(
+        expr = SnowflakeAlterPipeStatement(
             dialect, "my_pipe", mode=SnowflakeAlterPipeMode.PAUSE
         )
         sql, _ = expr.to_sql()
         assert sql == 'ALTER PIPE "my_pipe" SET PIPE_EXECUTION_PAUSED = TRUE'
 
     def test_alter_pipe_resume(self, dialect):
-        expr = SnowflakeAlterPipeExpression(
+        expr = SnowflakeAlterPipeStatement(
             dialect, "my_pipe", mode=SnowflakeAlterPipeMode.RESUME
         )
         sql, _ = expr.to_sql()
         assert sql == 'ALTER PIPE "my_pipe" SET PIPE_EXECUTION_PAUSED = FALSE'
 
     def test_alter_pipe_set_without_property_raises(self, dialect):
-        expr = SnowflakeAlterPipeExpression(
+        expr = SnowflakeAlterPipeStatement(
             dialect, "my_pipe", mode=SnowflakeAlterPipeMode.SET
         )
         with pytest.raises(ValueError):
             expr.to_sql()
 
     def test_drop_pipe(self, dialect):
-        expr = SnowflakeDropPipeExpression(dialect, "my_pipe")
+        expr = SnowflakeDropPipeStatement(dialect, "my_pipe")
         sql, _ = expr.to_sql()
         assert sql == 'DROP PIPE "my_pipe"'
 
     def test_drop_pipe_if_exists(self, dialect):
-        expr = SnowflakeDropPipeExpression(dialect, "my_pipe", if_exists=True)
+        expr = SnowflakeDropPipeStatement(dialect, "my_pipe", if_exists=True)
         sql, _ = expr.to_sql()
         assert sql == 'DROP PIPE IF EXISTS "my_pipe"'

@@ -5,9 +5,9 @@ from typing import Dict, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.routine import (
-        SnowflakeCreateFunctionExpression,
-        SnowflakeCreateProcedureExpression,
-        SnowflakeDropRoutineExpression,
+        SnowflakeCreateFunctionStatement,
+        SnowflakeCreateProcedureStatement,
+        SnowflakeDropRoutineStatement,
     )
 
 
@@ -28,12 +28,12 @@ class SnowflakeRoutineMixin:
         return {}
 
     def format_create_procedure_statement(
-        self, expr: "SnowflakeCreateProcedureExpression"
+        self, expr: "SnowflakeCreateProcedureStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] PROCEDURE statement.
 
         Args:
-            expr: :class:`SnowflakeCreateProcedureExpression`.
+            expr: :class:`SnowflakeCreateProcedureStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -78,12 +78,12 @@ class SnowflakeRoutineMixin:
         return " ".join(parts), ()
 
     def format_create_function_statement(
-        self, expr: "SnowflakeCreateFunctionExpression"
+        self, expr: "SnowflakeCreateFunctionStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] FUNCTION statement.
 
         Args:
-            expr: :class:`SnowflakeCreateFunctionExpression`.
+            expr: :class:`SnowflakeCreateFunctionStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -132,12 +132,12 @@ class SnowflakeRoutineMixin:
         return " ".join(parts), ()
 
     def format_drop_routine_statement(
-        self, expr: "SnowflakeDropRoutineExpression"
+        self, expr: "SnowflakeDropRoutineStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP PROCEDURE / FUNCTION statement.
 
         Args:
-            expr: :class:`SnowflakeDropRoutineExpression`.
+            expr: :class:`SnowflakeDropRoutineStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).

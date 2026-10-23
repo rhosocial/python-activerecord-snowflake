@@ -7,10 +7,10 @@ from ..expression.ddl.stage import SnowflakeCopyIntoMode
 
 if TYPE_CHECKING:
     from ..expression.ddl.stage import (
-        SnowflakeAlterStageExpression,
-        SnowflakeCopyIntoExpression,
-        SnowflakeCreateStageExpression,
-        SnowflakeDropStageExpression,
+        SnowflakeAlterStageStatement,
+        SnowflakeCopyIntoStatement,
+        SnowflakeCreateStageStatement,
+        SnowflakeDropStageStatement,
     )
 
 
@@ -22,12 +22,12 @@ class SnowflakeStageMixin:
         return True
 
     def format_copy_into_statement(
-        self, expr: "SnowflakeCopyIntoExpression"
+        self, expr: "SnowflakeCopyIntoStatement"
     ) -> Tuple[str, tuple]:
         """Format a full COPY INTO statement (load or unload).
 
         Args:
-            expr: :class:`SnowflakeCopyIntoExpression`.
+            expr: :class:`SnowflakeCopyIntoStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -38,7 +38,7 @@ class SnowflakeStageMixin:
         return self.format_copy_into_load(expr)
 
     def format_copy_into_load(
-        self, expr: "SnowflakeCopyIntoExpression"
+        self, expr: "SnowflakeCopyIntoStatement"
     ) -> Tuple[str, tuple]:
         """Format COPY INTO <table> FROM @<stage> (load direction)."""
         parts = [f"COPY INTO {expr.table} FROM @{expr.stage}"]
@@ -79,7 +79,7 @@ class SnowflakeStageMixin:
         return " ".join(parts), ()
 
     def format_copy_into_unload(
-        self, expr: "SnowflakeCopyIntoExpression"
+        self, expr: "SnowflakeCopyIntoStatement"
     ) -> Tuple[str, tuple]:
         """Format COPY INTO @<stage> FROM <table> (unload direction)."""
         parts = [f"COPY INTO @{expr.stage} FROM {expr.table}"]
@@ -107,12 +107,12 @@ class SnowflakeStageMixin:
         return " ".join(parts), ()
 
     def format_create_stage_statement(
-        self, expr: "SnowflakeCreateStageExpression"
+        self, expr: "SnowflakeCreateStageStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE STAGE statement.
 
         Args:
-            expr: :class:`SnowflakeCreateStageExpression`.
+            expr: :class:`SnowflakeCreateStageStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -158,12 +158,12 @@ class SnowflakeStageMixin:
         return " ".join(parts), ()
 
     def format_alter_stage_statement(
-        self, expr: "SnowflakeAlterStageExpression"
+        self, expr: "SnowflakeAlterStageStatement"
     ) -> Tuple[str, tuple]:
         """Format ALTER STAGE ... SET statement.
 
         Args:
-            expr: :class:`SnowflakeAlterStageExpression`.
+            expr: :class:`SnowflakeAlterStageStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -195,12 +195,12 @@ class SnowflakeStageMixin:
         return " ".join(parts), ()
 
     def format_drop_stage_statement(
-        self, expr: "SnowflakeDropStageExpression"
+        self, expr: "SnowflakeDropStageStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP STAGE statement.
 
         Args:
-            expr: :class:`SnowflakeDropStageExpression`.
+            expr: :class:`SnowflakeDropStageStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).

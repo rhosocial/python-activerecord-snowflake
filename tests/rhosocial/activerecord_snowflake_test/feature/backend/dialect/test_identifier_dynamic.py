@@ -43,7 +43,7 @@ class TestSnowflakeIdentifierExpression:
         assert sql == "IDENTIFIER(%s)"
         assert params == ("my_schema.my_table",)
 
-    def test_format_identifier_dynamic_uses_placeholder(self, dialect):
+    def test_format_snowflake_identifier_expression_uses_placeholder(self, dialect):
         expr = SnowflakeIdentifierExpression(dialect, "whatever")
         sql, params = expr.to_sql()
         assert sql == "IDENTIFIER(%s)"

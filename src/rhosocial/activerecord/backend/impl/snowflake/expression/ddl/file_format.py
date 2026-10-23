@@ -24,9 +24,9 @@ if TYPE_CHECKING:
 
 __all__ = [
     "SnowflakeFileFormatType",
-    "SnowflakeCreateFileFormatExpression",
-    "SnowflakeAlterFileFormatExpression",
-    "SnowflakeDropFileFormatExpression",
+    "SnowflakeCreateFileFormatStatement",
+    "SnowflakeAlterFileFormatStatement",
+    "SnowflakeDropFileFormatStatement",
 ]
 
 
@@ -47,7 +47,7 @@ class SnowflakeFileFormatType(str, Enum):
     XML = "XML"
 
 
-class SnowflakeCreateFileFormatExpression(BaseExpression):
+class SnowflakeCreateFileFormatStatement(BaseExpression):
     """Snowflake CREATE [OR REPLACE] FILE FORMAT statement expression.
 
     Attributes:
@@ -90,7 +90,7 @@ class SnowflakeCreateFileFormatExpression(BaseExpression):
         return self.dialect.format_create_file_format_statement(self)
 
 
-class SnowflakeAlterFileFormatExpression(BaseExpression):
+class SnowflakeAlterFileFormatStatement(BaseExpression):
     """Snowflake ALTER FILE FORMAT statement expression.
 
     Attributes:
@@ -128,7 +128,7 @@ class SnowflakeAlterFileFormatExpression(BaseExpression):
         return self.dialect.format_alter_file_format_statement(self)
 
 
-class SnowflakeDropFileFormatExpression(BaseExpression):
+class SnowflakeDropFileFormatStatement(BaseExpression):
     """Snowflake DROP FILE FORMAT statement expression.
 
     Attributes:

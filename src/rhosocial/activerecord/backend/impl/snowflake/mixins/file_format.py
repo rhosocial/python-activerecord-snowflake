@@ -6,9 +6,9 @@ from typing import Any, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.file_format import (
-        SnowflakeAlterFileFormatExpression,
-        SnowflakeCreateFileFormatExpression,
-        SnowflakeDropFileFormatExpression,
+        SnowflakeAlterFileFormatStatement,
+        SnowflakeCreateFileFormatStatement,
+        SnowflakeDropFileFormatStatement,
     )
 
 
@@ -36,12 +36,12 @@ class SnowflakeFileFormatMixin:
         return True
 
     def format_create_file_format_statement(
-        self, expr: "SnowflakeCreateFileFormatExpression"
+        self, expr: "SnowflakeCreateFileFormatStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] FILE FORMAT statement.
 
         Args:
-            expr: :class:`SnowflakeCreateFileFormatExpression`.
+            expr: :class:`SnowflakeCreateFileFormatStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -71,12 +71,12 @@ class SnowflakeFileFormatMixin:
         return " ".join(parts), ()
 
     def format_alter_file_format_statement(
-        self, expr: "SnowflakeAlterFileFormatExpression"
+        self, expr: "SnowflakeAlterFileFormatStatement"
     ) -> Tuple[str, tuple]:
         """Format ALTER FILE FORMAT SET statement.
 
         Args:
-            expr: :class:`SnowflakeAlterFileFormatExpression`.
+            expr: :class:`SnowflakeAlterFileFormatStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -104,12 +104,12 @@ class SnowflakeFileFormatMixin:
         return " ".join(parts), ()
 
     def format_drop_file_format_statement(
-        self, expr: "SnowflakeDropFileFormatExpression"
+        self, expr: "SnowflakeDropFileFormatStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP FILE FORMAT statement.
 
         Args:
-            expr: :class:`SnowflakeDropFileFormatExpression`.
+            expr: :class:`SnowflakeDropFileFormatStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).

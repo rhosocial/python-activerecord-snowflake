@@ -132,7 +132,7 @@ def test_no_backend_class_replaces_a_core_kind(backend_classes, core_kinds):
     The audit's headline number: **zero** overrides. That is the only shape
     that keeps an artifact readable -- a kind resolves to one class, always.
     A class that genuinely specialises a core node inherits it and carries its
-    own kind (``SnowflakeCreateMaterializedViewExpression`` over
+    own kind (``SnowflakeCreateMaterializedViewStatement`` over
     ``CreateMaterializedViewStatement``), which is what makes this zero rather
     than a rule the backend happens to dodge.
     """

@@ -25,9 +25,9 @@ if TYPE_CHECKING:
 
 __all__ = [
     "SnowflakeAlterWarehouseMode",
-    "SnowflakeCreateWarehouseExpression",
-    "SnowflakeAlterWarehouseExpression",
-    "SnowflakeDropWarehouseExpression",
+    "SnowflakeCreateWarehouseStatement",
+    "SnowflakeAlterWarehouseStatement",
+    "SnowflakeDropWarehouseStatement",
 ]
 
 
@@ -52,7 +52,7 @@ class SnowflakeAlterWarehouseMode(str, Enum):
     RENAME = "RENAME"
 
 
-class SnowflakeCreateWarehouseExpression(BaseExpression):
+class SnowflakeCreateWarehouseStatement(BaseExpression):
     """Snowflake CREATE WAREHOUSE statement expression.
 
     Attributes:
@@ -105,7 +105,7 @@ class SnowflakeCreateWarehouseExpression(BaseExpression):
         return self.dialect.format_create_warehouse_statement(self)
 
 
-class SnowflakeAlterWarehouseExpression(BaseExpression):
+class SnowflakeAlterWarehouseStatement(BaseExpression):
     """Snowflake ALTER WAREHOUSE statement expression.
 
     The ``mode`` selects one of the four ALTER WAREHOUSE forms:
@@ -165,7 +165,7 @@ class SnowflakeAlterWarehouseExpression(BaseExpression):
         return self.dialect.format_alter_warehouse_statement(self)
 
 
-class SnowflakeDropWarehouseExpression(BaseExpression):
+class SnowflakeDropWarehouseStatement(BaseExpression):
     """Snowflake DROP WAREHOUSE statement expression.
 
     Attributes:

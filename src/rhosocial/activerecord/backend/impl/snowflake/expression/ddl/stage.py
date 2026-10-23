@@ -27,10 +27,10 @@ if TYPE_CHECKING:
 
 __all__ = [
     "SnowflakeCopyIntoMode",
-    "SnowflakeCreateStageExpression",
-    "SnowflakeAlterStageExpression",
-    "SnowflakeDropStageExpression",
-    "SnowflakeCopyIntoExpression",
+    "SnowflakeCreateStageStatement",
+    "SnowflakeAlterStageStatement",
+    "SnowflakeDropStageStatement",
+    "SnowflakeCopyIntoStatement",
 ]
 
 
@@ -51,7 +51,7 @@ class SnowflakeCopyIntoMode(str, Enum):
     UNLOAD = "UNLOAD"
 
 
-class SnowflakeCreateStageExpression(BaseExpression):
+class SnowflakeCreateStageStatement(BaseExpression):
     """Snowflake CREATE STAGE statement expression.
 
     Attributes:
@@ -99,7 +99,7 @@ class SnowflakeCreateStageExpression(BaseExpression):
         return self.dialect.format_create_stage_statement(self)
 
 
-class SnowflakeAlterStageExpression(BaseExpression):
+class SnowflakeAlterStageStatement(BaseExpression):
     """Snowflake ALTER STAGE statement expression.
 
     Only the ``SET`` form is emitted; properties not specified are left
@@ -143,7 +143,7 @@ class SnowflakeAlterStageExpression(BaseExpression):
         return self.dialect.format_alter_stage_statement(self)
 
 
-class SnowflakeDropStageExpression(BaseExpression):
+class SnowflakeDropStageStatement(BaseExpression):
     """Snowflake DROP STAGE statement expression.
 
     Attributes:
@@ -172,7 +172,7 @@ class SnowflakeDropStageExpression(BaseExpression):
         return self.dialect.format_drop_stage_statement(self)
 
 
-class SnowflakeCopyIntoExpression(BaseExpression):
+class SnowflakeCopyIntoStatement(BaseExpression):
     """Snowflake COPY INTO statement expression (load or unload).
 
     ``mode`` selects the direction:

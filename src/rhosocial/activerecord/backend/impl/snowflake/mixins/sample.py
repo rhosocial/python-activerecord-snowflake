@@ -18,7 +18,7 @@ class SnowflakeSampleMixin:
         """Snowflake supports the TABLESAMPLE clause."""
         return True
 
-    def format_sample_clause(
+    def format_sample_expression(
         self, expr: "SnowflakeSampleExpression"
     ) -> Tuple[str, tuple]:
         """Format a ``SAMPLE`` clause.

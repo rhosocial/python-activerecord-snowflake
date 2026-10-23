@@ -7,9 +7,9 @@ from ..expression.ddl.pipe import SnowflakeAlterPipeMode
 
 if TYPE_CHECKING:
     from ..expression.ddl.pipe import (
-        SnowflakeAlterPipeExpression,
-        SnowflakeCreatePipeExpression,
-        SnowflakeDropPipeExpression,
+        SnowflakeAlterPipeStatement,
+        SnowflakeCreatePipeStatement,
+        SnowflakeDropPipeStatement,
     )
 
 
@@ -21,12 +21,12 @@ class SnowflakePipeMixin:
         return True
 
     def format_create_pipe_statement(
-        self, expr: "SnowflakeCreatePipeExpression"
+        self, expr: "SnowflakeCreatePipeStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] PIPE statement.
 
         Args:
-            expr: :class:`SnowflakeCreatePipeExpression`.
+            expr: :class:`SnowflakeCreatePipeStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -66,7 +66,7 @@ class SnowflakePipeMixin:
         return " ".join(parts), ()
 
     def format_alter_pipe_statement(
-        self, expr: "SnowflakeAlterPipeExpression"
+        self, expr: "SnowflakeAlterPipeStatement"
     ) -> Tuple[str, tuple]:
         """Format ALTER PIPE statement.
 
@@ -74,7 +74,7 @@ class SnowflakePipeMixin:
         :attr:`expr.mode`.
 
         Args:
-            expr: :class:`SnowflakeAlterPipeExpression`.
+            expr: :class:`SnowflakeAlterPipeStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -116,12 +116,12 @@ class SnowflakePipeMixin:
         return " ".join(parts), ()
 
     def format_drop_pipe_statement(
-        self, expr: "SnowflakeDropPipeExpression"
+        self, expr: "SnowflakeDropPipeStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP PIPE statement.
 
         Args:
-            expr: :class:`SnowflakeDropPipeExpression`.
+            expr: :class:`SnowflakeDropPipeStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).

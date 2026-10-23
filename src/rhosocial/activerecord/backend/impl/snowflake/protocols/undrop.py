@@ -13,7 +13,7 @@ Official Documentation:
 from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..expression.ddl.undrop import SnowflakeUndropExpression
+    from ..expression.ddl.undrop import SnowflakeUndropStatement
 
 
 @runtime_checkable
@@ -25,7 +25,7 @@ class SnowflakeUndropSupport(Protocol):
         ...
 
     def format_undrop_statement(
-        self, expr: "SnowflakeUndropExpression"
+        self, expr: "SnowflakeUndropStatement"
     ) -> Tuple[str, tuple]:
         """Format UNDROP statement."""
         ...

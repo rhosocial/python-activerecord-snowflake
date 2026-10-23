@@ -19,8 +19,8 @@ from rhosocial.activerecord.backend.impl.snowflake.protocols import (
     SnowflakeUndropSupport,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
-    SnowflakeCreateMaterializedViewExpression,
-    SnowflakeUndropExpression,
+    SnowflakeCreateMaterializedViewStatement,
+    SnowflakeUndropStatement,
     SnowflakeUndropObjectType,
 )
 
@@ -44,7 +44,7 @@ class TestSnowflakeUndrop:
     """UNDROP statement generation."""
 
     def test_undrop_table(self, dialect):
-        expr = SnowflakeUndropExpression(
+        expr = SnowflakeUndropStatement(
             dialect, "t", object_type=SnowflakeUndropObjectType.TABLE
         )
         sql, params = expr.to_sql()
@@ -52,21 +52,21 @@ class TestSnowflakeUndrop:
         assert params == ()
 
     def test_undrop_schema(self, dialect):
-        expr = SnowflakeUndropExpression(
+        expr = SnowflakeUndropStatement(
             dialect, "s", object_type=SnowflakeUndropObjectType.SCHEMA
         )
         sql, _ = expr.to_sql()
         assert sql == 'UNDROP SCHEMA "s"'
 
     def test_undrop_database(self, dialect):
-        expr = SnowflakeUndropExpression(
+        expr = SnowflakeUndropStatement(
             dialect, "d", object_type=SnowflakeUndropObjectType.DATABASE
         )
         sql, _ = expr.to_sql()
         assert sql == 'UNDROP DATABASE "d"'
 
     def test_undrop_defaults_to_table(self, dialect):
-        expr = SnowflakeUndropExpression(dialect, "t")
+        expr = SnowflakeUndropStatement(dialect, "t")
         sql, _ = expr.to_sql()
         assert sql == 'UNDROP TABLE "t"'
 
@@ -95,7 +95,7 @@ class TestSnowflakeCreateMaterializedView:
     """CREATE [OR REPLACE] MATERIALIZED VIEW statement generation."""
 
     def test_create_materialized_view_basic(self, dialect):
-        expr = SnowflakeCreateMaterializedViewExpression(
+        expr = SnowflakeCreateMaterializedViewStatement(
             dialect, "mv", as_query="SELECT c1, SUM(c2) FROM t GROUP BY c1"
         )
         sql, params = expr.to_sql()
@@ -106,14 +106,14 @@ class TestSnowflakeCreateMaterializedView:
         assert params == ()
 
     def test_create_materialized_view_or_replace(self, dialect):
-        expr = SnowflakeCreateMaterializedViewExpression(
+        expr = SnowflakeCreateMaterializedViewStatement(
             dialect, "mv", or_replace=True, as_query="SELECT 1"
         )
         sql, _ = expr.to_sql()
         assert sql == 'CREATE OR REPLACE MATERIALIZED VIEW "mv" AS SELECT 1'
 
     def test_create_materialized_view_cluster_by(self, dialect):
-        expr = SnowflakeCreateMaterializedViewExpression(
+        expr = SnowflakeCreateMaterializedViewStatement(
             dialect,
             "mv",
             cluster_by=["c1"],
@@ -126,7 +126,7 @@ class TestSnowflakeCreateMaterializedView:
         )
 
     def test_create_materialized_view_column_list(self, dialect):
-        expr = SnowflakeCreateMaterializedViewExpression(
+        expr = SnowflakeCreateMaterializedViewStatement(
             dialect,
             "mv",
             column_list=["a", "b"],
@@ -139,7 +139,7 @@ class TestSnowflakeCreateMaterializedView:
         )
 
     def test_create_materialized_view_requires_as_query(self, dialect):
-        expr = SnowflakeCreateMaterializedViewExpression(dialect, "mv")
+        expr = SnowflakeCreateMaterializedViewStatement(dialect, "mv")
         with pytest.raises(ValueError):
             expr.to_sql()
 
@@ -147,7 +147,7 @@ class TestSnowflakeCreateMaterializedView:
 class TestSnowflakeGenericMaterializedViewInterop:
     """The core MV expression must render on Snowflake.
 
-    ``SnowflakeCreateMaterializedViewExpression`` extends the core expression, so
+    ``SnowflakeCreateMaterializedViewStatement`` extends the core expression, so
     a backend advertising ``supports_materialized_view()`` has to work with the
     generic API too. Previously the formatter read ``expr.as_query`` only, and
     the generic expression raised ``AttributeError``.
@@ -189,21 +189,21 @@ class TestSnowflakeGenericMaterializedViewInterop:
 
     def test_snowflake_expression_accepts_core_field_names(self, dialect):
         """The core vocabulary (view/query) works on the Snowflake expression."""
-        expr = SnowflakeCreateMaterializedViewExpression(
+        expr = SnowflakeCreateMaterializedViewStatement(
             dialect, view=MaterializedView(dialect, "mv"), query=self._query(dialect)
         )
         sql, _ = expr.to_sql()
         assert sql.startswith('CREATE MATERIALIZED VIEW "mv" AS SELECT')
 
     def test_snowflake_expression_accepts_raw_query_string(self, dialect):
-        expr = SnowflakeCreateMaterializedViewExpression(
+        expr = SnowflakeCreateMaterializedViewStatement(
             dialect, "mv", as_query="SELECT 1"
         )
         sql, _ = expr.to_sql()
         assert sql == 'CREATE MATERIALIZED VIEW "mv" AS SELECT 1'
 
     def test_field_name_aliases(self, dialect):
-        expr = SnowflakeCreateMaterializedViewExpression(
+        expr = SnowflakeCreateMaterializedViewStatement(
             dialect, "mv", as_query="SELECT 1", column_list=["a"]
         )
         assert expr.name == expr.view.name == "mv"
@@ -212,24 +212,24 @@ class TestSnowflakeGenericMaterializedViewInterop:
 
     def test_or_replace_and_if_not_exists_are_exclusive(self, dialect):
         with pytest.raises(ValueError):
-            SnowflakeCreateMaterializedViewExpression(
+            SnowflakeCreateMaterializedViewStatement(
                 dialect, "mv", as_query="SELECT 1", or_replace=True, if_not_exists=True
             )
 
     def test_view_name_is_required(self, dialect):
         with pytest.raises(ValueError):
-            SnowflakeCreateMaterializedViewExpression(dialect, as_query="SELECT 1")
+            SnowflakeCreateMaterializedViewStatement(dialect, as_query="SELECT 1")
 
     def test_tablespace_is_rejected(self, dialect):
         """Snowflake has no TABLESPACE — refuse instead of dropping the clause."""
-        expr = SnowflakeCreateMaterializedViewExpression(
+        expr = SnowflakeCreateMaterializedViewStatement(
             dialect, "mv", as_query="SELECT 1", tablespace="fast_ssd"
         )
         with pytest.raises(UnsupportedFeatureError):
             expr.to_sql()
 
     def test_storage_options_are_rejected(self, dialect):
-        expr = SnowflakeCreateMaterializedViewExpression(
+        expr = SnowflakeCreateMaterializedViewStatement(
             dialect, "mv", as_query="SELECT 1", storage_options={"fillfactor": 70}
         )
         with pytest.raises(UnsupportedFeatureError):

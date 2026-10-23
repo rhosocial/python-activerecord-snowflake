@@ -14,9 +14,9 @@ from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.file_format import (
-        SnowflakeAlterFileFormatExpression,
-        SnowflakeCreateFileFormatExpression,
-        SnowflakeDropFileFormatExpression,
+        SnowflakeAlterFileFormatStatement,
+        SnowflakeCreateFileFormatStatement,
+        SnowflakeDropFileFormatStatement,
     )
 
 
@@ -29,19 +29,19 @@ class SnowflakeFileFormatSupport(Protocol):
         ...
 
     def format_create_file_format_statement(
-        self, expr: "SnowflakeCreateFileFormatExpression"
+        self, expr: "SnowflakeCreateFileFormatStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] FILE FORMAT statement."""
         ...
 
     def format_alter_file_format_statement(
-        self, expr: "SnowflakeAlterFileFormatExpression"
+        self, expr: "SnowflakeAlterFileFormatStatement"
     ) -> Tuple[str, tuple]:
         """Format ALTER FILE FORMAT ... SET statement."""
         ...
 
     def format_drop_file_format_statement(
-        self, expr: "SnowflakeDropFileFormatExpression"
+        self, expr: "SnowflakeDropFileFormatStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP FILE FORMAT statement."""
         ...

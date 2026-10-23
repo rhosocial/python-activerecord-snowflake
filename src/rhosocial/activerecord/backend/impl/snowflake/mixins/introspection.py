@@ -5,14 +5,14 @@ from typing import List, Tuple, TYPE_CHECKING
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.introspection.types import IntrospectionScope
     from rhosocial.activerecord.backend.expression.introspection import (
-        DatabaseInfoExpression,
-        TableListExpression,
-        ColumnInfoExpression,
-        IndexInfoExpression,
-        ForeignKeyExpression,
-        ViewListExpression,
-        ViewInfoExpression,
-        TriggerListExpression,
+        DatabaseInfoQueryStatement,
+        TableListQueryStatement,
+        ColumnInfoQueryStatement,
+        IndexInfoQueryStatement,
+        ForeignKeyQueryStatement,
+        ViewListQueryStatement,
+        ViewInfoQueryStatement,
+        TriggerListQueryStatement,
     )
 
 
@@ -84,8 +84,8 @@ class SnowflakeIntrospectionMixin:
 
     # ========== Query Formatting ==========
 
-    def format_database_info_query(
-        self, expr: "DatabaseInfoExpression"
+    def format_database_info_query_statement(
+        self, expr: "DatabaseInfoQueryStatement"
     ) -> Tuple[str, tuple]:
         """Format database information query using context functions."""
         sql = (
@@ -94,8 +94,8 @@ class SnowflakeIntrospectionMixin:
         )
         return (sql, ())
 
-    def format_table_list_query(
-        self, expr: "TableListExpression"
+    def format_table_list_query_statement(
+        self, expr: "TableListQueryStatement"
     ) -> Tuple[str, tuple]:
         """Format table list query using INFORMATION_SCHEMA.TABLES."""
         params = expr.get_params()
@@ -125,8 +125,8 @@ class SnowflakeIntrospectionMixin:
         )
         return (sql, tuple(sql_params))
 
-    def format_column_info_query(
-        self, expr: "ColumnInfoExpression"
+    def format_column_info_query_statement(
+        self, expr: "ColumnInfoQueryStatement"
     ) -> Tuple[str, tuple]:
         """Format column information query using INFORMATION_SCHEMA.COLUMNS."""
         params = expr.get_params()
@@ -143,8 +143,8 @@ class SnowflakeIntrospectionMixin:
         )
         return (sql, (schema, table_name))
 
-    def format_index_info_query(
-        self, expr: "IndexInfoExpression"
+    def format_index_info_query_statement(
+        self, expr: "IndexInfoQueryStatement"
     ) -> Tuple[str, tuple]:
         """Format index information query using constraints.
 
@@ -169,8 +169,8 @@ class SnowflakeIntrospectionMixin:
         )
         return (sql, (schema, table_name))
 
-    def format_foreign_key_query(
-        self, expr: "ForeignKeyExpression"
+    def format_foreign_key_query_statement(
+        self, expr: "ForeignKeyQueryStatement"
     ) -> Tuple[str, tuple]:
         """Format foreign key information query.
 
@@ -203,8 +203,8 @@ class SnowflakeIntrospectionMixin:
         )
         return (sql, (schema, table_name))
 
-    def format_view_list_query(
-        self, expr: "ViewListExpression"
+    def format_view_list_query_statement(
+        self, expr: "ViewListQueryStatement"
     ) -> Tuple[str, tuple]:
         """Format view list query using INFORMATION_SCHEMA.VIEWS."""
         params = expr.get_params()
@@ -227,8 +227,8 @@ class SnowflakeIntrospectionMixin:
         )
         return (sql, tuple(sql_params))
 
-    def format_view_info_query(
-        self, expr: "ViewInfoExpression"
+    def format_view_info_query_statement(
+        self, expr: "ViewInfoQueryStatement"
     ) -> Tuple[str, tuple]:
         """Format single view information query."""
         params = expr.get_params()
@@ -242,13 +242,13 @@ class SnowflakeIntrospectionMixin:
         )
         return (sql, (schema, view_name))
 
-    def format_trigger_list_query(
-        self, expr: "TriggerListExpression"
+    def format_trigger_list_query_statement(
+        self, expr: "TriggerListQueryStatement"
     ) -> Tuple[str, tuple]:
         """Snowflake does not support triggers; return empty result."""
         return ("SELECT 1 WHERE 1 = 0", ())
 
-    def format_trigger_info_query(
+    def format_trigger_info_query_statement(
         self, expr
     ) -> Tuple[str, tuple]:
         """Snowflake does not support triggers; return empty result."""

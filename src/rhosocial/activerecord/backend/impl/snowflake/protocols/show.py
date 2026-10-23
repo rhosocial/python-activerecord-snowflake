@@ -13,7 +13,7 @@ Official Documentation:
 from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..expression.show import SnowflakeShowExpression
+    from ..expression.show import SnowflakeShowStatement
 
 
 @runtime_checkable
@@ -25,7 +25,7 @@ class SnowflakeShowSupport(Protocol):
         ...
 
     def format_show_statement(
-        self, expr: "SnowflakeShowExpression"
+        self, expr: "SnowflakeShowStatement"
     ) -> Tuple[str, tuple]:
         """Format a SHOW statement."""
         ...

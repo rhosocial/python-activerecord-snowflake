@@ -25,9 +25,9 @@ if TYPE_CHECKING:
 
 __all__ = [
     "SnowflakeAlterPipeMode",
-    "SnowflakeCreatePipeExpression",
-    "SnowflakeAlterPipeExpression",
-    "SnowflakeDropPipeExpression",
+    "SnowflakeCreatePipeStatement",
+    "SnowflakeAlterPipeStatement",
+    "SnowflakeDropPipeStatement",
 ]
 
 
@@ -52,7 +52,7 @@ class SnowflakeAlterPipeMode(str, Enum):
     RESUME = "RESUME"
 
 
-class SnowflakeCreatePipeExpression(BaseExpression):
+class SnowflakeCreatePipeStatement(BaseExpression):
     """Snowflake CREATE [OR REPLACE] PIPE statement expression.
 
     Attributes:
@@ -102,7 +102,7 @@ class SnowflakeCreatePipeExpression(BaseExpression):
         return self.dialect.format_create_pipe_statement(self)
 
 
-class SnowflakeAlterPipeExpression(BaseExpression):
+class SnowflakeAlterPipeStatement(BaseExpression):
     """Snowflake ALTER PIPE statement expression.
 
     The ``mode`` selects one of the ALTER PIPE forms: ``REFRESH``,
@@ -149,7 +149,7 @@ class SnowflakeAlterPipeExpression(BaseExpression):
         return self.dialect.format_alter_pipe_statement(self)
 
 
-class SnowflakeDropPipeExpression(BaseExpression):
+class SnowflakeDropPipeStatement(BaseExpression):
     """Snowflake DROP PIPE statement expression.
 
     Attributes:

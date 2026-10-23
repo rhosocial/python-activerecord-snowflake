@@ -31,13 +31,13 @@ class SnowflakePivotSupport(Protocol):
         """Whether the UNPIVOT clause is supported."""
         ...
 
-    def format_pivot_clause(
+    def format_pivot_expression(
         self, expr: "SnowflakePivotExpression"
     ) -> Tuple[str, tuple]:
         """Format a PIVOT clause."""
         ...
 
-    def format_unpivot_clause(
+    def format_unpivot_expression(
         self, expr: "SnowflakeUnpivotExpression"
     ) -> Tuple[str, tuple]:
         """Format an UNPIVOT clause."""

@@ -28,10 +28,10 @@ if TYPE_CHECKING:
 
 __all__ = [
     "SnowflakeAlterTaskMode",
-    "SnowflakeCreateTaskExpression",
-    "SnowflakeAlterTaskExpression",
-    "SnowflakeExecuteTaskExpression",
-    "SnowflakeDropTaskExpression",
+    "SnowflakeCreateTaskStatement",
+    "SnowflakeAlterTaskStatement",
+    "SnowflakeExecuteTaskStatement",
+    "SnowflakeDropTaskStatement",
 ]
 
 
@@ -58,7 +58,7 @@ class SnowflakeAlterTaskMode(str, Enum):
     SET = "SET"
 
 
-class SnowflakeCreateTaskExpression(BaseExpression):
+class SnowflakeCreateTaskStatement(BaseExpression):
     """Snowflake CREATE [OR REPLACE] TASK statement expression.
 
     Attributes:
@@ -123,7 +123,7 @@ class SnowflakeCreateTaskExpression(BaseExpression):
         return self.dialect.format_create_task_statement(self)
 
 
-class SnowflakeAlterTaskExpression(BaseExpression):
+class SnowflakeAlterTaskStatement(BaseExpression):
     """Snowflake ALTER TASK statement expression.
 
     The ``mode`` selects one of the ALTER TASK forms: ``RESUME``,
@@ -176,7 +176,7 @@ class SnowflakeAlterTaskExpression(BaseExpression):
         return self.dialect.format_alter_task_statement(self)
 
 
-class SnowflakeExecuteTaskExpression(BaseExpression):
+class SnowflakeExecuteTaskStatement(BaseExpression):
     """Snowflake EXECUTE TASK statement expression.
 
     Attributes:
@@ -205,7 +205,7 @@ class SnowflakeExecuteTaskExpression(BaseExpression):
         return self.dialect.format_execute_task_statement(self)
 
 
-class SnowflakeDropTaskExpression(BaseExpression):
+class SnowflakeDropTaskStatement(BaseExpression):
     """Snowflake DROP TASK statement expression.
 
     Attributes:

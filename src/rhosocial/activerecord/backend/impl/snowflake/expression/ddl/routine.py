@@ -30,9 +30,9 @@ __all__ = [
     "SnowflakeRoutineLanguage",
     "SnowflakeRoutineExecuteAs",
     "SnowflakeRoutineType",
-    "SnowflakeCreateProcedureExpression",
-    "SnowflakeCreateFunctionExpression",
-    "SnowflakeDropRoutineExpression",
+    "SnowflakeCreateProcedureStatement",
+    "SnowflakeCreateFunctionStatement",
+    "SnowflakeDropRoutineStatement",
 ]
 
 
@@ -78,7 +78,7 @@ class SnowflakeRoutineType(str, Enum):
     FUNCTION = "FUNCTION"
 
 
-class SnowflakeCreateProcedureExpression(BaseExpression):
+class SnowflakeCreateProcedureStatement(BaseExpression):
     """Snowflake CREATE [OR REPLACE] PROCEDURE statement expression.
 
     Attributes:
@@ -125,7 +125,7 @@ class SnowflakeCreateProcedureExpression(BaseExpression):
         return self.dialect.format_create_procedure_statement(self)
 
 
-class SnowflakeCreateFunctionExpression(BaseExpression):
+class SnowflakeCreateFunctionStatement(BaseExpression):
     """Snowflake CREATE [OR REPLACE] FUNCTION statement expression.
 
     Attributes:
@@ -188,7 +188,7 @@ class SnowflakeCreateFunctionExpression(BaseExpression):
         return self.dialect.format_create_function_statement(self)
 
 
-class SnowflakeDropRoutineExpression(BaseExpression):
+class SnowflakeDropRoutineStatement(BaseExpression):
     """Snowflake DROP PROCEDURE / DROP FUNCTION statement expression.
 
     Attributes:

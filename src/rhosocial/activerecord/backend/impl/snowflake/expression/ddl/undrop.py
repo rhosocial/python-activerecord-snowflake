@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "SnowflakeUndropObjectType",
-    "SnowflakeUndropExpression",
+    "SnowflakeUndropStatement",
 ]
 
 
@@ -42,7 +42,7 @@ class SnowflakeUndropObjectType(str, Enum):
     TAG = "TAG"
 
 
-class SnowflakeUndropExpression(BaseExpression):
+class SnowflakeUndropStatement(BaseExpression):
     """Snowflake UNDROP statement expression.
 
     Attributes:

@@ -107,7 +107,7 @@ from rhosocial.activerecord.backend.expression.transaction import (
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.routine import (
-    SnowflakeCreateFunctionExpression,
+    SnowflakeCreateFunctionStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.pivot import (
     SnowflakeUnpivotExpression,
@@ -417,8 +417,8 @@ PAIR_CASES: Tuple[PairCase, ...] = (
         note="UNPIVOT [ { INCLUDE | EXCLUDE } NULLS ]; omitting it is legal (default EXCLUDE).",
     ),
     PairCase(
-        "SnowflakeCreateFunctionExpression.immutable",
-        lambda d, **kw: SnowflakeCreateFunctionExpression(
+        "SnowflakeCreateFunctionStatement.immutable",
+        lambda d, **kw: SnowflakeCreateFunctionStatement(
             d, "f", returns="NUMBER", body="SELECT 1", **kw
         ),
         "immutable",
@@ -800,7 +800,7 @@ class TestGuardIsNotVacuous:
             "CreateTableAsStatement.with_data",
             "CTEClause.materialized",
             "SnowflakeUnpivotExpression.include_nulls",
-            "SnowflakeCreateFunctionExpression.immutable",
+            "SnowflakeCreateFunctionStatement.immutable",
             "CreateMaterializedViewStatement.with_data",
             "BeginTransactionStatement.deferrable",
             "BeginTransactionStatement.wait",

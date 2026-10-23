@@ -204,19 +204,19 @@ from rhosocial.activerecord.backend.expression.xml import (
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.file_format import (
-    SnowflakeAlterFileFormatExpression,
+    SnowflakeAlterFileFormatStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.materialized_view import (  # noqa: E501
-    SnowflakeCreateMaterializedViewExpression,
+    SnowflakeCreateMaterializedViewStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.pipe import (
-    SnowflakeCreatePipeExpression,
+    SnowflakeCreatePipeStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.stage import (
-    SnowflakeAlterStageExpression,
+    SnowflakeAlterStageStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.stream import (
-    SnowflakeCreateStreamExpression,
+    SnowflakeCreateStreamStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.type import (
     SnowflakeAlterTypeExpression,
@@ -235,7 +235,7 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.sample import (
     SnowflakeSampleExpression,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.show import (
-    SnowflakeShowExpression,
+    SnowflakeShowStatement,
     SnowflakeShowObjectType,
     SnowflakeShowScope,
 )
@@ -837,8 +837,8 @@ def register_specials():
     # guess skips it, or of a kind the guess fills with a bare string. All are
     # backend-owned, so their shape is this repository's business.
     register_special_constructor(
-        "ddl.materialized_view.SnowflakeCreateMaterializedViewExpression",
-        lambda d: SnowflakeCreateMaterializedViewExpression(
+        "ddl.materialized_view.SnowflakeCreateMaterializedViewStatement",
+        lambda d: SnowflakeCreateMaterializedViewStatement(
             d, "mv", as_query="SELECT 1"
         ),
     )
@@ -863,28 +863,28 @@ def register_specials():
         lambda d: SnowflakeExternalPartitionClause(d, [Column(d, "c1")]),
     )
     register_special_constructor(
-        "ddl.pipe.SnowflakeCreatePipeExpression",
-        lambda d: SnowflakeCreatePipeExpression(d, "p", copy_sql="COPY INTO t FROM @s"),
+        "ddl.pipe.SnowflakeCreatePipeStatement",
+        lambda d: SnowflakeCreatePipeStatement(d, "p", copy_sql="COPY INTO t FROM @s"),
     )
     register_special_constructor(
-        "ddl.stream.SnowflakeCreateStreamExpression",
-        lambda d: SnowflakeCreateStreamExpression(d, "s", object_name="t"),
+        "ddl.stream.SnowflakeCreateStreamStatement",
+        lambda d: SnowflakeCreateStreamStatement(d, "s", object_name="t"),
     )
     register_special_constructor(
-        "ddl.file_format.SnowflakeAlterFileFormatExpression",
-        lambda d: SnowflakeAlterFileFormatExpression(d, "f", options={"TYPE": "CSV"}),
+        "ddl.file_format.SnowflakeAlterFileFormatStatement",
+        lambda d: SnowflakeAlterFileFormatStatement(d, "f", options={"TYPE": "CSV"}),
     )
     register_special_constructor(
-        "ddl.stage.SnowflakeAlterStageExpression",
-        lambda d: SnowflakeAlterStageExpression(d, "s", url="s3://bucket/path"),
+        "ddl.stage.SnowflakeAlterStageStatement",
+        lambda d: SnowflakeAlterStageStatement(d, "s", url="s3://bucket/path"),
     )
     register_special_constructor(
         "sample.SnowflakeSampleExpression",
         lambda d: SnowflakeSampleExpression(d, 10),
     )
     register_special_constructor(
-        "show.SnowflakeShowExpression",
-        lambda d: SnowflakeShowExpression(
+        "show.SnowflakeShowStatement",
+        lambda d: SnowflakeShowStatement(
             d, SnowflakeShowObjectType.TABLES,
             in_scope=SnowflakeShowScope.DATABASE,
             limit=10,
@@ -1003,7 +1003,7 @@ register_specials()
 #: object and handed the parameter a ``Sequence`` instead of a list of columns.
 #: The class was fine and the harness was wrong. It constructs now, and what it
 #: reports is a real answer: Snowflake has no SQL/XML at all, so the dispatch finds
-#: no ``format_xmltable_expression``. That is why the method is in
+#: no ``format_xml_table_expression``. That is why the method is in
 #: :data:`UNMODELLED_FORMATTERS` under SQL/XML rather than the class staying pinned
 #: here -- the matrix could not find that out while the class could not be built.
 UNCONSTRUCTIBLE = (
@@ -1054,7 +1054,7 @@ UNCONSTRUCTIBLE = (
 #: graphs, no triggers, no DOMAIN" says what the dialect is.
 UNMODELLED_FORMATTERS = {
     # --- SQL/XML: Snowflake implements no part of SQL/XML -------------------
-    # Thirteen. ``format_xmltable_expression`` is the one that arrived last and
+    # Thirteen. ``format_xml_table_expression`` is the one that arrived last and
     # the one worth explaining: ``XMLTableExpression`` was pinned in
     # UNCONSTRUCTIBLE until the testsuite's introspective constructor stopped
     # reading ``columns: Sequence[XMLTableColumn]`` as a request for a
@@ -1066,19 +1066,19 @@ UNMODELLED_FORMATTERS = {
     "SQL/XML (no XMLAGG, XMLATTRIBUTES, XMLCOMMENT, XMLCONCAT, XMLELEMENT, "
     "XMLEXISTS, XMLFOREST, XMLPARSE, XMLPI, XMLQUERY, XMLROOT, XMLSERIALIZE or "
     "XMLTABLE)": (
-        "format_xmlagg_expression",
-        "format_xmlattributes_expression",
-        "format_xmlcomment_expression",
-        "format_xmlconcat_expression",
-        "format_xmlelement_expression",
+        "format_xml_agg_expression",
+        "format_xml_attributes_expression",
+        "format_xml_comment_expression",
+        "format_xml_concat_expression",
+        "format_xml_element_expression",
         "format_xmlexists_predicate",
-        "format_xmlforest_expression",
-        "format_xmlparse_expression",
+        "format_xml_forest_expression",
+        "format_xml_parse_expression",
         "format_xmlpi_expression",
-        "format_xmlquery_expression",
-        "format_xmlroot_expression",
-        "format_xmlserialize_expression",
-        "format_xmltable_expression",
+        "format_xml_query_expression",
+        "format_xml_root_expression",
+        "format_xml_serialize_expression",
+        "format_xml_table_expression",
         "format_passing_clause",
     ),
     # --- SQL/PGQ property graphs: no graph tables, no MATCH ---------------
@@ -1296,9 +1296,9 @@ LEGITIMATE_NON_RENDERS = {
     # An introspection query base rather than a DDL or DML one: it names a
     # category ("ask the server about something") and each concrete subclass
     # supplies its own query. The message is the base's own, not the shared one.
-    "rhosocial.activerecord.backend.expression.introspection.TableInfoExpression": (
+    "rhosocial.activerecord.backend.expression.introspection.TableInfoQueryStatement": (
         NotImplementedError,
-        "Subclass must implement format_table_info_query",
+        "Subclass must implement format_table_info_query_statement",
     ),
     # ---- a protocol answering where a formatter belongs -------------------
     # The root of the type tree answers ``format_domain_object`` through the
@@ -1326,7 +1326,7 @@ LEGITIMATE_NON_RENDERS = {
     ),
     # ---- the core routine statement under this dialect's override ---------
     # ``SnowflakeRoutineMixin`` overrides ``format_create_function_statement``
-    # for ``SnowflakeCreateFunctionExpression``, which carries a bare ``name``.
+    # for ``SnowflakeCreateFunctionStatement``, which carries a bare ``name``.
     # The core statement carries a ``Function`` object and has no ``name``, so
     # the override -- which shadows the core formatter -- reads an attribute that
     # is not there. Pinned with its exact message so a change in what happens

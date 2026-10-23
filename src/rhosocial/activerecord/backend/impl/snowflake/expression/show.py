@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 __all__ = [
     "SnowflakeShowObjectType",
     "SnowflakeShowScope",
-    "SnowflakeShowExpression",
+    "SnowflakeShowStatement",
 ]
 
 
@@ -70,7 +70,7 @@ class SnowflakeShowScope(str, Enum):
     SCHEMA = "SCHEMA"
 
 
-class SnowflakeShowExpression(BaseExpression):
+class SnowflakeShowStatement(BaseExpression):
     """Snowflake SHOW statement expression.
 
     Attributes:

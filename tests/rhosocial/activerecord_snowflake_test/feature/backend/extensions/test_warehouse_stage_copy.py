@@ -12,15 +12,15 @@ from rhosocial.activerecord.backend.impl.snowflake.protocols import (
     SnowflakeWarehouseSupport,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
-    SnowflakeAlterWarehouseExpression,
+    SnowflakeAlterWarehouseStatement,
     SnowflakeAlterWarehouseMode,
-    SnowflakeAlterStageExpression,
-    SnowflakeCopyIntoExpression,
+    SnowflakeAlterStageStatement,
+    SnowflakeCopyIntoStatement,
     SnowflakeCopyIntoMode,
-    SnowflakeCreateStageExpression,
-    SnowflakeCreateWarehouseExpression,
-    SnowflakeDropStageExpression,
-    SnowflakeDropWarehouseExpression,
+    SnowflakeCreateStageStatement,
+    SnowflakeCreateWarehouseStatement,
+    SnowflakeDropStageStatement,
+    SnowflakeDropWarehouseStatement,
 )
 
 
@@ -49,13 +49,13 @@ class TestSnowflakeCreateWarehouse:
     """CREATE WAREHOUSE statement generation."""
 
     def test_create_warehouse_basic(self, dialect):
-        expr = SnowflakeCreateWarehouseExpression(dialect, "my_wh")
+        expr = SnowflakeCreateWarehouseStatement(dialect, "my_wh")
         sql, params = expr.to_sql()
         assert sql == 'CREATE WAREHOUSE "my_wh"'
         assert params == ()
 
     def test_create_warehouse_full_options(self, dialect):
-        expr = SnowflakeCreateWarehouseExpression(
+        expr = SnowflakeCreateWarehouseStatement(
             dialect,
             "my_wh",
             or_replace=True,
@@ -83,7 +83,7 @@ class TestSnowflakeCreateWarehouse:
         assert params == ()
 
     def test_create_warehouse_string_escaped(self, dialect):
-        expr = SnowflakeCreateWarehouseExpression(
+        expr = SnowflakeCreateWarehouseStatement(
             dialect, "my_wh", comment="it's quoted"
         )
         sql, _ = expr.to_sql()
@@ -94,7 +94,7 @@ class TestSnowflakeAlterWarehouse:
     """ALTER WAREHOUSE SUSPEND / RESUME / SET / RENAME generation."""
 
     def test_alter_warehouse_suspend(self, dialect):
-        expr = SnowflakeAlterWarehouseExpression(
+        expr = SnowflakeAlterWarehouseStatement(
             dialect, "my_wh", mode=SnowflakeAlterWarehouseMode.SUSPEND
         )
         sql, params = expr.to_sql()
@@ -102,14 +102,14 @@ class TestSnowflakeAlterWarehouse:
         assert params == ()
 
     def test_alter_warehouse_resume(self, dialect):
-        expr = SnowflakeAlterWarehouseExpression(
+        expr = SnowflakeAlterWarehouseStatement(
             dialect, "my_wh", mode=SnowflakeAlterWarehouseMode.RESUME
         )
         sql, _ = expr.to_sql()
         assert sql == 'ALTER WAREHOUSE "my_wh" RESUME'
 
     def test_alter_warehouse_set(self, dialect):
-        expr = SnowflakeAlterWarehouseExpression(
+        expr = SnowflakeAlterWarehouseStatement(
             dialect,
             "my_wh",
             mode=SnowflakeAlterWarehouseMode.SET,
@@ -119,7 +119,7 @@ class TestSnowflakeAlterWarehouse:
         assert sql == 'ALTER WAREHOUSE "my_wh" SET WAREHOUSE_SIZE = \'MEDIUM\''
 
     def test_alter_warehouse_set_multiple(self, dialect):
-        expr = SnowflakeAlterWarehouseExpression(
+        expr = SnowflakeAlterWarehouseStatement(
             dialect,
             "my_wh",
             mode=SnowflakeAlterWarehouseMode.SET,
@@ -130,7 +130,7 @@ class TestSnowflakeAlterWarehouse:
         assert sql == 'ALTER WAREHOUSE "my_wh" SET MAX_CLUSTER_COUNT = 3 AUTO_SUSPEND = FALSE'
 
     def test_alter_warehouse_rename(self, dialect):
-        expr = SnowflakeAlterWarehouseExpression(
+        expr = SnowflakeAlterWarehouseStatement(
             dialect,
             "my_wh",
             mode=SnowflakeAlterWarehouseMode.RENAME,
@@ -140,7 +140,7 @@ class TestSnowflakeAlterWarehouse:
         assert sql == 'ALTER WAREHOUSE "my_wh" RENAME TO "new_wh"'
 
     def test_alter_warehouse_set_without_property_raises(self, dialect):
-        expr = SnowflakeAlterWarehouseExpression(
+        expr = SnowflakeAlterWarehouseStatement(
             dialect, "my_wh", mode=SnowflakeAlterWarehouseMode.SET
         )
         with pytest.raises(ValueError):
@@ -151,13 +151,13 @@ class TestSnowflakeDropWarehouse:
     """DROP WAREHOUSE statement generation."""
 
     def test_drop_warehouse(self, dialect):
-        expr = SnowflakeDropWarehouseExpression(dialect, "my_wh")
+        expr = SnowflakeDropWarehouseStatement(dialect, "my_wh")
         sql, params = expr.to_sql()
         assert sql == 'DROP WAREHOUSE "my_wh"'
         assert params == ()
 
     def test_drop_warehouse_if_exists(self, dialect):
-        expr = SnowflakeDropWarehouseExpression(dialect, "my_wh", if_exists=True)
+        expr = SnowflakeDropWarehouseStatement(dialect, "my_wh", if_exists=True)
         sql, _ = expr.to_sql()
         assert sql == 'DROP WAREHOUSE IF EXISTS "my_wh"'
 
@@ -166,20 +166,20 @@ class TestSnowflakeCreateStage:
     """CREATE STAGE statement generation."""
 
     def test_create_stage_basic(self, dialect):
-        expr = SnowflakeCreateStageExpression(dialect, "my_stage")
+        expr = SnowflakeCreateStageStatement(dialect, "my_stage")
         sql, params = expr.to_sql()
         assert sql == 'CREATE STAGE "my_stage"'
         assert params == ()
 
     def test_create_stage_or_replace_temporary(self, dialect):
-        expr = SnowflakeCreateStageExpression(
+        expr = SnowflakeCreateStageStatement(
             dialect, "my_stage", or_replace=True, temporary=True
         )
         sql, _ = expr.to_sql()
         assert sql == 'CREATE OR REPLACE TEMPORARY STAGE "my_stage"'
 
     def test_create_stage_full_options(self, dialect):
-        expr = SnowflakeCreateStageExpression(
+        expr = SnowflakeCreateStageStatement(
             dialect,
             "my_stage",
             url="s3://bucket/path",
@@ -199,7 +199,7 @@ class TestSnowflakeCreateStage:
         )
 
     def test_create_stage_encryption_string_fragment(self, dialect):
-        expr = SnowflakeCreateStageExpression(
+        expr = SnowflakeCreateStageStatement(
             dialect, "my_stage", encryption="TYPE = 'SSE_S3'"
         )
         sql, _ = expr.to_sql()
@@ -210,13 +210,13 @@ class TestSnowflakeAlterDropStage:
     """ALTER / DROP STAGE statement generation."""
 
     def test_alter_stage_set_file_format(self, dialect):
-        expr = SnowflakeAlterStageExpression(dialect, "my_stage", file_format="csv")
+        expr = SnowflakeAlterStageStatement(dialect, "my_stage", file_format="csv")
         sql, params = expr.to_sql()
         assert sql == 'ALTER STAGE "my_stage" SET FILE_FORMAT = "csv"'
         assert params == ()
 
     def test_alter_stage_set_url(self, dialect):
-        expr = SnowflakeAlterStageExpression(
+        expr = SnowflakeAlterStageStatement(
             dialect, "my_stage", url="azure://container/path"
         )
         sql, _ = expr.to_sql()
@@ -225,18 +225,18 @@ class TestSnowflakeAlterDropStage:
         )
 
     def test_alter_stage_without_property_raises(self, dialect):
-        expr = SnowflakeAlterStageExpression(dialect, "my_stage")
+        expr = SnowflakeAlterStageStatement(dialect, "my_stage")
         with pytest.raises(ValueError):
             expr.to_sql()
 
     def test_drop_stage(self, dialect):
-        expr = SnowflakeDropStageExpression(dialect, "my_stage")
+        expr = SnowflakeDropStageStatement(dialect, "my_stage")
         sql, params = expr.to_sql()
         assert sql == 'DROP STAGE "my_stage"'
         assert params == ()
 
     def test_drop_stage_if_exists(self, dialect):
-        expr = SnowflakeDropStageExpression(dialect, "my_stage", if_exists=True)
+        expr = SnowflakeDropStageStatement(dialect, "my_stage", if_exists=True)
         sql, _ = expr.to_sql()
         assert sql == 'DROP STAGE IF EXISTS "my_stage"'
 
@@ -245,7 +245,7 @@ class TestSnowflakeCopyIntoLoad:
     """COPY INTO <table> FROM @<stage> (load direction)."""
 
     def test_copy_into_load_basic(self, dialect):
-        expr = SnowflakeCopyIntoExpression(
+        expr = SnowflakeCopyIntoStatement(
             dialect,
             mode=SnowflakeCopyIntoMode.LOAD,
             table="t",
@@ -256,7 +256,7 @@ class TestSnowflakeCopyIntoLoad:
         assert params == ()
 
     def test_copy_into_load_full_options(self, dialect):
-        expr = SnowflakeCopyIntoExpression(
+        expr = SnowflakeCopyIntoStatement(
             dialect,
             mode=SnowflakeCopyIntoMode.LOAD,
             table="t",
@@ -282,7 +282,7 @@ class TestSnowflakeCopyIntoLoad:
         )
 
     def test_copy_into_load_file_format_string_fragment(self, dialect):
-        expr = SnowflakeCopyIntoExpression(
+        expr = SnowflakeCopyIntoStatement(
             dialect,
             mode=SnowflakeCopyIntoMode.LOAD,
             table="t",
@@ -297,7 +297,7 @@ class TestSnowflakeCopyIntoUnload:
     """COPY INTO @<stage> FROM <table> (unload direction)."""
 
     def test_copy_into_unload_basic(self, dialect):
-        expr = SnowflakeCopyIntoExpression(
+        expr = SnowflakeCopyIntoStatement(
             dialect,
             mode=SnowflakeCopyIntoMode.UNLOAD,
             table="t",
@@ -308,7 +308,7 @@ class TestSnowflakeCopyIntoUnload:
         assert params == ()
 
     def test_copy_into_unload_full_options(self, dialect):
-        expr = SnowflakeCopyIntoExpression(
+        expr = SnowflakeCopyIntoStatement(
             dialect,
             mode=SnowflakeCopyIntoMode.UNLOAD,
             table="t",

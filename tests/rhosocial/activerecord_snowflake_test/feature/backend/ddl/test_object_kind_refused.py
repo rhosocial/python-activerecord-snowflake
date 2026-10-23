@@ -67,7 +67,7 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.database import (
     SnowflakeCreateDatabaseExpression,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.materialized_view import (  # noqa: E501
-    SnowflakeCreateMaterializedViewExpression,
+    SnowflakeCreateMaterializedViewStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.type import (
     SnowflakeScalarTypeDefinition,
@@ -150,10 +150,10 @@ CASES = [
     ),
     (
         "snowflake create materialized view",
-        lambda d, o: SnowflakeCreateMaterializedViewExpression(d, o, _query(d)),
+        lambda d, o: SnowflakeCreateMaterializedViewStatement(d, o, _query(d)),
         lambda d: Table(d, "users"),
         (
-            "SnowflakeCreateMaterializedViewExpression.view must be a "
+            "SnowflakeCreateMaterializedViewStatement.view must be a "
             "MaterializedView, got Table"
         ),
     ),
@@ -273,7 +273,7 @@ class TestRightObjectKindStillRenders:
         the coercion is a feature of the expression, and a check placed in the
         shared constructor would have made it impossible.
         """
-        sql, _ = SnowflakeCreateMaterializedViewExpression(
+        sql, _ = SnowflakeCreateMaterializedViewStatement(
             dialect, "mv", as_query="SELECT 1"
         ).to_sql()
         assert sql == 'CREATE MATERIALIZED VIEW "mv" AS SELECT 1'

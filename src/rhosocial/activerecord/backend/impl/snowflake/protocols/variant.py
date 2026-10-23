@@ -29,13 +29,13 @@ class SnowflakeVariantSupport(Protocol):
         """Whether VARIANT type is supported."""
         ...
 
-    def format_variant_path_access(
+    def format_variant_path_access_expression(
         self, expr: "SnowflakeVariantPathAccessExpression"
     ) -> Tuple[str, tuple]:
         """Format VARIANT path access expression."""
         ...
 
-    def format_variant_cast(
+    def format_variant_cast_expression(
         self, expr: "SnowflakeVariantCastExpression"
     ) -> Tuple[str, tuple]:
         """Format VARIANT path access with explicit cast."""

@@ -15,8 +15,8 @@ from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.stream import (
-        SnowflakeCreateStreamExpression,
-        SnowflakeDropStreamExpression,
+        SnowflakeCreateStreamStatement,
+        SnowflakeDropStreamStatement,
     )
 
 
@@ -29,13 +29,13 @@ class SnowflakeStreamSupport(Protocol):
         ...
 
     def format_create_stream_statement(
-        self, expr: "SnowflakeCreateStreamExpression"
+        self, expr: "SnowflakeCreateStreamStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] STREAM statement."""
         ...
 
     def format_drop_stream_statement(
-        self, expr: "SnowflakeDropStreamExpression"
+        self, expr: "SnowflakeDropStreamStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP STREAM statement."""
         ...

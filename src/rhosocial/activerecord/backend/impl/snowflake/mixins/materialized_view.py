@@ -7,7 +7,7 @@ from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeature
 from rhosocial.activerecord.backend.expression.objects import MaterializedView
 
 from ..expression.ddl.materialized_view import (
-    SnowflakeCreateMaterializedViewExpression,
+    SnowflakeCreateMaterializedViewStatement,
 )
 
 if TYPE_CHECKING:
@@ -53,11 +53,11 @@ class SnowflakeMaterializedViewMixin:
         return False
 
     def format_create_materialized_view_statement(
-        self, expr: "SnowflakeCreateMaterializedViewExpression"
+        self, expr: "SnowflakeCreateMaterializedViewStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] MATERIALIZED VIEW statement.
 
-        Accepts both ``SnowflakeCreateMaterializedViewExpression`` and the core
+        Accepts both ``SnowflakeCreateMaterializedViewStatement`` and the core
         ``CreateMaterializedViewStatement``; the defining query may be a
         ``QueryStatement`` or a raw SQL string.
 
@@ -112,10 +112,10 @@ class SnowflakeMaterializedViewMixin:
         # formatter also accepts declares none of them, so the subclass is
         # asked by name rather than probed for attributes its contract does
         # not carry.
-        if isinstance(expr, SnowflakeCreateMaterializedViewExpression) and expr.or_replace:
+        if isinstance(expr, SnowflakeCreateMaterializedViewStatement) and expr.or_replace:
             parts.append("OR REPLACE")
         parts.append("MATERIALIZED VIEW")
-        if isinstance(expr, SnowflakeCreateMaterializedViewExpression) and expr.if_not_exists:
+        if isinstance(expr, SnowflakeCreateMaterializedViewStatement) and expr.if_not_exists:
             parts.append("IF NOT EXISTS")
         # The statement already holds the named view, so it renders itself
         # through its own format_materialized_view_object rather than through
@@ -128,7 +128,7 @@ class SnowflakeMaterializedViewMixin:
             cols = ", ".join(self.format_identifier(col) for col in column_aliases)
             parts.append(f"({cols})")
 
-        if isinstance(expr, SnowflakeCreateMaterializedViewExpression):
+        if isinstance(expr, SnowflakeCreateMaterializedViewStatement):
             if expr.cluster_by:
                 cols = ", ".join(
                     self.format_identifier(col) for col in expr.cluster_by

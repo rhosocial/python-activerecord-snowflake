@@ -76,39 +76,39 @@ class TestSnowflakeIntrospectionSQLGeneration:
     """Test SQL generation for introspection queries."""
 
     def test_format_database_info_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import DatabaseInfoExpression
-        expr = DatabaseInfoExpression(dialect)
+        from rhosocial.activerecord.backend.expression.introspection import DatabaseInfoQueryStatement
+        expr = DatabaseInfoQueryStatement(dialect)
         sql, params = expr.to_sql()
         assert "CURRENT_DATABASE()" in sql
         assert "CURRENT_VERSION()" in sql
         assert params == ()
 
     def test_format_table_list_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import TableListExpression
-        expr = TableListExpression(dialect, schema="MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import TableListQueryStatement
+        expr = TableListQueryStatement(dialect, schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.TABLES" in sql
         assert "TABLE_SCHEMA = %s" in sql
         assert params == ("MY_SCHEMA",)
 
     def test_format_table_list_query_no_views(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import TableListExpression
-        expr = TableListExpression(dialect, schema="MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import TableListQueryStatement
+        expr = TableListQueryStatement(dialect, schema="MY_SCHEMA")
         # include_views defaults to True
         sql, params = expr.to_sql()
         # When include_views=True, no TABLE_TYPE filter should be present
         assert "TABLE_TYPE = 'BASE TABLE'" not in sql
 
     def test_format_column_info_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import ColumnInfoExpression
-        expr = ColumnInfoExpression(dialect, table_name="users", schema="MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import ColumnInfoQueryStatement
+        expr = ColumnInfoQueryStatement(dialect, table_name="users", schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.COLUMNS" in sql
         assert params == ("MY_SCHEMA", "users")
 
     def test_format_index_info_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import IndexInfoExpression
-        expr = IndexInfoExpression(dialect, table_name="users", schema="MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import IndexInfoQueryStatement
+        expr = IndexInfoQueryStatement(dialect, table_name="users", schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.TABLE_CONSTRAINTS" in sql
         assert "INFORMATION_SCHEMA.KEY_COLUMN_USAGE" in sql
@@ -116,8 +116,8 @@ class TestSnowflakeIntrospectionSQLGeneration:
         assert params == ("MY_SCHEMA", "users")
 
     def test_format_foreign_key_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import ForeignKeyExpression
-        expr = ForeignKeyExpression(dialect, table_name="orders", schema="MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import ForeignKeyQueryStatement
+        expr = ForeignKeyQueryStatement(dialect, table_name="orders", schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS" in sql
         assert "INFORMATION_SCHEMA.KEY_COLUMN_USAGE" in sql
@@ -126,23 +126,23 @@ class TestSnowflakeIntrospectionSQLGeneration:
         assert params == ("MY_SCHEMA", "orders")
 
     def test_format_view_list_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import ViewListExpression
-        expr = ViewListExpression(dialect, schema="MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import ViewListQueryStatement
+        expr = ViewListQueryStatement(dialect, schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.VIEWS" in sql
         assert params == ("MY_SCHEMA",)
 
     def test_format_view_info_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import ViewInfoExpression
-        expr = ViewInfoExpression(dialect, view_name="my_view", schema="MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import ViewInfoQueryStatement
+        expr = ViewInfoQueryStatement(dialect, view_name="my_view", schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.VIEWS" in sql
         assert "TABLE_NAME = %s" in sql
         assert params == ("MY_SCHEMA", "my_view")
 
     def test_format_trigger_list_query_returns_empty(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import TriggerListExpression
-        expr = TriggerListExpression(dialect, schema="MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import TriggerListQueryStatement
+        expr = TriggerListQueryStatement(dialect, schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "1 = 0" in sql
 

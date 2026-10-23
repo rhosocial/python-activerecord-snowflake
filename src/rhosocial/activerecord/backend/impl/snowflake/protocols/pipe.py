@@ -15,9 +15,9 @@ from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.pipe import (
-        SnowflakeAlterPipeExpression,
-        SnowflakeCreatePipeExpression,
-        SnowflakeDropPipeExpression,
+        SnowflakeAlterPipeStatement,
+        SnowflakeCreatePipeStatement,
+        SnowflakeDropPipeStatement,
     )
 
 
@@ -30,19 +30,19 @@ class SnowflakePipeSupport(Protocol):
         ...
 
     def format_create_pipe_statement(
-        self, expr: "SnowflakeCreatePipeExpression"
+        self, expr: "SnowflakeCreatePipeStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] PIPE statement."""
         ...
 
     def format_alter_pipe_statement(
-        self, expr: "SnowflakeAlterPipeExpression"
+        self, expr: "SnowflakeAlterPipeStatement"
     ) -> Tuple[str, tuple]:
         """Format ALTER PIPE statement (REFRESH / SET / PAUSE / RESUME)."""
         ...
 
     def format_drop_pipe_statement(
-        self, expr: "SnowflakeDropPipeExpression"
+        self, expr: "SnowflakeDropPipeStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP PIPE statement."""
         ...

@@ -14,7 +14,7 @@ from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.materialized_view import (
-        SnowflakeCreateMaterializedViewExpression,
+        SnowflakeCreateMaterializedViewStatement,
     )
 
 
@@ -27,7 +27,7 @@ class SnowflakeMaterializedViewSupport(Protocol):
         ...
 
     def format_create_materialized_view_statement(
-        self, expr: "SnowflakeCreateMaterializedViewExpression"
+        self, expr: "SnowflakeCreateMaterializedViewStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] MATERIALIZED VIEW statement."""
         ...

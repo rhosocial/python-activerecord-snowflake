@@ -17,10 +17,10 @@ from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.task import (
-        SnowflakeAlterTaskExpression,
-        SnowflakeCreateTaskExpression,
-        SnowflakeDropTaskExpression,
-        SnowflakeExecuteTaskExpression,
+        SnowflakeAlterTaskStatement,
+        SnowflakeCreateTaskStatement,
+        SnowflakeDropTaskStatement,
+        SnowflakeExecuteTaskStatement,
     )
 
 
@@ -33,25 +33,25 @@ class SnowflakeTaskSupport(Protocol):
         ...
 
     def format_create_task_statement(
-        self, expr: "SnowflakeCreateTaskExpression"
+        self, expr: "SnowflakeCreateTaskStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] TASK statement."""
         ...
 
     def format_alter_task_statement(
-        self, expr: "SnowflakeAlterTaskExpression"
+        self, expr: "SnowflakeAlterTaskStatement"
     ) -> Tuple[str, tuple]:
         """Format ALTER TASK statement (RESUME / SUSPEND / AFTER / SET)."""
         ...
 
     def format_execute_task_statement(
-        self, expr: "SnowflakeExecuteTaskExpression"
+        self, expr: "SnowflakeExecuteTaskStatement"
     ) -> Tuple[str, tuple]:
         """Format EXECUTE TASK statement."""
         ...
 
     def format_drop_task_statement(
-        self, expr: "SnowflakeDropTaskExpression"
+        self, expr: "SnowflakeDropTaskStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP TASK statement."""
         ...

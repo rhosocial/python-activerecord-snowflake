@@ -247,7 +247,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         Snowflake splits what a caller writes as a single type across several
         catalog columns, so handing ``parse_type`` the bare ``DATA_TYPE`` alone
         throws away the size and only the size.  Measured on this worktree with
-        the query in :meth:`~...mixins.introspection.SnowflakeIntrospectionMixin.format_column_info_query`:
+        the query in :meth:`~...mixins.introspection.SnowflakeIntrospectionMixin.format_column_info_query_statement`:
         a ``VARCHAR(50)`` column answered ``16777216`` -- the *bare* word reached
         the parser and the parser honestly filled in Snowflake's documented
         default -- and a ``NUMBER(10, 2)`` column answered ``DecimalType()`` with

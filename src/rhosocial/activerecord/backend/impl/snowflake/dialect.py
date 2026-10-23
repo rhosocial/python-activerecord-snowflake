@@ -434,7 +434,7 @@ class SnowflakeDialect(
         """Snowflake supports IDENTIFIER() dynamic binding."""
         return True
 
-    def format_identifier_dynamic(self, identifier: str) -> str:
+    def format_snowflake_identifier_expression(self, identifier: str) -> str:
         """Format an IDENTIFIER(placeholder) dynamic object reference."""
         placeholder = self.get_parameter_placeholder()
         return f"IDENTIFIER({placeholder})"
@@ -473,7 +473,7 @@ class SnowflakeDialect(
             )
         return super().format_begin_transaction_statement(expr)
 
-    def format_set_transaction(self, expr: "SetTransactionStatement") -> Tuple[str, tuple]:
+    def format_set_transaction_statement(self, expr: "SetTransactionStatement") -> Tuple[str, tuple]:
         """Format SET TRANSACTION statement for Snowflake.
 
         Snowflake only supports READ COMMITTED isolation level, so

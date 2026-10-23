@@ -15,9 +15,9 @@ from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.routine import (
-        SnowflakeCreateFunctionExpression,
-        SnowflakeCreateProcedureExpression,
-        SnowflakeDropRoutineExpression,
+        SnowflakeCreateFunctionStatement,
+        SnowflakeCreateProcedureStatement,
+        SnowflakeDropRoutineStatement,
     )
 
 
@@ -30,19 +30,19 @@ class SnowflakeRoutineSupport(Protocol):
         ...
 
     def format_create_procedure_statement(
-        self, expr: "SnowflakeCreateProcedureExpression"
+        self, expr: "SnowflakeCreateProcedureStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] PROCEDURE statement."""
         ...
 
     def format_create_function_statement(
-        self, expr: "SnowflakeCreateFunctionExpression"
+        self, expr: "SnowflakeCreateFunctionStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] FUNCTION statement."""
         ...
 
     def format_drop_routine_statement(
-        self, expr: "SnowflakeDropRoutineExpression"
+        self, expr: "SnowflakeDropRoutineStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP PROCEDURE / DROP FUNCTION statement."""
         ...
