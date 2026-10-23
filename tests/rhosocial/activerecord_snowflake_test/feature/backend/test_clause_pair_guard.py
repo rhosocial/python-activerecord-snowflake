@@ -171,7 +171,7 @@ class PairCase:
     def render(self, d, **kw) -> Outcome:
         return _render(lambda: self.build(d, **kw))
 
-    def _check_spelling(self, sql: str, mine: Optional[str], other: Optional[str], label: str) -> None:
+    def check_spelling(self, sql: str, mine: Optional[str], other: Optional[str], label: str) -> None:
         if mine is not None:
             assert re.search(mine, sql), (
                 f"{self.case_id}: {label} was rendered but its spelling {mine!r} "
@@ -528,7 +528,7 @@ class TestFourStatesArePairwiseDistinguishable:
             f"{case.case_id}: {case.a!r} -> {outcome!r}, expected {case.a_outcome!r}"
         )
         if outcome[0] == "rendered":
-            case._check_spelling(outcome[1], case.a_pattern, case.b_pattern, repr(case.a))
+            case.check_spelling(outcome[1], case.a_pattern, case.b_pattern, repr(case.a))
 
     @pytest.mark.parametrize("case", PAIR_CASES, ids=PAIR_IDS)
     def test_b_set_answers_b_only(self, case):
@@ -537,7 +537,7 @@ class TestFourStatesArePairwiseDistinguishable:
             f"{case.case_id}: {case.b!r} -> {outcome!r}, expected {case.b_outcome!r}"
         )
         if outcome[0] == "rendered":
-            case._check_spelling(outcome[1], case.b_pattern, case.a_pattern, repr(case.b))
+            case.check_spelling(outcome[1], case.b_pattern, case.a_pattern, repr(case.b))
 
     @pytest.mark.parametrize("case", PAIR_CASES, ids=PAIR_IDS)
     def test_both_set_is_refused_at_construction(self, case):

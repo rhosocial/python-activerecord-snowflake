@@ -240,7 +240,7 @@ class AsyncSnowflakeBackend(
         ``cursor.description`` returns them as such.  Python model
         field names are lowercase by convention, so we normalise
         column names to lowercase before building row dicts so that
-        ``_map_columns_to_fields()`` and ``_remap_row_columns()`` can
+        ``_map_columns_to_fields()`` and ``remap_row_columns()`` can
         match them correctly.
         """
         if not is_select:
@@ -255,8 +255,8 @@ class AsyncSnowflakeBackend(
             mapping = column_mapping or {}
             for row in rows:
                 row_dict = dict(zip(column_names, row))
-                adapted_row = self._adapt_row_types(row_dict, adapters)
-                final_row = self._remap_row_columns(adapted_row, mapping)
+                adapted_row = self.adapt_row_types(row_dict, adapters)
+                final_row = self.remap_row_columns(adapted_row, mapping)
                 final_results.append(final_row)
             return final_results
         except Exception as e:

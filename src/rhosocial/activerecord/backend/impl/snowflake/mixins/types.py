@@ -471,7 +471,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         ``UnsupportedFeatureError``, not ``ValueError``: this is a declaration the
         grammar cannot express at all rather than a wrong value, and the two
         exceptions do not share a base class.  This runs **before**
-        ``_check_spelling`` and before every precision and scale check, so a
+        ``check_spelling`` and before every precision and scale check, so a
         request wrong in two ways is told about the signedness first — that one
         is a stronger and less recoverable statement than a misspelled word or an
         out-of-range number.  Every one of those existing checks still fires
@@ -521,7 +521,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         :meth:`_refuse_unsigned_integer`, which is also where the reason for
         the refusal is written down.
         """
-        self._check_spelling(expr, IntegerType)
+        self.check_spelling(expr, IntegerType)
         self._refuse_unsigned_integer(expr, "INTEGER")
         return "INTEGER", ()
 
@@ -544,7 +544,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
 
         ``unsigned`` is refused as well; see :meth:`_refuse_unsigned_integer`.
         """
-        self._check_spelling(expr, ("tinyint",))
+        self.check_spelling(expr, ("tinyint",))
         self._refuse_unsigned_integer(expr, "TINYINT")
         return "TINYINT", ()
 
@@ -554,7 +554,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
 
         ``unsigned`` is refused; see :meth:`_refuse_unsigned_integer`.
         """
-        self._check_spelling(expr, BigIntType)
+        self.check_spelling(expr, BigIntType)
         self._refuse_unsigned_integer(expr, "BIGINT")
         return "BIGINT", ()
 
@@ -566,7 +566,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
 
         ``unsigned`` is refused; see :meth:`_refuse_unsigned_integer`.
         """
-        self._check_spelling(expr, SmallIntType)
+        self.check_spelling(expr, SmallIntType)
         self._refuse_unsigned_integer(expr, "SMALLINT")
         return "SMALLINT", ()
 
@@ -608,7 +608,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         ``unsigned`` is refused rather than ignored, **before** the spelling
         check; see :meth:`_refuse_unsigned_numeric`."""
         self._refuse_unsigned_numeric(expr, "DOUBLE")
-        self._check_spelling(expr, DoubleType)
+        self.check_spelling(expr, DoubleType)
         return "DOUBLE", ()
 
     def format_data_type_decimal(self, expr: DecimalType) -> Tuple[str, tuple]:
@@ -620,18 +620,18 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         both halves of the ``NUMBER(p, s)`` syntax: it renders a declared scale,
         and refuses one declared without a precision.
 
-        ``unsigned`` is refused rather than ignored, **before** ``_check_spelling``
+        ``unsigned`` is refused rather than ignored, **before** ``check_spelling``
         and before :meth:`_format_number`'s "scale without a precision" refusal
         and its two range checks; see :meth:`_refuse_unsigned_numeric`.  All three
         of those still fire unchanged for a signed declaration."""
         self._refuse_unsigned_numeric(expr, "NUMBER")
-        self._check_spelling(expr, DecimalType)
+        self.check_spelling(expr, DecimalType)
         return self._format_number(expr.precision, expr.scale)
 
     def format_data_type_boolean(self, expr: BooleanType) -> Tuple[str, tuple]:
         """``BOOL`` is a Snowflake-accepted spelling of ``BOOLEAN``, so both
         render as ``BOOLEAN``."""
-        self._check_spelling(expr, BooleanType)
+        self.check_spelling(expr, BooleanType)
         return "BOOLEAN", ()
 
     def format_data_type_varchar(self, expr: VarCharType) -> Tuple[str, tuple]:
@@ -666,7 +666,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
           caller declared a bounded concept rather than text; the *server* does
           not distinguish them and does not pretend to.
         """
-        self._check_spelling(expr, VarCharType)
+        self.check_spelling(expr, VarCharType)
         if expr.length is not None:
             return f"VARCHAR({expr.length})", ()
         return "VARCHAR", ()
@@ -682,7 +682,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         was already ``CHAR(1)`` for a bare declaration, and the manual's "except
         the default length is ``VARCHAR(1)``" is what that 1 is.
         """
-        self._check_spelling(expr, CharType)
+        self.check_spelling(expr, CharType)
         return (f"CHAR({expr.length})" if expr.length is not None else "CHAR(1)"), ()
 
     def format_data_type_text(self, expr: TextType) -> Tuple[str, tuple]:
@@ -694,7 +694,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         word, but it is the concept's second spelling and both denote the same
         unbounded string, so it is accepted and normalised rather than refused.
         """
-        self._check_spelling(expr, TextType)
+        self.check_spelling(expr, TextType)
         return "VARCHAR(16777216)", ()
 
     def format_data_type_blob(self, expr: BlobType) -> Tuple[str, tuple]:
@@ -706,7 +706,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         spelling, which is the one every plain ``BlobType(dialect)`` carries,
         so the spelling is normalised instead.
         """
-        self._check_spelling(expr, BlobType)
+        self.check_spelling(expr, BlobType)
         return "BINARY", ()
 
     def format_data_type_datetime(self, expr: DateTimeType) -> Tuple[str, tuple]:
@@ -794,7 +794,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         :class:`~...impl.sqlserver.expression.types.SQLServerNVarCharMaxType` is
         not handed SQL Server's ``VARCHAR`` width merely for deriving from one.
         """
-        self._check_spelling(expr, VarCharType)
+        self.check_spelling(expr, VarCharType)
         if expr.length is not None:
             return f"VARCHAR({expr.length})", ()
         return "VARCHAR", ()
@@ -816,7 +816,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         :meth:`_refuse_unsigned_numeric`, which is also where the reasoning about
         the two class hierarchies is written down."""
         self._refuse_unsigned_numeric(expr, "NUMBER")
-        self._check_spelling(expr, DecimalType)
+        self.check_spelling(expr, DecimalType)
         return self._format_number(expr.precision, expr.scale)
 
     def format_data_type_snowflake_float(self, expr: SnowflakeFloatType) -> Tuple[str, tuple]:
@@ -825,7 +825,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
 
         ``unsigned`` is refused rather than ignored, before the precision check —
         see :meth:`_refuse_unsigned_numeric`.  ``spelling`` is not a field of this
-        class, so :meth:`_check_spelling` is deliberately **not** called here:
+        class, so :meth:`check_spelling` is deliberately **not** called here:
         there is no word on the concept to gate."""
         self._refuse_unsigned_numeric(expr, "FLOAT")
         if expr.precision is not None:
@@ -866,7 +866,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
     def format_data_type_snowflake_blob(self, expr: SnowflakeBinaryType) -> Tuple[str, tuple]:
         """``BINARY(n)`` states the maximum byte count; without one, Snowflake's
         default of 8,388,608 applies and is left implicit."""
-        self._check_spelling(expr, ("blob",))
+        self.check_spelling(expr, ("blob",))
         if expr.length is not None:
             return f"BINARY({expr.length})", ()
         return "BINARY", ()
