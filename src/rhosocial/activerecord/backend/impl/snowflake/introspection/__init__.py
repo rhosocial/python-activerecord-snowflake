@@ -10,9 +10,19 @@ from .introspector import (
     SyncSnowflakeIntrospector,
     AsyncSnowflakeIntrospector,
 )
+from .types import (
+    SnowflakeDatabaseInfo,
+    SnowflakeSchemaInfo,
+    SnowflakeTableStorageMetrics,
+    SnowflakeWarehouseInfo,
+)
 
 __all__ = [
     "SnowflakeIntrospectorMixin",
     "SyncSnowflakeIntrospector",
     "AsyncSnowflakeIntrospector",
+    "SnowflakeDatabaseInfo",
+    "SnowflakeSchemaInfo",
+    "SnowflakeTableStorageMetrics",
+    "SnowflakeWarehouseInfo",
 ]

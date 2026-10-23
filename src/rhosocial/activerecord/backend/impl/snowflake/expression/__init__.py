@@ -45,6 +45,12 @@ from .show import (
     SnowflakeShowObjectType,
     SnowflakeShowScope,
 )
+from .introspection import (
+    SnowflakeDatabaseListQueryStatement,
+    SnowflakeSchemaListQueryStatement,
+    SnowflakeTableStorageMetricsQueryStatement,
+    SnowflakeWarehouseListQueryStatement,
+)
 from .variant import (
     SnowflakeVariantPathAccessExpression,
     SnowflakeVariantCastExpression,
@@ -128,6 +134,10 @@ __all__ = [
     "SnowflakeShowStatement",
     "SnowflakeShowObjectType",
     "SnowflakeShowScope",
+    "SnowflakeDatabaseListQueryStatement",
+    "SnowflakeSchemaListQueryStatement",
+    "SnowflakeTableStorageMetricsQueryStatement",
+    "SnowflakeWarehouseListQueryStatement",
     "SnowflakeVariantPathAccessExpression",
     "SnowflakeVariantCastExpression",
     "SnowflakeAlterWarehouseMode",

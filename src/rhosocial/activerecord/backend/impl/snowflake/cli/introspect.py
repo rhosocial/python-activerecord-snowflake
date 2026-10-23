@@ -19,7 +19,8 @@ OUTPUT_CHOICES = ['table', 'json', 'csv', 'tsv']
 
 INTROSPECT_TYPES = [
     "tables", "views", "table", "columns",
-    "indexes", "foreign-keys", "database"
+    "indexes", "foreign-keys", "database",
+    "databases", "schemas", "warehouses",
 ]
 # Note: "triggers" is intentionally excluded because Snowflake does not support triggers.
 
@@ -41,6 +42,12 @@ def create_parser(subparsers):
 
   # Get column details for a table
   %(prog)s columns users --account myaccount --database mydb
+
+  # List the databases visible to the role, the schemas of a database,
+  # and the virtual warehouses
+  %(prog)s databases --account myaccount
+  %(prog)s schemas --account myaccount --database mydb
+  %(prog)s warehouses --account myaccount
 
   # Output as JSON
   %(prog)s tables --account myaccount --database mydb -o json
@@ -70,7 +77,10 @@ def create_parser(subparsers):
     parser.add_argument(
         "type",
         choices=INTROSPECT_TYPES,
-        help="Introspection type: tables, views, table, columns, indexes, foreign-keys, database",
+        help=(
+            "Introspection type: tables, views, table, columns, indexes, "
+            "foreign-keys, database, databases, schemas, warehouses"
+        ),
     )
     parser.add_argument(
         "name",
@@ -203,6 +213,23 @@ def _handle_introspect_sync(args, backend: SnowflakeBackend, provider):
             data = _serialize_for_output(info)
             provider.display_results([data], title="Database Info")
 
+        elif args.type == "databases":
+            databases = introspector.list_databases()
+            data = _serialize_for_output(databases)
+            provider.display_results(data, title="Databases")
+
+        elif args.type == "schemas":
+            # SCHEMATA is a database-level view: --database names the
+            # database to enumerate, or None for the session's current one.
+            schemas = introspector.list_schemas(database=args.database)
+            data = _serialize_for_output(schemas)
+            provider.display_results(data, title="Schemas")
+
+        elif args.type == "warehouses":
+            warehouses = introspector.list_warehouses()
+            data = _serialize_for_output(warehouses)
+            provider.display_results(data, title="Warehouses")
+
     except ConnectionError as e:
         provider.display_connection_error(e)
         sys.exit(1)
@@ -280,6 +307,23 @@ async def _handle_introspect_async(args, backend: AsyncSnowflakeBackend, provide
             info = await introspector.get_database_info()
             data = _serialize_for_output(info)
             provider.display_results([data], title="Database Info")
+
+        elif args.type == "databases":
+            databases = await introspector.list_databases()
+            data = _serialize_for_output(databases)
+            provider.display_results(data, title="Databases")
+
+        elif args.type == "schemas":
+            # SCHEMATA is a database-level view: --database names the
+            # database to enumerate, or None for the session's current one.
+            schemas = await introspector.list_schemas(database=args.database)
+            data = _serialize_for_output(schemas)
+            provider.display_results(data, title="Schemas")
+
+        elif args.type == "warehouses":
+            warehouses = await introspector.list_warehouses()
+            data = _serialize_for_output(warehouses)
+            provider.display_results(data, title="Warehouses")
 
     except ConnectionError as e:
         provider.display_connection_error(e)

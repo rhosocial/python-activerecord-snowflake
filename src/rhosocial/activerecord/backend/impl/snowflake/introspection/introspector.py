@@ -57,6 +57,19 @@ from rhosocial.activerecord.backend.introspection.types import (
     IntrospectionScope,
 )
 
+from ..expression.introspection import (
+    SnowflakeDatabaseListQueryStatement,
+    SnowflakeSchemaListQueryStatement,
+    SnowflakeTableStorageMetricsQueryStatement,
+    SnowflakeWarehouseListQueryStatement,
+)
+from .types import (
+    SnowflakeDatabaseInfo,
+    SnowflakeSchemaInfo,
+    SnowflakeTableStorageMetrics,
+    SnowflakeWarehouseInfo,
+)
+
 
 class SnowflakeIntrospectorMixin(IntrospectorMixin):
     """Mixin providing shared Snowflake-specific introspection logic.
@@ -105,6 +118,253 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             version=version_str,
             version_tuple=version,
             vendor="Snowflake",
+        )
+
+    # ------------------------------------------------------------------ #
+    # Account-object parsing -- Snowflake's own views, not core's scopes
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _upper_row(row: Dict[str, Any]) -> Dict[str, Any]:
+        """One result row with its keys upper-cased.
+
+        ``INFORMATION_SCHEMA`` columns are documented uppercase, but
+        ``SHOW`` output is documented lowercase (the ``SHOW WAREHOUSES``
+        page's sample header is ``name | state | type | ...``). The driver
+        reproduces whichever spelling the statement produces, so the parser
+        normalizes before reading and does not have to care which kind of
+        statement answered. Values are untouched: only the keys are casing.
+        """
+        return {str(key).upper(): value for key, value in row.items()}
+
+    @staticmethod
+    def _as_flag(value: Any) -> bool:
+        """Read one of Snowflake's several spellings of a boolean flag.
+
+        The catalog is not consistent, and the difference is documented
+        rather than incidental: Information Schema columns such as
+        ``IS_TRANSIENT`` are ``VARCHAR`` holding ``'YES'``/``'NO'``
+        (https://docs.snowflake.com/en/sql-reference/info-schema/databases),
+        while ``SHOW WAREHOUSES`` documents ``is_current`` and friends as
+        ``Y``/``N`` (https://docs.snowflake.com/en/sql-reference/sql/show-warehouses).
+        ``TABLES.AUTO_CLUSTERING_ON`` is a real ``BOOLEAN``. Treating an
+        unreadable value as false matches the "no" default all three
+        spellings share; treating it as true would invent a capability.
+        """
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return False
+        if isinstance(value, (int, float)):
+            return value != 0
+        return str(value).strip().upper() in ("Y", "YES", "TRUE", "1")
+
+    @classmethod
+    def _as_optional_flag(cls, value: Any) -> Optional[bool]:
+        """A flag that distinguishes "not reported" from "reported false".
+
+        ``SHOW WAREHOUSES`` documents ``auto_resume`` as a boolean but says
+        nothing about NULL, and a missing optional property is not the same
+        answer as "false" -- so the ``None`` is preserved for the fields
+        where the docs describe a possibly-absent property.
+        """
+        if value is None:
+            return None
+        return cls._as_flag(value)
+
+    @staticmethod
+    def _as_int(value: Any) -> Optional[int]:
+        """One catalog number as an ``int``, or ``None`` when unreadable.
+
+        The catalog is not under this backend's control; an unreadable
+        count should cost that field its value, not the whole row. Zero is
+        preserved: it is a real byte count and a real retention period.
+        """
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _parse_databases(self, rows: List[Dict[str, Any]]) -> List[SnowflakeDatabaseInfo]:
+        """Parse ``INFORMATION_SCHEMA.DATABASES`` rows.
+
+        Columns read and their documented meanings are in
+        :meth:`~..mixins.introspection.SnowflakeIntrospectionMixin.format_database_list_query_statement`
+        and https://docs.snowflake.com/en/sql-reference/info-schema/databases:
+        ``DATABASE_NAME``, ``DATABASE_OWNER``, ``IS_TRANSIENT`` (``VARCHAR``
+        ``'YES'``/``'NO'``), ``COMMENT``, ``CREATED``, ``LAST_ALTERED``,
+        ``RETENTION_TIME``, ``TYPE`` and ``OWNER_ROLE_TYPE``.
+        """
+        databases = []
+        for row in rows:
+            normalized = self._upper_row(row)
+            databases.append(
+                SnowflakeDatabaseInfo(
+                    name=normalized.get("DATABASE_NAME", ""),
+                    owner=normalized.get("DATABASE_OWNER"),
+                    is_transient=self._as_flag(normalized.get("IS_TRANSIENT")),
+                    comment=normalized.get("COMMENT"),
+                    created=normalized.get("CREATED"),
+                    last_altered=normalized.get("LAST_ALTERED"),
+                    retention_time=self._as_int(normalized.get("RETENTION_TIME")),
+                    database_type=normalized.get("TYPE"),
+                    owner_role_type=normalized.get("OWNER_ROLE_TYPE"),
+                )
+            )
+        return databases
+
+    def _parse_schemas(self, rows: List[Dict[str, Any]]) -> List[SnowflakeSchemaInfo]:
+        """Parse ``INFORMATION_SCHEMA.SCHEMATA`` rows.
+
+        Columns read are documented on
+        https://docs.snowflake.com/en/sql-reference/info-schema/schemata:
+        ``CATALOG_NAME``, ``SCHEMA_NAME``, ``SCHEMA_OWNER``,
+        ``IS_TRANSIENT``, ``IS_MANAGED_ACCESS``, ``RETENTION_TIME``,
+        ``CREATED``, ``LAST_ALTERED`` and ``COMMENT``.
+
+        ``IS_MANAGED_ACCESS`` is kept as a flag rather than dropped: it is
+        the documented answer to "does this schema use managed access?", and
+        a caller deciding whether a grant will be honoured needs it.
+        """
+        schemas = []
+        for row in rows:
+            normalized = self._upper_row(row)
+            schemas.append(
+                SnowflakeSchemaInfo(
+                    name=normalized.get("SCHEMA_NAME", ""),
+                    catalog_name=normalized.get("CATALOG_NAME"),
+                    owner=normalized.get("SCHEMA_OWNER"),
+                    is_transient=self._as_flag(normalized.get("IS_TRANSIENT")),
+                    is_managed_access=self._as_flag(normalized.get("IS_MANAGED_ACCESS")),
+                    retention_time=self._as_int(normalized.get("RETENTION_TIME")),
+                    created=normalized.get("CREATED"),
+                    last_altered=normalized.get("LAST_ALTERED"),
+                    comment=normalized.get("COMMENT"),
+                )
+            )
+        return schemas
+
+    def _parse_warehouses(self, rows: List[Dict[str, Any]]) -> List[SnowflakeWarehouseInfo]:
+        """Parse ``SHOW WAREHOUSES`` rows.
+
+        The row shape is the one documented on
+        https://docs.snowflake.com/en/sql-reference/sql/show-warehouses:
+        **lowercase** keys, ``is_default`` / ``is_current`` /
+        ``is_interactive`` as ``Y``/``N``, ``auto_suspend`` in seconds with
+        ``null`` for "never", and ``size`` spelled ``X-Small`` ...
+        ``6X-Large``. ``_upper_row`` bridges the casing and ``_as_flag`` the
+        ``Y``/``N`` spelling, so nothing here depends on the driver choosing
+        one casing over the other.
+
+        ``available`` / ``provisioning`` / ``quiescing`` / ``other`` are
+        percentages documented as possibly empty, and the ``actives`` /
+        ``pendings`` / ``failed`` / ``suspended`` / ``uuid`` columns are
+        documented as "for internal use and will be removed in a future
+        release" -- none is modelled, because a field whose meaning the
+        vendor has disclaimed is not metadata this backend should promise.
+        """
+        warehouses = []
+        for row in rows:
+            normalized = self._upper_row(row)
+            warehouses.append(
+                SnowflakeWarehouseInfo(
+                    name=normalized.get("NAME", ""),
+                    state=normalized.get("STATE"),
+                    warehouse_type=normalized.get("TYPE"),
+                    size=normalized.get("SIZE"),
+                    min_cluster_count=self._as_int(normalized.get("MIN_CLUSTER_COUNT")),
+                    max_cluster_count=self._as_int(normalized.get("MAX_CLUSTER_COUNT")),
+                    started_clusters=self._as_int(normalized.get("STARTED_CLUSTERS")),
+                    running=self._as_int(normalized.get("RUNNING")),
+                    queued=self._as_int(normalized.get("QUEUED")),
+                    is_default=self._as_flag(normalized.get("IS_DEFAULT")),
+                    is_current=self._as_flag(normalized.get("IS_CURRENT")),
+                    is_interactive=self._as_flag(normalized.get("IS_INTERACTIVE")),
+                    auto_suspend=self._as_int(normalized.get("AUTO_SUSPEND")),
+                    auto_resume=self._as_optional_flag(normalized.get("AUTO_RESUME")),
+                    created_on=normalized.get("CREATED_ON"),
+                    resumed_on=normalized.get("RESUMED_ON"),
+                    updated_on=normalized.get("UPDATED_ON"),
+                    owner=normalized.get("OWNER"),
+                    comment=normalized.get("COMMENT"),
+                    scaling_policy=normalized.get("SCALING_POLICY"),
+                    resource_constraint=normalized.get("RESOURCE_CONSTRAINT"),
+                    generation=self._as_int(normalized.get("GENERATION")),
+                    enable_query_acceleration=self._as_optional_flag(
+                        normalized.get("ENABLE_QUERY_ACCELERATION")
+                    ),
+                    query_acceleration_max_scale_factor=self._as_int(
+                        normalized.get("QUERY_ACCELERATION_MAX_SCALE_FACTOR")
+                    ),
+                    resource_monitor=normalized.get("RESOURCE_MONITOR"),
+                    owner_role_type=normalized.get("OWNER_ROLE_TYPE"),
+                )
+            )
+        return warehouses
+
+    def _parse_table_storage_metrics(
+        self,
+        rows: List[Dict[str, Any]],
+        table_name: str,
+        schema: Optional[str],
+    ) -> Optional[SnowflakeTableStorageMetrics]:
+        """Parse the storage-metrics row for one table, or ``None``.
+
+        The byte columns are the ones documented on
+        https://docs.snowflake.com/en/sql-reference/info-schema/table_storage_metrics;
+        ``ROW_COUNT``, ``CLUSTERING_KEY``, ``AUTO_CLUSTERING_ON`` and
+        ``TABLE_TYPE`` come from the joined ``TABLES`` row, documented on
+        https://docs.snowflake.com/en/sql-reference/info-schema/tables.
+        See :meth:`~..mixins.introspection.SnowflakeIntrospectionMixin.format_table_storage_metrics_query_statement`
+        for why the join exists and why only the current table version is asked
+        for.
+
+        Only the current version is used even if a wider result set arrives:
+        a row with ``TABLE_DROPPED`` set describes a table that no longer
+        exists, and reporting it as this table's metrics would answer a
+        question nobody asked. The first current row wins; a result with no
+        current row falls back to the first row so a caller that widened the
+        query still gets the row it selected rather than a silent ``None``.
+
+        ``None`` is returned for no rows, which -- per the view's documented
+        ``ACCOUNTADMIN`` requirement -- can also mean "this role may not see
+        the metrics". The caller cannot tell the two apart from this view;
+        the docstring of :meth:`get_table_storage_metrics` says so instead of
+        pretending otherwise.
+        """
+        if not rows:
+            return None
+
+        normalized_rows = [self._upper_row(row) for row in rows]
+        row = next(
+            (candidate for candidate in normalized_rows if candidate.get("TABLE_DROPPED") is None),
+            normalized_rows[0],
+        )
+
+        return SnowflakeTableStorageMetrics(
+            table_name=row.get("TABLE_NAME") or table_name,
+            table_catalog=row.get("TABLE_CATALOG"),
+            table_schema=row.get("TABLE_SCHEMA") or schema or None,
+            table_id=self._as_int(row.get("ID")),
+            clone_group_id=self._as_int(row.get("CLONE_GROUP_ID")),
+            is_transient=self._as_flag(row.get("IS_TRANSIENT")),
+            table_type=row.get("TABLE_TYPE"),
+            active_bytes=self._as_int(row.get("ACTIVE_BYTES")) or 0,
+            time_travel_bytes=self._as_int(row.get("TIME_TRAVEL_BYTES")) or 0,
+            failsafe_bytes=self._as_int(row.get("FAILSAFE_BYTES")) or 0,
+            retained_for_clone_bytes=self._as_int(
+                row.get("RETAINED_FOR_CLONE_BYTES")
+            )
+            or 0,
+            row_count=self._as_int(row.get("ROW_COUNT")),
+            clustering_key=row.get("CLUSTERING_KEY"),
+            auto_clustering_on=self._as_flag(row.get("AUTO_CLUSTERING_ON")),
+            table_created=row.get("TABLE_CREATED"),
+            table_dropped=row.get("TABLE_DROPPED"),
+            table_entered_failsafe=row.get("TABLE_ENTERED_FAILSAFE"),
+            comment=row.get("COMMENT"),
         )
 
     def _parse_tables(
@@ -565,6 +825,142 @@ class SyncSnowflakeIntrospector(
         self._cache.set(key, table)
         return table
 
+    # ------------------------------------------------------------------ #
+    # Account-level objects: databases, schemas, warehouses, storage
+    # ------------------------------------------------------------------ #
+
+    def list_databases(self) -> List[SnowflakeDatabaseInfo]:
+        """List every database the session's role can see.
+
+        Reads ``SNOWFLAKE.INFORMATION_SCHEMA.DATABASES``; see
+        :meth:`~..mixins.introspection.SnowflakeIntrospectionMixin.format_database_list_query_statement`
+        for the columns and the reason the view is qualified with ``SNOWFLAKE``.
+        This answers "which
+        databases exist in the account", which is not what
+        :meth:`get_database_info` answers ("which database am I connected
+        to") -- hence the ``extra`` on the cache key: both live in
+        :attr:`IntrospectionScope.DATABASE`, and without it the two questions
+        would serve each other's answers.
+
+        The view is documented to return fewer rows than ``SHOW DATABASES``
+        for a holder of ``MANAGE GRANTS``, so this is the privilege-filtered
+        answer, not a claim of omniscience.
+        """
+        key = self._cache.key(IntrospectionScope.DATABASE, extra="databases")
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        sql, params = SnowflakeDatabaseListQueryStatement(self.dialect).to_sql()
+        result = self._parse_databases(self._executor.execute(sql, params))
+        self._cache.set(key, result)
+        return result
+
+    def list_schemas(self, database: Optional[str] = None) -> List[SnowflakeSchemaInfo]:
+        """List the schemas of *database*, or of the session's current one.
+
+        ``SCHEMATA`` is a database-level view (documented on
+        https://docs.snowflake.com/en/sql-reference/info-schema/schemata),
+        so ``database=None`` is a real choice -- "the current database" --
+        and not a default standing in for a required argument. Passing a
+        name qualifies the view with it; see
+        :meth:`~..mixins.introspection.SnowflakeIntrospectionMixin.format_schema_list_query_statement`
+        for the quoting rule.
+
+        The ``database`` is part of the cache key as a positional
+        discriminator, so ``list_schemas()`` and ``list_schemas("OTHER")``
+        cannot answer each other -- ``schema=`` would be the wrong slot for
+        it, because that parameter names the schema of the *requested*
+        objects, and here the database is the container being enumerated.
+        """
+        key = self._cache.key(
+            IntrospectionScope.SCHEMA, database or "*", extra="schemas"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        sql, params = SnowflakeSchemaListQueryStatement(
+            self.dialect, database=database
+        ).to_sql()
+        result = self._parse_schemas(self._executor.execute(sql, params))
+        self._cache.set(key, result)
+        return result
+
+    def list_warehouses(self) -> List[SnowflakeWarehouseInfo]:
+        """List the virtual warehouses the session's role can see.
+
+        ``SHOW WAREHOUSES`` is the documented route because there is no
+        Information Schema view for warehouses; see
+        :meth:`~..mixins.introspection.SnowflakeIntrospectionMixin.format_warehouse_list_query_statement`
+        for the evidence, the lowercase row shape and why ``RESULT_SCAN`` is
+        not used.
+
+        Warehouses are account-level compute, not schema objects, and core's
+        :class:`IntrospectionScope` has no warehouse member. The closest
+        scope is ``DATABASE`` -- the account-level one -- and the ``extra``
+        keeps it from colliding with both ``get_database_info`` and
+        ``list_databases``. Core is not edited to add a scope this one
+        backend needs; the key policy is the extension point it documents.
+
+        Unlike the Information Schema queries, this one is documented not to
+        require a running warehouse: "The command doesn't require a running
+        warehouse to execute."
+        """
+        key = self._cache.key(IntrospectionScope.DATABASE, extra="warehouses")
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        sql, params = SnowflakeWarehouseListQueryStatement(self.dialect).to_sql()
+        result = self._parse_warehouses(self._executor.execute(sql, params))
+        self._cache.set(key, result)
+        return result
+
+    def get_table_storage_metrics(
+        self, table_name: str, schema: Optional[str] = None
+    ) -> Optional[SnowflakeTableStorageMetrics]:
+        """Billed storage, row count and clustering for one live table.
+
+        Read ``INFORMATION_SCHEMA.TABLE_STORAGE_METRICS`` joined to
+        ``INFORMATION_SCHEMA.TABLES``; the columns, the join and the
+        current-version filter are explained in
+        :meth:`~..mixins.introspection.SnowflakeIntrospectionMixin.format_table_storage_metrics_query_statement`.
+
+        The view belongs to the session's current **database**, so this
+        method has no ``database`` argument: it answers for the database the
+        session is in, exactly like the other schema introspection methods.
+        *schema* defaults to the configured schema, as elsewhere; when there
+        is no configured schema either, the statement does not filter by
+        schema and the catalog's ``TABLE_SCHEMA`` is reported back.
+
+        ``None`` means "no metrics row", which the documentation makes
+        ambiguous on purpose: the view "is visible to other views and can be
+        queried, but the queries will return no rows" for roles other than
+        ``ACCOUNTADMIN``. This method cannot distinguish "the table is gone"
+        from "your role cannot see the metrics", and does not pretend to.
+
+        ``None`` is not cached, following :meth:`get_view_info`: an absent
+        answer may become present after a grant or a load, and caching a
+        permission-shaped ``None`` would outlive the permission.
+        """
+        target_schema = schema if schema is not None else self._get_default_schema()
+        key = self._cache.key(
+            IntrospectionScope.TABLE,
+            table_name,
+            schema=schema,
+            extra="storage_metrics",
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        sql, params = SnowflakeTableStorageMetricsQueryStatement(
+            self.dialect, table_name, schema=target_schema
+        ).to_sql()
+        result = self._parse_table_storage_metrics(
+            self._executor.execute(sql, params), table_name, target_schema
+        )
+        if result is not None:
+            self._cache.set(key, result)
+        return result
+
 
 class _SnowflakeAsyncIntrospectorExecutor:
     """Async executor wrapping synchronous Snowflake cursor operations.
@@ -643,3 +1039,89 @@ class AsyncSnowflakeIntrospector(
         table.foreign_keys = await self.list_foreign_keys(table_name, schema)
         self._cache.set(key, table)
         return table
+
+    # ------------------------------------------------------------------ #
+    # Account-level objects: databases, schemas, warehouses, storage
+    # Method names and signatures match the sync class exactly.
+    # ------------------------------------------------------------------ #
+
+    async def list_databases(self) -> List[SnowflakeDatabaseInfo]:
+        """List every database the session's role can see.
+
+        Asynchronous twin of :meth:`SyncSnowflakeIntrospector.list_databases`;
+        the SQL, parsing and cache key are shared through the mixin, so only
+        the ``await`` differs.
+        """
+        key = self._cache.key(IntrospectionScope.DATABASE, extra="databases")
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        sql, params = SnowflakeDatabaseListQueryStatement(self.dialect).to_sql()
+        result = self._parse_databases(await self._executor.execute(sql, params))
+        self._cache.set(key, result)
+        return result
+
+    async def list_schemas(
+        self, database: Optional[str] = None
+    ) -> List[SnowflakeSchemaInfo]:
+        """List the schemas of *database*, or of the session's current one.
+
+        Asynchronous twin of :meth:`SyncSnowflakeIntrospector.list_schemas`.
+        """
+        key = self._cache.key(
+            IntrospectionScope.SCHEMA, database or "*", extra="schemas"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        sql, params = SnowflakeSchemaListQueryStatement(
+            self.dialect, database=database
+        ).to_sql()
+        result = self._parse_schemas(await self._executor.execute(sql, params))
+        self._cache.set(key, result)
+        return result
+
+    async def list_warehouses(self) -> List[SnowflakeWarehouseInfo]:
+        """List the virtual warehouses the session's role can see.
+
+        Asynchronous twin of :meth:`SyncSnowflakeIntrospector.list_warehouses`.
+        """
+        key = self._cache.key(IntrospectionScope.DATABASE, extra="warehouses")
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        sql, params = SnowflakeWarehouseListQueryStatement(self.dialect).to_sql()
+        result = self._parse_warehouses(await self._executor.execute(sql, params))
+        self._cache.set(key, result)
+        return result
+
+    async def get_table_storage_metrics(
+        self, table_name: str, schema: Optional[str] = None
+    ) -> Optional[SnowflakeTableStorageMetrics]:
+        """Billed storage, row count and clustering for one live table.
+
+        Asynchronous twin of
+        :meth:`SyncSnowflakeIntrospector.get_table_storage_metrics`, including
+        the documented ``ACCOUNTADMIN`` caveat on the view and the decision
+        not to cache ``None``.
+        """
+        target_schema = schema if schema is not None else self._get_default_schema()
+        key = self._cache.key(
+            IntrospectionScope.TABLE,
+            table_name,
+            schema=schema,
+            extra="storage_metrics",
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        sql, params = SnowflakeTableStorageMetricsQueryStatement(
+            self.dialect, table_name, schema=target_schema
+        ).to_sql()
+        result = self._parse_table_storage_metrics(
+            await self._executor.execute(sql, params), table_name, target_schema
+        )
+        if result is not None:
+            self._cache.set(key, result)
+        return result
+
