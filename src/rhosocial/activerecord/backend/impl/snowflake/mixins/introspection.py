@@ -72,6 +72,29 @@ class SnowflakeIntrospectionMixin:
     invisible in a concatenation and obvious in a tree.
     """
 
+    def supports_warehouse_introspection(self) -> bool:
+        """Snowflake answers for its warehouses from ``SHOW WAREHOUSES``.
+
+        The capability for the ``introspect warehouses`` family. There
+        is no INFORMATION_SCHEMA view for them, which is why the
+        statement is a SHOW rather than a SELECT."""
+        return True
+
+    def supports_schema_introspection(self) -> bool:
+        """Snowflake answers for its schemas from ``INFORMATION_SCHEMA.SCHEMATA``.
+
+        The capability for the ``introspect schemas`` family; a schema
+        here is a level below a database, which is why it is not the
+        same switch as the database one."""
+        return True
+
+    def supports_database_introspection(self) -> bool:
+        """Snowflake answers for its databases from ``INFORMATION_SCHEMA.DATABASES``.
+
+        The capability for the ``introspect databases`` family -- an
+        account-level question the other engines do not have."""
+        return True
+
     # ========== Capability Detection ==========
 
     def supports_introspection(self) -> bool:
