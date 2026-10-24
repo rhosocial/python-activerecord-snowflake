@@ -36,7 +36,7 @@ list types take no name.
 | `--account` | `SNOWFLAKE_ACCOUNT` | Account identifier. |
 | `--host`, `--port` | _None_ | Connection endpoint, when not using the account locator. |
 | `--database` | `SNOWFLAKE_DATABASE` | Database to connect to. |
-| `--schema` | `SNOWFLAKE_SCHEMA` | Schema to read. |
+| `--schema` | `SNOWFLAKE_SCHEMA` | Schema to connect to; introspection reads it. Defaults to `PUBLIC`. |
 | `--warehouse` | `SNOWFLAKE_WAREHOUSE` | Warehouse to run queries on. |
 | `--role` | `SNOWFLAKE_ROLE` | Role to assume. |
 | `--user`, `--password` | env | Credentials. |

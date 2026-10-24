@@ -89,12 +89,6 @@ def create_parser(subparsers):
         help="Table/view name (required for some types)",
     )
     parser.add_argument(
-        "--introspect-schema",
-        dest="introspect_schema",
-        default=None,
-        help="Schema name for introspection (default: PUBLIC)",
-    )
-    parser.add_argument(
         "--include-system",
         action="store_true",
         help="Include system tables in output",
@@ -158,14 +152,14 @@ def _handle_introspect_sync(args, backend: SnowflakeBackend, provider):
 
         if args.type == "tables":
             tables = introspector.list_tables(
-                schema=args.introspect_schema,
+                schema=None,
                 include_system=args.include_system
             )
             data = _serialize_for_output(tables)
             provider.display_results(data, title="Tables")
 
         elif args.type == "views":
-            views = introspector.list_views(schema=args.introspect_schema)
+            views = introspector.list_views(schema=None)
             data = _serialize_for_output(views)
             provider.display_results(data, title="Views")
 
@@ -173,7 +167,7 @@ def _handle_introspect_sync(args, backend: SnowflakeBackend, provider):
             if not args.name:
                 print("Error: Table name is required for 'table' introspection", file=sys.stderr)
                 sys.exit(1)
-            info = introspector.get_table_info(args.name, schema=args.introspect_schema)
+            info = introspector.get_table_info(args.name, schema=None)
             if info:
                 provider.display_results(_serialize_for_output(info.columns), title=f"Columns of {args.name}")
                 if info.indexes:
@@ -188,7 +182,7 @@ def _handle_introspect_sync(args, backend: SnowflakeBackend, provider):
             if not args.name:
                 print("Error: Table name is required for 'columns' introspection", file=sys.stderr)
                 sys.exit(1)
-            columns = introspector.list_columns(args.name, schema=args.introspect_schema)
+            columns = introspector.list_columns(args.name, schema=None)
             data = _serialize_for_output(columns)
             provider.display_results(data, title=f"Columns of {args.name}")
 
@@ -196,7 +190,7 @@ def _handle_introspect_sync(args, backend: SnowflakeBackend, provider):
             if not args.name:
                 print("Error: Table name is required for 'indexes' introspection", file=sys.stderr)
                 sys.exit(1)
-            indexes = introspector.list_indexes(args.name, schema=args.introspect_schema)
+            indexes = introspector.list_indexes(args.name, schema=None)
             data = _serialize_for_output(indexes)
             provider.display_results(data, title=f"Indexes of {args.name}")
 
@@ -204,7 +198,7 @@ def _handle_introspect_sync(args, backend: SnowflakeBackend, provider):
             if not args.name:
                 print("Error: Table name is required for 'foreign-keys' introspection", file=sys.stderr)
                 sys.exit(1)
-            fks = introspector.list_foreign_keys(args.name, schema=args.introspect_schema)
+            fks = introspector.list_foreign_keys(args.name, schema=None)
             data = _serialize_for_output(fks)
             provider.display_results(data, title=f"Foreign Keys of {args.name}")
 
@@ -253,14 +247,14 @@ async def _handle_introspect_async(args, backend: AsyncSnowflakeBackend, provide
 
         if args.type == "tables":
             tables = await introspector.list_tables(
-                schema=args.introspect_schema,
+                schema=None,
                 include_system=args.include_system
             )
             data = _serialize_for_output(tables)
             provider.display_results(data, title="Tables")
 
         elif args.type == "views":
-            views = await introspector.list_views(schema=args.introspect_schema)
+            views = await introspector.list_views(schema=None)
             data = _serialize_for_output(views)
             provider.display_results(data, title="Views")
 
@@ -268,7 +262,7 @@ async def _handle_introspect_async(args, backend: AsyncSnowflakeBackend, provide
             if not args.name:
                 print("Error: Table name is required for 'table' introspection", file=sys.stderr)
                 sys.exit(1)
-            info = await introspector.get_table_info(args.name, schema=args.introspect_schema)
+            info = await introspector.get_table_info(args.name, schema=None)
             if info:
                 provider.display_results(_serialize_for_output(info.columns), title=f"Columns of {args.name}")
                 if info.indexes:
@@ -283,7 +277,7 @@ async def _handle_introspect_async(args, backend: AsyncSnowflakeBackend, provide
             if not args.name:
                 print("Error: Table name is required for 'columns' introspection", file=sys.stderr)
                 sys.exit(1)
-            columns = await introspector.list_columns(args.name, schema=args.introspect_schema)
+            columns = await introspector.list_columns(args.name, schema=None)
             data = _serialize_for_output(columns)
             provider.display_results(data, title=f"Columns of {args.name}")
 
@@ -291,7 +285,7 @@ async def _handle_introspect_async(args, backend: AsyncSnowflakeBackend, provide
             if not args.name:
                 print("Error: Table name is required for 'indexes' introspection", file=sys.stderr)
                 sys.exit(1)
-            indexes = await introspector.list_indexes(args.name, schema=args.introspect_schema)
+            indexes = await introspector.list_indexes(args.name, schema=None)
             data = _serialize_for_output(indexes)
             provider.display_results(data, title=f"Indexes of {args.name}")
 
@@ -299,7 +293,7 @@ async def _handle_introspect_async(args, backend: AsyncSnowflakeBackend, provide
             if not args.name:
                 print("Error: Table name is required for 'foreign-keys' introspection", file=sys.stderr)
                 sys.exit(1)
-            fks = await introspector.list_foreign_keys(args.name, schema=args.introspect_schema)
+            fks = await introspector.list_foreign_keys(args.name, schema=None)
             data = _serialize_for_output(fks)
             provider.display_results(data, title=f"Foreign Keys of {args.name}")
 
