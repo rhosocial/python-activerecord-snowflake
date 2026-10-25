@@ -289,7 +289,7 @@ class TestAccountObjectParsing:
         return SnowflakeIntrospectorMixin.__new__(SnowflakeIntrospectorMixin)
 
     def test_database_row_maps_to_typed_value(self, parser):
-        [database] = parser._parse_databases([database_row()])
+        [database] = parser.parse_databases([database_row()])
         assert database == SnowflakeDatabaseInfo(
             name="ANALYTICS",
             owner="SYSADMIN",
@@ -303,24 +303,24 @@ class TestAccountObjectParsing:
         )
 
     def test_database_transient_flag_reads_yes(self, parser):
-        [database] = parser._parse_databases(
+        [database] = parser.parse_databases(
             [database_row(IS_TRANSIENT="YES")]
         )
         assert database.is_transient is True
 
     def test_database_keys_are_case_insensitive(self, parser):
         row = {key.lower(): value for key, value in database_row().items()}
-        [database] = parser._parse_databases([row])
+        [database] = parser.parse_databases([row])
         assert database.name == "ANALYTICS"
 
     def test_database_unreadable_number_becomes_none(self, parser):
-        [database] = parser._parse_databases(
+        [database] = parser.parse_databases(
             [database_row(RETENTION_TIME="not-a-number")]
         )
         assert database.retention_time is None
 
     def test_schema_row_maps_to_typed_value(self, parser):
-        [schema] = parser._parse_schemas([schema_row()])
+        [schema] = parser.parse_schemas([schema_row()])
         assert schema == SnowflakeSchemaInfo(
             name="PUBLIC",
             catalog_name="ANALYTICS",
@@ -334,13 +334,13 @@ class TestAccountObjectParsing:
         )
 
     def test_schema_managed_access_reads_yes(self, parser):
-        [schema] = parser._parse_schemas(
+        [schema] = parser.parse_schemas(
             [schema_row(IS_MANAGED_ACCESS="YES")]
         )
         assert schema.is_managed_access is True
 
     def test_warehouse_row_maps_lowercase_keys(self, parser):
-        [warehouse] = parser._parse_warehouses([warehouse_row()])
+        [warehouse] = parser.parse_warehouses([warehouse_row()])
         assert warehouse == SnowflakeWarehouseInfo(
             name="COMPUTE_WH",
             state="STARTED",
@@ -371,14 +371,14 @@ class TestAccountObjectParsing:
         )
 
     def test_warehouse_auto_suspend_null_means_never(self, parser):
-        [warehouse] = parser._parse_warehouses(
+        [warehouse] = parser.parse_warehouses(
             [warehouse_row(auto_suspend=None, auto_resume=None)]
         )
         assert warehouse.auto_suspend is None
         assert warehouse.auto_resume is None
 
     def test_storage_row_maps_and_sums_bytes(self, parser):
-        metrics = parser._parse_table_storage_metrics(
+        metrics = parser.parse_table_storage_metrics(
             [storage_row()], "ORDERS", "PUBLIC"
         )
         assert metrics == SnowflakeTableStorageMetrics(
@@ -411,7 +411,7 @@ class TestAccountObjectParsing:
             ACTIVE_BYTES=1,
             TABLE_NAME="ORDERS",
         )
-        metrics = parser._parse_table_storage_metrics(
+        metrics = parser.parse_table_storage_metrics(
             [dropped, storage_row()], "ORDERS", "PUBLIC"
         )
         assert metrics.table_dropped is None
@@ -419,12 +419,12 @@ class TestAccountObjectParsing:
 
     def test_storage_without_rows_is_none(self, parser):
         assert (
-            parser._parse_table_storage_metrics([], "ORDERS", "PUBLIC")
+            parser.parse_table_storage_metrics([], "ORDERS", "PUBLIC")
             is None
         )
 
     def test_storage_unclustered_table(self, parser):
-        metrics = parser._parse_table_storage_metrics(
+        metrics = parser.parse_table_storage_metrics(
             [
                 storage_row(
                     CLUSTERING_KEY=None,

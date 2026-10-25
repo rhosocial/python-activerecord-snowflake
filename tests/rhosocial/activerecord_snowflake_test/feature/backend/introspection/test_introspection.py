@@ -3,7 +3,7 @@
 
 Tests cover:
 - SnowflakeIntrospectionMixin format_*_query methods
-- SnowflakeIntrospectorMixin _parse_* methods
+- SnowflakeIntrospectorMixin parse_* methods
 - SyncSnowflakeIntrospector with mock backend
 - AsyncSnowflakeIntrospector with mock backend
 """
@@ -152,7 +152,7 @@ class TestSnowflakeIntrospectionSQLGeneration:
 # ================================================================== #
 
 class TestSnowflakeIntrospectorParsing:
-    """Test _parse_* methods for converting raw rows to data structures."""
+    """Test parse_* methods for converting raw rows to data structures."""
 
     @pytest.fixture
     def introspector_mixin(self):
@@ -171,14 +171,14 @@ class TestSnowflakeIntrospectorParsing:
         rows = [
             {"CATALOG_NAME": "MY_DB", "SERVER_VERSION": "8.32.0"},
         ]
-        result = introspector_mixin._parse_database_info(rows)
+        result = introspector_mixin.parse_database_info(rows)
         assert isinstance(result, IntrospectionDatabaseInfo)
         assert result.name == "MY_DB"
         assert result.vendor == "Snowflake"
         assert result.version_tuple == (8, 32, 0)
 
     def test_parse_database_info_empty_rows(self, introspector_mixin):
-        result = introspector_mixin._parse_database_info([])
+        result = introspector_mixin.parse_database_info([])
         assert isinstance(result, IntrospectionDatabaseInfo)
         assert result.vendor == "Snowflake"
 
@@ -187,7 +187,7 @@ class TestSnowflakeIntrospectorParsing:
             {"TABLE_NAME": "users", "TABLE_TYPE": "BASE TABLE", "COMMENT": None},
             {"TABLE_NAME": "v_users", "TABLE_TYPE": "VIEW", "COMMENT": "user view"},
         ]
-        result = introspector_mixin._parse_tables(rows, "PUBLIC")
+        result = introspector_mixin.parse_tables(rows, "PUBLIC")
         assert len(result) == 2
         assert result[0].name == "users"
         assert result[0].table_type == TableType.BASE_TABLE
@@ -222,7 +222,7 @@ class TestSnowflakeIntrospectorParsing:
                 "COMMENT": "user name",
             },
         ]
-        result = introspector_mixin._parse_columns(rows, "users", "PUBLIC")
+        result = introspector_mixin.parse_columns(rows, "users", "PUBLIC")
         assert len(result) == 2
 
         assert result[0].name == "id"
@@ -295,7 +295,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
         }
 
     def _parsed(self, introspector_mixin, row):
-        columns = introspector_mixin._parse_columns([row], "t", "PUBLIC")
+        columns = introspector_mixin.parse_columns([row], "t", "PUBLIC")
         return columns[0].parsed_data_type
 
     @pytest.mark.parametrize("width", [1, 20, 50, 200, 134217728])
@@ -478,7 +478,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
         cannot be parsed; ``data_type_full`` is the spelling that says how
         wide the column is.
         """
-        columns = introspector_mixin._parse_columns(
+        columns = introspector_mixin.parse_columns(
             [self._row("VARCHAR", cml=50)], "t", "PUBLIC")
         assert columns[0].data_type == "varchar"
         assert columns[0].data_type_full == "VARCHAR(50)"
@@ -534,7 +534,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
             side_effect=ValueError("not a type this backend can read"),
         ):
             with pytest.warns(RuntimeWarning, match="could not read"):
-                columns = introspector_mixin._parse_columns(
+                columns = introspector_mixin.parse_columns(
                     [good], "t", "PUBLIC")
         assert len(columns) == 1
         assert columns[0].parsed_data_type is None
@@ -586,7 +586,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
             {"CONSTRAINT_NAME": "PK_USERS", "CONSTRAINT_TYPE": "PRIMARY KEY", "COLUMN_NAME": "id", "ORDINAL_POSITION": 1},
             {"CONSTRAINT_NAME": "UK_USERS_EMAIL", "CONSTRAINT_TYPE": "UNIQUE", "COLUMN_NAME": "email", "ORDINAL_POSITION": 1},
         ]
-        result = introspector_mixin._parse_indexes(rows, "users", "PUBLIC")
+        result = introspector_mixin.parse_indexes(rows, "users", "PUBLIC")
         assert len(result) == 2
 
         pk = next(i for i in result if i.is_primary)
@@ -612,7 +612,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
                 "REFERENCED_COLUMN_NAME": "id",
             },
         ]
-        result = introspector_mixin._parse_foreign_keys(rows, "orders", "PUBLIC")
+        result = introspector_mixin.parse_foreign_keys(rows, "orders", "PUBLIC")
         assert len(result) == 1
         assert result[0].name == "FK_ORDERS_USER"
         assert result[0].columns == ["user_id"]
@@ -642,7 +642,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
                 "REFERENCED_COLUMN_NAME": "product_id",
             },
         ]
-        result = introspector_mixin._parse_foreign_keys(rows, "order_items", "PUBLIC")
+        result = introspector_mixin.parse_foreign_keys(rows, "order_items", "PUBLIC")
         assert len(result) == 1
         assert result[0].columns == ["order_id", "product_id"]
         assert result[0].referenced_columns == ["id", "product_id"]
@@ -656,7 +656,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
                 "IS_UPDATABLE": "NO",
             },
         ]
-        result = introspector_mixin._parse_views(rows, "PUBLIC")
+        result = introspector_mixin.parse_views(rows, "PUBLIC")
         assert len(result) == 1
         assert result[0].name == "v_active_users"
         assert result[0].definition == "SELECT * FROM users WHERE active = TRUE"
@@ -671,17 +671,17 @@ class TestSnowflakeCatalogSizeReachesParseType:
                 "IS_UPDATABLE": "NO",
             },
         ]
-        result = introspector_mixin._parse_view_info(rows, "v_active_users", "PUBLIC")
+        result = introspector_mixin.parse_view_info(rows, "v_active_users", "PUBLIC")
         assert result is not None
         assert result.name == "v_active_users"
 
     def test_parse_view_info_not_found(self, introspector_mixin):
-        result = introspector_mixin._parse_view_info([], "nonexistent", "PUBLIC")
+        result = introspector_mixin.parse_view_info([], "nonexistent", "PUBLIC")
         assert result is None
 
     def test_parse_triggers_always_empty(self, introspector_mixin):
         """Snowflake doesn't support triggers."""
-        result = introspector_mixin._parse_triggers([], "PUBLIC")
+        result = introspector_mixin.parse_triggers([], "PUBLIC")
         assert result == []
 
 
@@ -710,8 +710,8 @@ class TestSyncSnowflakeIntrospector:
     def introspector(self, mock_backend, mock_executor):
         return SyncSnowflakeIntrospector(mock_backend, mock_executor)
 
-    def test_get_default_schema(self, introspector):
-        assert introspector._get_default_schema() == "PUBLIC"
+    def test_default_schema(self, introspector):
+        assert introspector.default_schema == "PUBLIC"
 
     def test_get_database_info(self, introspector, mock_executor):
         mock_executor.execute.return_value = [

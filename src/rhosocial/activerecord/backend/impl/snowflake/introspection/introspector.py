@@ -11,13 +11,13 @@ Architecture:
   - SQL generation: Delegated to SnowflakeIntrospectionMixin.format_*_query()
     methods in the Dialect layer via Expression.to_sql()
   - Query execution: Handled by IntrospectorExecutor
-  - Result parsing: _parse_* methods in this module (pure Python, no I/O)
+  - Result parsing: parse_* methods in this module (pure Python, no I/O)
 
 Key behaviours:
   - Queries INFORMATION_SCHEMA.TABLES, COLUMNS, TABLE_CONSTRAINTS,
     KEY_COLUMN_USAGE, REFERENTIAL_CONSTRAINTS, VIEWS
-  - _parse_* methods are pure Python -- shared by sync and async introspectors
-  - Snowflake does not support triggers; _parse_triggers returns empty list
+  - parse_* methods are pure Python -- shared by sync and async introspectors
+  - Snowflake does not support triggers; parse_triggers returns empty list
   - Snowflake does not have traditional indexes; constraints are used instead
 
 Design principle: Sync and Async are separate and cannot coexist.
@@ -78,13 +78,14 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
     from this mixin to share:
     - Default schema handling
     - Snowflake version detection
-    - _parse_* implementations
+    - parse_* implementations
 
     SQL generation is delegated to the Dialect layer via Expression.to_sql()
     which calls SnowflakeIntrospectionMixin.format_*_query() methods.
     """
 
-    def _get_default_schema(self) -> str:
+    @property
+    def default_schema(self) -> str:
         """Return the Snowflake schema name from the backend config.
 
         Snowflake uses a three-level namespace: database.schema.table.
@@ -106,10 +107,10 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
     # Parse methods — pure Python, no I/O
     # ------------------------------------------------------------------ #
 
-    def _parse_database_info(self, rows: List[Dict[str, Any]]) -> IntrospectionDatabaseInfo:
+    def parse_database_info(self, rows: List[Dict[str, Any]]) -> IntrospectionDatabaseInfo:
         version = self._get_version()
         version_str = ".".join(str(v) for v in version)
-        db_name = self._get_default_schema()
+        db_name = self.default_schema
 
         db_row = rows[0] if rows else {}
 
@@ -187,7 +188,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         except (TypeError, ValueError):
             return None
 
-    def _parse_databases(self, rows: List[Dict[str, Any]]) -> List[SnowflakeDatabaseInfo]:
+    def parse_databases(self, rows: List[Dict[str, Any]]) -> List[SnowflakeDatabaseInfo]:
         """Parse ``INFORMATION_SCHEMA.DATABASES`` rows.
 
         Columns read and their documented meanings are in
@@ -215,7 +216,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             )
         return databases
 
-    def _parse_schemas(self, rows: List[Dict[str, Any]]) -> List[SnowflakeSchemaInfo]:
+    def parse_schemas(self, rows: List[Dict[str, Any]]) -> List[SnowflakeSchemaInfo]:
         """Parse ``INFORMATION_SCHEMA.SCHEMATA`` rows.
 
         Columns read are documented on
@@ -246,7 +247,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             )
         return schemas
 
-    def _parse_warehouses(self, rows: List[Dict[str, Any]]) -> List[SnowflakeWarehouseInfo]:
+    def parse_warehouses(self, rows: List[Dict[str, Any]]) -> List[SnowflakeWarehouseInfo]:
         """Parse ``SHOW WAREHOUSES`` rows.
 
         The row shape is the one documented on
@@ -304,7 +305,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             )
         return warehouses
 
-    def _parse_table_storage_metrics(
+    def parse_table_storage_metrics(
         self,
         rows: List[Dict[str, Any]],
         table_name: str,
@@ -367,10 +368,10 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             comment=row.get("COMMENT"),
         )
 
-    def _parse_tables(
+    def parse_tables(
         self, rows: List[Dict[str, Any]], schema: Optional[str]
     ) -> List[IntrospectionTableInfo]:
-        target_schema = schema if schema is not None else self._get_default_schema()
+        target_schema = schema if schema is not None else self.default_schema
         table_type_map = {
             "BASE TABLE": TableType.BASE_TABLE,
             "VIEW": TableType.VIEW,
@@ -564,7 +565,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         # An unreadable word is caught here rather than raised, because not being
         # able to name its concept is the same as not knowing which column would
         # have carried its size -- so nothing is composed, the bare word is handed
-        # on, and :meth:`_parse_data_type` is where the unreadable type is
+        # on, and :meth:`parse_data_type` is where the unreadable type is
         # reported and degraded to ``None`` for that one column.
         try:
             concept = getattr(
@@ -591,7 +592,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         return word
 
     @staticmethod
-    def _parse_data_type(
+    def parse_data_type(
         composed: str, row: Dict[str, Any], dialect: Any
     ) -> Optional[Any]:
         """Read one composed catalog type string into a ``DataType``, or ``None``.
@@ -627,7 +628,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             )
             return None
 
-    def _parse_columns(
+    def parse_columns(
         self,
         rows: List[Dict[str, Any]],
         table_name: str,
@@ -659,7 +660,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
                     data_type=data_type.lower(),
                     data_type_full=composed,
                     parsed_data_type=(
-                        self._parse_data_type(composed, row, dialect)
+                        self.parse_data_type(composed, row, dialect)
                         if dialect
                         else None
                     ),
@@ -674,7 +675,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             )
         return columns
 
-    def _parse_indexes(
+    def parse_indexes(
         self,
         rows: List[Dict[str, Any]],
         table_name: str,
@@ -711,7 +712,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             )
         return list(constraint_map.values())
 
-    def _parse_foreign_keys(
+    def parse_foreign_keys(
         self,
         rows: List[Dict[str, Any]],
         table_name: str,
@@ -746,7 +747,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             )
         return list(fk_map.values())
 
-    def _parse_views(
+    def parse_views(
         self, rows: List[Dict[str, Any]], schema: str
     ) -> List[IntrospectionViewInfo]:
         return [
@@ -760,7 +761,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             for row in rows
         ]
 
-    def _parse_view_info(
+    def parse_view_info(
         self,
         rows: List[Dict[str, Any]],
         view_name: str,
@@ -777,7 +778,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             is_updatable=row.get("IS_UPDATABLE") == "YES",
         )
 
-    def _parse_triggers(
+    def parse_triggers(
         self, rows: List[Dict[str, Any]], schema: str
     ) -> List[IntrospectionTriggerInfo]:
         """Snowflake does not support triggers; always returns empty list."""
@@ -851,7 +852,7 @@ class SyncSnowflakeIntrospector(
         if cached is not None:
             return cached
         sql, params = SnowflakeDatabaseListQueryStatement(self.dialect).to_sql()
-        result = self._parse_databases(self._executor.execute(sql, params))
+        result = self.parse_databases(self._executor.execute(sql, params))
         self._cache.set(key, result)
         return result
 
@@ -881,7 +882,7 @@ class SyncSnowflakeIntrospector(
         sql, params = SnowflakeSchemaListQueryStatement(
             self.dialect, database=database
         ).to_sql()
-        result = self._parse_schemas(self._executor.execute(sql, params))
+        result = self.parse_schemas(self._executor.execute(sql, params))
         self._cache.set(key, result)
         return result
 
@@ -910,7 +911,7 @@ class SyncSnowflakeIntrospector(
         if cached is not None:
             return cached
         sql, params = SnowflakeWarehouseListQueryStatement(self.dialect).to_sql()
-        result = self._parse_warehouses(self._executor.execute(sql, params))
+        result = self.parse_warehouses(self._executor.execute(sql, params))
         self._cache.set(key, result)
         return result
 
@@ -941,7 +942,7 @@ class SyncSnowflakeIntrospector(
         answer may become present after a grant or a load, and caching a
         permission-shaped ``None`` would outlive the permission.
         """
-        target_schema = schema if schema is not None else self._get_default_schema()
+        target_schema = schema if schema is not None else self.default_schema
         key = self._cache.key(
             IntrospectionScope.TABLE,
             table_name,
@@ -954,7 +955,7 @@ class SyncSnowflakeIntrospector(
         sql, params = SnowflakeTableStorageMetricsQueryStatement(
             self.dialect, table_name, schema=target_schema
         ).to_sql()
-        result = self._parse_table_storage_metrics(
+        result = self.parse_table_storage_metrics(
             self._executor.execute(sql, params), table_name, target_schema
         )
         if result is not None:
@@ -1057,7 +1058,7 @@ class AsyncSnowflakeIntrospector(
         if cached is not None:
             return cached
         sql, params = SnowflakeDatabaseListQueryStatement(self.dialect).to_sql()
-        result = self._parse_databases(await self._executor.execute(sql, params))
+        result = self.parse_databases(await self._executor.execute(sql, params))
         self._cache.set(key, result)
         return result
 
@@ -1077,7 +1078,7 @@ class AsyncSnowflakeIntrospector(
         sql, params = SnowflakeSchemaListQueryStatement(
             self.dialect, database=database
         ).to_sql()
-        result = self._parse_schemas(await self._executor.execute(sql, params))
+        result = self.parse_schemas(await self._executor.execute(sql, params))
         self._cache.set(key, result)
         return result
 
@@ -1091,7 +1092,7 @@ class AsyncSnowflakeIntrospector(
         if cached is not None:
             return cached
         sql, params = SnowflakeWarehouseListQueryStatement(self.dialect).to_sql()
-        result = self._parse_warehouses(await self._executor.execute(sql, params))
+        result = self.parse_warehouses(await self._executor.execute(sql, params))
         self._cache.set(key, result)
         return result
 
@@ -1105,7 +1106,7 @@ class AsyncSnowflakeIntrospector(
         the documented ``ACCOUNTADMIN`` caveat on the view and the decision
         not to cache ``None``.
         """
-        target_schema = schema if schema is not None else self._get_default_schema()
+        target_schema = schema if schema is not None else self.default_schema
         key = self._cache.key(
             IntrospectionScope.TABLE,
             table_name,
@@ -1118,7 +1119,7 @@ class AsyncSnowflakeIntrospector(
         sql, params = SnowflakeTableStorageMetricsQueryStatement(
             self.dialect, table_name, schema=target_schema
         ).to_sql()
-        result = self._parse_table_storage_metrics(
+        result = self.parse_table_storage_metrics(
             await self._executor.execute(sql, params), table_name, target_schema
         )
         if result is not None:

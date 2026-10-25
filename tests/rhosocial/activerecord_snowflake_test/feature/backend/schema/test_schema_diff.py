@@ -52,7 +52,7 @@ def _introspected_column(name, declared_type, dialect):
     for testing the differ and wrong for testing the round trip: the whole
     question here is what the introspector hands the differ, so the column is
     built by running the declaration's catalog row through
-    ``SnowflakeIntrospectorMixin._parse_columns`` and taking what comes out.
+    ``SnowflakeIntrospectorMixin.parse_columns`` and taking what comes out.
     """
     from unittest.mock import MagicMock
 
@@ -99,7 +99,7 @@ def _introspected_column(name, declared_type, dialect):
     backend.dialect = dialect
     mixin = SnowflakeIntrospectorMixin()
     mixin._backend = backend
-    return mixin._parse_columns([row], "t", "PUBLIC")[0]
+    return mixin.parse_columns([row], "t", "PUBLIC")[0]
 
 
 class TestSnowflakeSchemaDiffer:
@@ -215,7 +215,7 @@ class TestSnowflakeSchemaDifferRoundTrip:
     against the declaration that created it — a change on a column nobody
     touched, which is what this class asserts does not happen.
 
-    These go through the real ``_parse_columns``, not a hand-built
+    These go through the real ``parse_columns``, not a hand-built
     ``IntrospectionColumnInfo``, because the type the differ sees is the one the
     introspector composed.
     """
