@@ -283,10 +283,44 @@ class SnowflakeIntrospectionMixin:
             ],
         ).to_sql()
 
+    def _no_table_type_predicate(self) -> "ComparisonPredicate":
+        """A comparison that cannot hold, for a kind the catalogue never names.
+
+        A core ``TableType`` such as ``FOREIGN_TABLE`` or ``PARTITIONED_TABLE``
+        has no Snowflake spelling.  Dropping the condition would answer with
+        every table, which claims rows the catalogue never reported as that
+        kind; the honest answer is "none" (``1 = 2``), the idiom the trigger
+        formatter uses for a family this engine does not have.
+        """
+        return ComparisonPredicate(
+            self,
+            "eq",
+            Literal(self, 1, inline=True),
+            Literal(self, 2, inline=True),
+        )
+
     def format_table_list_query_statement(
         self, expr: "TableListQueryStatement"
     ) -> Tuple[str, tuple]:
-        """Format table list query using INFORMATION_SCHEMA.TABLES."""
+        """Format table list query using INFORMATION_SCHEMA.TABLES.
+
+        ``include_views=False`` removes the two view spellings and nothing
+        else.  It used to require ``TABLE_TYPE = 'BASE TABLE'``, which also
+        hid every other table kind the catalogue reports -- managed, event,
+        Iceberg, hybrid and dynamic tables are tables, not views, and a
+        "no views" listing must not answer as if they did not exist.
+
+        An explicit ``table_type`` is read in both vocabularies: an exact
+        catalogue spelling selects that spelling, a core ``TableType`` name
+        expands onto the spellings mapped to it, and an unknown spelling is a
+        catalogue value this backend has not learned yet.  See
+        :func:`..introspection.table_types.catalogue_spellings`.
+        """
+        from ..introspection.table_types import (
+            SNOWFLAKE_VIEW_TYPES,
+            catalogue_spellings,
+        )
+
         params = expr.get_params()
         schema = params.get("schema", "")
         include_views = params.get("include_views", True)
@@ -314,22 +348,24 @@ class SnowflakeIntrospectionMixin:
             )
         if not include_views:
             conditions.append(
-                ComparisonPredicate(
+                ~InPredicate(
                     self,
-                    "eq",
                     self._catalog_column("TABLE_TYPE"),
-                    Literal(self, "BASE TABLE", inline=True),
+                    Literal(self, list(SNOWFLAKE_VIEW_TYPES), inline=True),
                 )
             )
         if table_type:
-            conditions.append(
-                ComparisonPredicate(
-                    self,
-                    "eq",
-                    self._catalog_column("TABLE_TYPE"),
-                    Literal(self, table_type),
+            spellings = catalogue_spellings(table_type)
+            if spellings:
+                conditions.append(
+                    InPredicate(
+                        self,
+                        self._catalog_column("TABLE_TYPE"),
+                        Literal(self, list(spellings)),
+                    )
                 )
-            )
+            else:
+                conditions.append(self._no_table_type_predicate())
 
         return self._catalog_query(
             [

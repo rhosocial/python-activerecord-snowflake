@@ -44,7 +44,6 @@ from rhosocial.activerecord.backend.introspection.executor import (
 from rhosocial.activerecord.backend.introspection.types import (
     IntrospectionDatabaseInfo,
     IntrospectionTableInfo,
-    TableType,
     IntrospectionColumnInfo,
     ColumnNullable,
     IndexInfo,
@@ -63,6 +62,7 @@ from ..expression.introspection import (
     SnowflakeTableStorageMetricsQueryStatement,
     SnowflakeWarehouseListQueryStatement,
 )
+from .table_types import core_table_type, read_table_type
 from .types import (
     SnowflakeDatabaseInfo,
     SnowflakeSchemaInfo,
@@ -377,26 +377,32 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
     def parse_tables(
         self, rows: List[Dict[str, Any]], schema: Optional[str]
     ) -> List[IntrospectionTableInfo]:
+        """Turn a table listing into records, keeping the catalogue's word.
+
+        ``TABLE_TYPE`` is read in Snowflake's vocabulary (see
+        :mod:`.table_types`) and the raw spelling is stored on every record as
+        ``extra["snowflake_table_type"]``.  It is always present, not only for
+        the vendor kinds: a caller that wants to filter on
+        ``"ICEBERG TABLE"`` or tell ``"BASE TABLE"`` from ``"MANAGED TABLE"``
+        needs the spelling the catalogue actually reported, and a field that
+        exists only for some rows cannot be filtered on at all.
+
+        A spelling this backend does not know still reads as ``BASE_TABLE``,
+        because collapsing it is the only honest answer when the core enum has
+        no member for it -- but the spelling is kept, so the fold is no longer
+        silent.
+        """
         target_schema = schema if schema is not None else self.default_schema
-        table_type_map = {
-            "BASE TABLE": TableType.BASE_TABLE,
-            "VIEW": TableType.VIEW,
-            "MATERIALIZED VIEW": TableType.MATERIALIZED_VIEW,
-            "SYSTEM TABLE": TableType.SYSTEM_TABLE,
-            "EXTERNAL TABLE": TableType.EXTERNAL,
-            "TEMPORARY TABLE": TableType.TEMPORARY,
-        }
         tables = []
         for row in rows:
-            t_type = table_type_map.get(
-                row.get("TABLE_TYPE", "BASE TABLE"), TableType.BASE_TABLE
-            )
+            raw_type = read_table_type(row.get("TABLE_TYPE"))
             tables.append(
                 IntrospectionTableInfo(
                     name=row["TABLE_NAME"],
                     schema=target_schema,
-                    table_type=t_type,
+                    table_type=core_table_type(raw_type),
                     comment=row.get("COMMENT"),
+                    extra={"snowflake_table_type": raw_type},
                 )
             )
         return tables
