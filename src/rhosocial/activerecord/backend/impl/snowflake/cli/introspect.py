@@ -37,11 +37,10 @@ def create_parser(subparsers):
   # List all views
   %(prog)s views --account myaccount --database mydb
 
-  # Get detailed table info (columns, indexes, foreign keys)
-  %(prog)s table users --account myaccount --database mydb
-
-  # Get column details for a table
+  # Get column details, indexes and foreign keys for a table
   %(prog)s columns users --account myaccount --database mydb
+  %(prog)s indexes users --account myaccount --database mydb
+  %(prog)s foreign-keys users --account myaccount --database mydb
 
   # List the databases visible to the role, the schemas of a database,
   # and the virtual warehouses
@@ -78,7 +77,7 @@ def create_parser(subparsers):
         "type",
         choices=INTROSPECT_TYPES,
         help=(
-            "Introspection type: tables, views, table, columns, indexes, "
+            "Introspection type: tables, views, columns, indexes, "
             "foreign-keys, database, databases, schemas, warehouses"
         ),
     )

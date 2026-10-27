@@ -198,6 +198,18 @@ class TestSnowflakeDialectCapabilities:
         assert boundary_dialect.supports_returning_update() is True
         assert boundary_dialect.supports_returning_delete() is True
 
+    def test_returning_predicates_do_not_raise_without_a_version(self):
+        """An unconfirmed version is "not supported", not an exception.
+
+        A capability probe is asked precisely when the caller cannot assume
+        the answer is yes, so an unadapted dialect answers False instead of
+        raising DialectNotAdaptedException.
+        """
+        unknown = SnowflakeDialect(version=None)
+        assert unknown.supports_returning_insert() is False
+        assert unknown.supports_returning_update() is False
+        assert unknown.supports_returning_delete() is False
+
     def test_supports_offset_without_limit(self, dialect):
         assert dialect.supports_offset_without_limit() is True
 

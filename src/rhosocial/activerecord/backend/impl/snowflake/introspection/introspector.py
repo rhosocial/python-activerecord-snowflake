@@ -99,17 +99,23 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             return schema or ""
         return ""
 
-    def _get_version(self) -> tuple:
-        """Return the Snowflake server version tuple from the backend."""
-        return getattr(self._backend, '_version', (8, 0, 0))
-
     # ------------------------------------------------------------------ #
     # Parse methods — pure Python, no I/O
     # ------------------------------------------------------------------ #
 
     def parse_database_info(self, rows: List[Dict[str, Any]]) -> IntrospectionDatabaseInfo:
-        version = self._get_version()
-        version_str = ".".join(str(v) for v in version)
+        """Parse database info, reporting the version without raising.
+
+        ``self.server_version`` reads the dialect, then the backend's cached
+        server version, and never opens a connection. A version nothing knows
+        yet is reported as ``"unknown"`` with the all-zero tuple, per the
+        introspection contract.
+        """
+        version = self.server_version
+        version_tuple = version if version is not None else (0, 0, 0)
+        version_str = (
+            "unknown" if version is None else ".".join(str(v) for v in version)
+        )
         db_name = self.default_schema
 
         db_row = rows[0] if rows else {}
@@ -117,7 +123,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         return IntrospectionDatabaseInfo(
             name=db_row.get("CATALOG_NAME", db_name),
             version=version_str,
-            version_tuple=version,
+            version_tuple=version_tuple,
             vendor="Snowflake",
         )
 
@@ -375,6 +381,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         table_type_map = {
             "BASE TABLE": TableType.BASE_TABLE,
             "VIEW": TableType.VIEW,
+            "MATERIALIZED VIEW": TableType.MATERIALIZED_VIEW,
             "SYSTEM TABLE": TableType.SYSTEM_TABLE,
             "EXTERNAL TABLE": TableType.EXTERNAL,
             "TEMPORARY TABLE": TableType.TEMPORARY,

@@ -89,15 +89,15 @@ class SnowflakeCapabilityMixin:
 
     def supports_returning_insert(self) -> bool:
         """Snowflake supports RETURNING for INSERT from version 7.32.0+."""
-        return self.version >= (7, 32, 0)
+        return self.version_at_least((7, 32, 0))
 
     def supports_returning_update(self) -> bool:
         """Snowflake supports RETURNING for UPDATE from version 7.32.0+."""
-        return self.version >= (7, 32, 0)
+        return self.version_at_least((7, 32, 0))
 
     def supports_returning_delete(self) -> bool:
         """Snowflake supports RETURNING for DELETE from version 7.32.0+."""
-        return self.version >= (7, 32, 0)
+        return self.version_at_least((7, 32, 0))
 
     def supports_filter_clause(self) -> bool:
         """Snowflake supports FILTER clause."""

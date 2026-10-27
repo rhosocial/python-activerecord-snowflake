@@ -9,10 +9,8 @@ Tests cover:
 """
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
-from typing import Any, Dict, List, Optional
 
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
-from rhosocial.activerecord.backend.impl.snowflake.mixins import SnowflakeIntrospectionMixin
 from rhosocial.activerecord.backend.impl.snowflake.introspection import (
     SnowflakeIntrospectorMixin,
     SyncSnowflakeIntrospector,
@@ -20,17 +18,9 @@ from rhosocial.activerecord.backend.impl.snowflake.introspection import (
 )
 from rhosocial.activerecord.backend.introspection.types import (
     IntrospectionDatabaseInfo,
-    IntrospectionTableInfo,
     TableType,
-    IntrospectionColumnInfo,
     ColumnNullable,
-    IndexInfo,
-    IndexColumnInfo,
-    IndexType,
-    IntrospectionForeignKeyInfo,
     ReferentialAction,
-    IntrospectionViewInfo,
-    IntrospectionTriggerInfo,
 )
 from rhosocial.activerecord.backend.introspection.executor import SyncIntrospectorExecutor
 
@@ -159,9 +149,13 @@ class TestSnowflakeIntrospectorParsing:
         """Create a minimal introspector mixin with mock backend."""
 
         class MockBackend:
+            dialect = SnowflakeDialect(version=(8, 32, 0))
             _version = (8, 32, 0)
             config = MagicMock()
             config.schema = "PUBLIC"
+
+            def get_cached_server_version(self):
+                return (8, 32, 0)
 
         mixin = SnowflakeIntrospectorMixin()
         mixin._backend = MockBackend()
@@ -182,6 +176,22 @@ class TestSnowflakeIntrospectorParsing:
         assert isinstance(result, IntrospectionDatabaseInfo)
         assert result.vendor == "Snowflake"
 
+    def test_parse_database_info_reports_unknown_without_a_version(self):
+        class UnknownVersionBackend:
+            dialect = SnowflakeDialect(version=None)
+            config = MagicMock()
+            config.schema = "PUBLIC"
+
+            def get_cached_server_version(self):
+                return None
+
+        mixin = SnowflakeIntrospectorMixin()
+        mixin._backend = UnknownVersionBackend()
+
+        result = mixin.parse_database_info([])
+        assert result.version == "unknown"
+        assert result.version_tuple == (0, 0, 0)
+
     def test_parse_tables(self, introspector_mixin):
         rows = [
             {"TABLE_NAME": "users", "TABLE_TYPE": "BASE TABLE", "COMMENT": None},
@@ -194,6 +204,13 @@ class TestSnowflakeIntrospectorParsing:
         assert result[1].name == "v_users"
         assert result[1].table_type == TableType.VIEW
         assert result[1].comment == "user view"
+
+    def test_parse_tables_keeps_materialized_views_distinct(self, introspector_mixin):
+        rows = [
+            {"TABLE_NAME": "mv_sales", "TABLE_TYPE": "MATERIALIZED VIEW"},
+        ]
+        result = introspector_mixin.parse_tables(rows, "PUBLIC")
+        assert result[0].table_type == TableType.MATERIALIZED_VIEW
 
     def test_parse_columns(self, introspector_mixin):
         rows = [
@@ -583,8 +600,18 @@ class TestSnowflakeCatalogSizeReachesParseType:
     def test_parse_indexes_as_constraints(self, introspector_mixin):
         """Snowflake maps PK/unique constraints to IndexInfo."""
         rows = [
-            {"CONSTRAINT_NAME": "PK_USERS", "CONSTRAINT_TYPE": "PRIMARY KEY", "COLUMN_NAME": "id", "ORDINAL_POSITION": 1},
-            {"CONSTRAINT_NAME": "UK_USERS_EMAIL", "CONSTRAINT_TYPE": "UNIQUE", "COLUMN_NAME": "email", "ORDINAL_POSITION": 1},
+            {
+                "CONSTRAINT_NAME": "PK_USERS",
+                "CONSTRAINT_TYPE": "PRIMARY KEY",
+                "COLUMN_NAME": "id",
+                "ORDINAL_POSITION": 1,
+            },
+            {
+                "CONSTRAINT_NAME": "UK_USERS_EMAIL",
+                "CONSTRAINT_TYPE": "UNIQUE",
+                "COLUMN_NAME": "email",
+                "ORDINAL_POSITION": 1,
+            },
         ]
         result = introspector_mixin.parse_indexes(rows, "users", "PUBLIC")
         assert len(result) == 2
