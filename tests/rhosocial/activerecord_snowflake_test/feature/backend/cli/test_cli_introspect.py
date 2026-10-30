@@ -22,6 +22,7 @@ from typing import Any, List, Optional
 
 import pytest
 from rhosocial.activerecord.backend.errors import ConnectionError, QueryError
+from rhosocial.activerecord.backend.introspection.types import IntrospectionViewInfo
 
 from rhosocial.activerecord.backend.impl.snowflake.cli import introspect as cli_introspect
 from rhosocial.activerecord.backend.impl.snowflake.cli import output as cli_output
@@ -30,8 +31,13 @@ from rhosocial.activerecord.backend.impl.snowflake.introspection import (
     SnowflakeTableStorageMetrics,
 )
 
-#: The types that act on a named table, so the name is required.
+#: The types that act on a named table, so the name is required. ``views``
+#: takes an optional view name and is covered separately.
 NAME_TYPES = ("columns", "indexes", "foreign-keys", "table-storage-metrics")
+
+#: The types that answer for a whole family (or for the session's context),
+#: so a name is refused rather than ignored.
+NO_NAME_TYPES = ("tables", "database", "databases", "schemas", "warehouses")
 
 
 class RecordingProvider:
@@ -65,6 +71,17 @@ class FakeIntrospector:
     def list_views(self, schema=None):
         self.calls.append(("views", schema))
         return [{"TABLE_NAME": "V_CUSTOMERS"}]
+
+    def get_view_info(self, view_name, schema=None):
+        self.calls.append(("view-info", view_name, schema))
+        if view_name == "missing":
+            return None
+        return IntrospectionViewInfo(
+            name=view_name,
+            schema=schema or "PUBLIC",
+            definition="SELECT 1",
+            is_updatable=True,
+        )
 
     def list_columns(self, name, schema=None):
         self.calls.append(("columns", name, schema))
@@ -128,6 +145,7 @@ class AsyncFacade:
         for attr in (
             "list_tables",
             "list_views",
+            "get_view_info",
             "list_columns",
             "list_indexes",
             "list_foreign_keys",
@@ -318,6 +336,7 @@ class TestIntrospectSyncDispatch:
         [
             ("tables", None, "Tables"),
             ("views", None, "Views"),
+            ("views", "v_customers", "View v_customers"),
             ("columns", "customers", "Columns of customers"),
             ("indexes", "customers", "Indexes of customers"),
             ("foreign-keys", "orders", "Foreign Keys of orders"),
@@ -378,6 +397,26 @@ class TestIntrospectSyncDispatch:
         assert excinfo.value.code == 1
         assert "Table name is required" in capsys.readouterr().err
 
+    def test_a_named_view_asks_for_that_view(self, provider, monkeypatch):
+        insp = FakeIntrospector()
+        patch_sync_backend(monkeypatch, insp)
+        cli_introspect.handle(
+            build_parser().parse_args(["introspect", "views", "v_customers", "--account", "acct"])
+        )
+        assert insp.calls[-1] == ("view-info", "v_customers", None)
+        title, rows = provider.results[0]
+        assert title == "View v_customers"
+        assert rows[0]["name"] == "v_customers"
+
+    def test_a_named_view_that_is_not_there_exits_one(self, provider, capsys, monkeypatch):
+        patch_sync_backend(monkeypatch, FakeIntrospector())
+        with pytest.raises(SystemExit) as excinfo:
+            cli_introspect.handle(
+                build_parser().parse_args(["introspect", "views", "missing", "--account", "acct"])
+            )
+        assert excinfo.value.code == 1
+        assert "View 'missing' not found" in capsys.readouterr().err
+
     def test_storage_metrics_without_a_row_exits_one(self, provider, capsys, monkeypatch):
         """``None`` is "no metrics row", not "no such table"."""
         patch_sync_backend(monkeypatch, FakeIntrospector())
@@ -408,6 +447,20 @@ class TestIntrospectSyncDispatch:
         assert title == "Storage Metrics of orders"
         assert rows[0]["active_bytes"] == 1024
         assert rows[0]["row_count"] == 10
+
+    @pytest.mark.parametrize("itype", NO_NAME_TYPES)
+    def test_a_name_on_a_family_type_is_refused(self, provider, capsys, monkeypatch, itype):
+        """Exit 2: the pair does not exist, not a runtime failure."""
+        patch_sync_backend(monkeypatch, FakeIntrospector())
+        with pytest.raises(SystemExit) as excinfo:
+            cli_introspect.handle(
+                build_parser().parse_args(["introspect", itype, "analytics", "--account", "acct"])
+            )
+        assert excinfo.value.code == 2
+        err = capsys.readouterr().err
+        assert "takes no name" in err
+        assert "analytics" in err
+        assert provider.results == []
 
     def test_database_branch_wraps_one_row(self, provider, monkeypatch):
         patch_sync_backend(monkeypatch, FakeIntrospector())
@@ -479,6 +532,7 @@ class TestIntrospectAsyncDispatch:
         [
             ("tables", None, "Tables"),
             ("views", None, "Views"),
+            ("views", "v_customers", "View v_customers"),
             ("columns", "customers", "Columns of customers"),
             ("indexes", "customers", "Indexes of customers"),
             ("foreign-keys", "orders", "Foreign Keys of orders"),

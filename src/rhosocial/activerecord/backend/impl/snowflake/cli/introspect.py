@@ -51,6 +51,12 @@ INTROSPECT_TYPES = list(_TYPE_CAPABILITIES)
 # has a formatter for it, but no introspector method reads it, so there is no
 # answer behind the type.
 
+#: Types that answer for a whole family (or for the session's context), not
+#: for one named object. A NAME given to one of them is refused rather than
+#: ignored: the parser accepts the positional for the types that need it, so
+#: silently dropping it would claim a filtering the command never performed.
+_NO_NAME_TYPES = ("tables", "database", "databases", "schemas", "warehouses")
+
 
 def _require_capability(backend, args) -> None:
     """Refuse a type the connected dialect says it cannot answer.
@@ -79,6 +85,29 @@ def _require_capability(backend, args) -> None:
     sys.exit(2)
 
 
+def _refuse_name(args) -> None:
+    """Refuse a NAME on a type that does not take one.
+
+    Exit code 2: the type exists, the name exists, but the pair does not --
+    ``introspect databases analytics`` is not a narrower ``databases``, it
+    is a request this backend has no method for (there is no
+    ``get_database_info`` by name, no ``get_schema_info``, no
+    ``get_warehouse_info``). Refusing is the only answer that does not
+    pretend the name changed the output.
+
+    ``schemas --database analytics`` is not this check: ``--database`` says
+    *which database's* schemas to enumerate, which is a different question
+    from naming one schema, and it stays untouched.
+    """
+    if args.type not in _NO_NAME_TYPES or args.name is None:
+        return
+    print(
+        f"Error: '{args.type}' introspection takes no name (got '{args.name}')",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+
 def create_parser(subparsers):
     """Create the introspect subcommand parser."""
     parser = subparsers.add_parser(
@@ -99,6 +128,9 @@ def create_parser(subparsers):
   # One table's billed storage: active, time travel, failsafe and
   # clone-retained bytes, with its row count and clustering key
   %(prog)s table-storage-metrics users --account myaccount --database mydb
+
+  # One view, by name
+  %(prog)s views v_users --account myaccount --database mydb
 
   # List the databases visible to the role, the schemas of a database,
   # and the virtual warehouses
@@ -146,7 +178,12 @@ both exit 1 with the same message.
         "name",
         nargs="?",
         default=None,
-        help="Table/view name (required for some types)",
+        help=(
+            "Table name for columns, indexes, foreign-keys and "
+            "table-storage-metrics (required); view name for views "
+            "(optional); refused for tables, database, databases, schemas "
+            "and warehouses"
+        ),
     )
     parser.add_argument(
         "--include-system",
@@ -164,6 +201,8 @@ def handle(args):
     if not args.account and not args.database:
         print("Error: --account and/or --database is required for introspection", file=sys.stderr)
         sys.exit(1)
+
+    _refuse_name(args)
 
     config = resolve_connection_config_from_args(args)
 
@@ -219,9 +258,16 @@ def _handle_introspect_sync(args, backend: SnowflakeBackend, provider):
             provider.display_results(data, title="Tables")
 
         elif args.type == "views":
-            views = introspector.list_views(schema=None)
-            data = _serialize_for_output(views)
-            provider.display_results(data, title="Views")
+            if args.name:
+                view = introspector.get_view_info(args.name, schema=None)
+                if view is None:
+                    print(f"Error: View '{args.name}' not found", file=sys.stderr)
+                    sys.exit(1)
+                provider.display_results(_serialize_for_output([view]), title=f"View {args.name}")
+            else:
+                views = introspector.list_views(schema=None)
+                data = _serialize_for_output(views)
+                provider.display_results(data, title="Views")
 
         elif args.type == "columns":
             if not args.name:
@@ -321,9 +367,16 @@ async def _handle_introspect_async(args, backend: AsyncSnowflakeBackend, provide
             provider.display_results(data, title="Tables")
 
         elif args.type == "views":
-            views = await introspector.list_views(schema=None)
-            data = _serialize_for_output(views)
-            provider.display_results(data, title="Views")
+            if args.name:
+                view = await introspector.get_view_info(args.name, schema=None)
+                if view is None:
+                    print(f"Error: View '{args.name}' not found", file=sys.stderr)
+                    sys.exit(1)
+                provider.display_results(_serialize_for_output([view]), title=f"View {args.name}")
+            else:
+                views = await introspector.list_views(schema=None)
+                data = _serialize_for_output(views)
+                provider.display_results(data, title="Views")
 
         elif args.type == "columns":
             if not args.name:
