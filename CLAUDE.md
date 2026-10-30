@@ -41,6 +41,7 @@ This project is under active development. Key features implemented:
 - **pyformat placeholders**: `%s` style (snowflake-connector-python uses pyformat)
 - **PAT authentication**: Programmatic Access Tokens (JWT) for CI/automation
 - **Warehouse lifecycle**: Virtual warehouses auto-suspend; consider `client_session_keep_alive=True`
+- **No `status` subcommand**: this backend has no status introspector (no `AbstractStatusIntrospector` implementation under `introspection/`), so the CLI command list has no `status` — that is an accurate reflection of the library, not a missing wire-up. `info` covers the version and the protocol/capability matrix. If the backends are ever aligned on `status`, the library implementation comes first.
 
 ## Version Control and Changelog
 
