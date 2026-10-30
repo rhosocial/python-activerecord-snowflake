@@ -1,6 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/introspection.py
 """SnowflakeIntrospectionMixin — schema introspection via INFORMATION_SCHEMA."""
-from typing import List, Optional, Tuple, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from rhosocial.activerecord.backend.expression import (
     Column,
@@ -30,14 +31,14 @@ from ..expression.show import SnowflakeShowObjectType, SnowflakeShowStatement
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.introspection import (
-        DatabaseInfoQueryStatement,
-        TableListQueryStatement,
         ColumnInfoQueryStatement,
-        IndexInfoQueryStatement,
+        DatabaseInfoQueryStatement,
         ForeignKeyQueryStatement,
-        ViewListQueryStatement,
-        ViewInfoQueryStatement,
+        IndexInfoQueryStatement,
+        TableListQueryStatement,
         TriggerListQueryStatement,
+        ViewInfoQueryStatement,
+        ViewListQueryStatement,
     )
     from rhosocial.activerecord.backend.introspection.types import IntrospectionScope
 
@@ -95,6 +96,18 @@ class SnowflakeIntrospectionMixin:
         account-level question the other engines do not have."""
         return True
 
+    def supports_table_storage_metrics(self) -> bool:
+        """Snowflake answers for one table's billed storage.
+
+        The capability for the ``introspect table-storage-metrics`` family.
+        The answer is a join of ``TABLE_STORAGE_METRICS`` with ``TABLES``,
+        not a column of the ``tables`` listing, which is why it is a family
+        of its own; see
+        :meth:`format_table_storage_metrics_query_statement` for the columns
+        and the ``ACCOUNTADMIN`` caveat that makes an absent row distinct
+        from an absent table."""
+        return True
+
     # ========== Capability Detection ==========
 
     def supports_introspection(self) -> bool:
@@ -132,6 +145,7 @@ class SnowflakeIntrospectionMixin:
     def get_supported_introspection_scopes(self) -> List["IntrospectionScope"]:
         """Get list of supported introspection scopes."""
         from rhosocial.activerecord.backend.introspection.types import IntrospectionScope
+
         return [
             IntrospectionScope.DATABASE,
             IntrospectionScope.TABLE,
@@ -261,9 +275,7 @@ class SnowflakeIntrospectionMixin:
         """
         statement = QueryStatement(self, select=projections, from_=source)
         if conditions:
-            statement.where = WhereClause(
-                self, LogicalPredicate(self, "AND", *conditions)
-            )
+            statement.where = WhereClause(self, LogicalPredicate(self, "AND", *conditions))
         if order_by is not None:
             statement.order_by = OrderByClause(self, order_by)
         return statement.to_sql()
@@ -341,9 +353,7 @@ class SnowflakeIntrospectionMixin:
                 ~InPredicate(
                     self,
                     self._catalog_column("TABLE_SCHEMA"),
-                    Literal(
-                        self, ["information_schema", "PUBLIC"], inline=True
-                    ),
+                    Literal(self, ["information_schema", "PUBLIC"], inline=True),
                 )
             )
         if not include_views:
@@ -478,9 +488,7 @@ class SnowflakeIntrospectionMixin:
                 InPredicate(
                     self,
                     self._catalog_column("CONSTRAINT_TYPE", "tc"),
-                    Literal(
-                        self, ["PRIMARY KEY", "UNIQUE"], inline=True
-                    ),
+                    Literal(self, ["PRIMARY KEY", "UNIQUE"], inline=True),
                 ),
             ],
             [
@@ -521,36 +529,40 @@ class SnowflakeIntrospectionMixin:
         # Named per view, then joined in the order the original statement
         # joined them: the constraint, its columns, the constraint it points
         # at, and that constraint's columns.
-        source = JoinClause(
-            self,
-            left_table=self._information_schema_view("REFERENTIAL_CONSTRAINTS", "rc"),
-            right_table=self._information_schema_view("KEY_COLUMN_USAGE", "kcu"),
-            join_type=JoinType.INNER,
-            condition=LogicalPredicate(
+        source = (
+            JoinClause(
                 self,
-                "AND",
-                _same("CONSTRAINT_NAME", "CONSTRAINT_NAME", "rc", "kcu"),
-                _same("CONSTRAINT_SCHEMA", "CONSTRAINT_SCHEMA", "rc", "kcu"),
-            ),
-        ).join(
-            right_table=self._information_schema_view("TABLE_CONSTRAINTS", "utc"),
-            join_type="JOIN",
-            condition=LogicalPredicate(
-                self,
-                "AND",
-                _same("UNIQUE_CONSTRAINT_NAME", "CONSTRAINT_NAME", "rc", "utc"),
-                _same("UNIQUE_CONSTRAINT_SCHEMA", "CONSTRAINT_SCHEMA", "rc", "utc"),
-            ),
-        ).join(
-            right_table=self._information_schema_view("KEY_COLUMN_USAGE", "ukcu"),
-            join_type="JOIN",
-            condition=LogicalPredicate(
-                self,
-                "AND",
-                _same("UNIQUE_CONSTRAINT_NAME", "CONSTRAINT_NAME", "rc", "ukcu"),
-                _same("UNIQUE_CONSTRAINT_SCHEMA", "CONSTRAINT_SCHEMA", "rc", "ukcu"),
-                _same("POSITION_IN_UNIQUE_CONSTRAINT", "ORDINAL_POSITION", "kcu", "ukcu"),
-            ),
+                left_table=self._information_schema_view("REFERENTIAL_CONSTRAINTS", "rc"),
+                right_table=self._information_schema_view("KEY_COLUMN_USAGE", "kcu"),
+                join_type=JoinType.INNER,
+                condition=LogicalPredicate(
+                    self,
+                    "AND",
+                    _same("CONSTRAINT_NAME", "CONSTRAINT_NAME", "rc", "kcu"),
+                    _same("CONSTRAINT_SCHEMA", "CONSTRAINT_SCHEMA", "rc", "kcu"),
+                ),
+            )
+            .join(
+                right_table=self._information_schema_view("TABLE_CONSTRAINTS", "utc"),
+                join_type="JOIN",
+                condition=LogicalPredicate(
+                    self,
+                    "AND",
+                    _same("UNIQUE_CONSTRAINT_NAME", "CONSTRAINT_NAME", "rc", "utc"),
+                    _same("UNIQUE_CONSTRAINT_SCHEMA", "CONSTRAINT_SCHEMA", "rc", "utc"),
+                ),
+            )
+            .join(
+                right_table=self._information_schema_view("KEY_COLUMN_USAGE", "ukcu"),
+                join_type="JOIN",
+                condition=LogicalPredicate(
+                    self,
+                    "AND",
+                    _same("UNIQUE_CONSTRAINT_NAME", "CONSTRAINT_NAME", "rc", "ukcu"),
+                    _same("UNIQUE_CONSTRAINT_SCHEMA", "CONSTRAINT_SCHEMA", "rc", "ukcu"),
+                    _same("POSITION_IN_UNIQUE_CONSTRAINT", "ORDINAL_POSITION", "kcu", "ukcu"),
+                ),
+            )
         )
         return self._catalog_query(
             [
@@ -560,9 +572,7 @@ class SnowflakeIntrospectionMixin:
                 self._catalog_column("COLUMN_NAME", "kcu"),
                 self._catalog_column("ORDINAL_POSITION", "kcu"),
                 self._catalog_column("TABLE_NAME", "utc", alias="REFERENCED_TABLE_NAME"),
-                self._catalog_column(
-                    "COLUMN_NAME", "ukcu", alias="REFERENCED_COLUMN_NAME"
-                ),
+                self._catalog_column("COLUMN_NAME", "ukcu", alias="REFERENCED_COLUMN_NAME"),
             ],
             source,
             [
@@ -585,9 +595,7 @@ class SnowflakeIntrospectionMixin:
             ],
         )
 
-    def format_view_list_query_statement(
-        self, expr: "ViewListQueryStatement"
-    ) -> Tuple[str, tuple]:
+    def format_view_list_query_statement(self, expr: "ViewListQueryStatement") -> Tuple[str, tuple]:
         """Format view list query using INFORMATION_SCHEMA.VIEWS."""
         params = expr.get_params()
         schema = params.get("schema", "")
@@ -623,9 +631,7 @@ class SnowflakeIntrospectionMixin:
             [self._catalog_column("TABLE_NAME")],
         )
 
-    def format_view_info_query_statement(
-        self, expr: "ViewInfoQueryStatement"
-    ) -> Tuple[str, tuple]:
+    def format_view_info_query_statement(self, expr: "ViewInfoQueryStatement") -> Tuple[str, tuple]:
         """Format single view information query."""
         params = expr.get_params()
         view_name = params.get("view_name", "")
@@ -676,9 +682,7 @@ class SnowflakeIntrospectionMixin:
             ),
         ).to_sql()
 
-    def format_trigger_info_query_statement(
-        self, expr
-    ) -> Tuple[str, tuple]:
+    def format_trigger_info_query_statement(self, expr) -> Tuple[str, tuple]:
         """Snowflake does not support triggers; return empty result."""
         return self.format_trigger_list_query_statement(expr)
 
@@ -785,9 +789,7 @@ class SnowflakeIntrospectionMixin:
                 self._catalog_column("LAST_ALTERED"),
                 self._catalog_column("COMMENT"),
             ],
-            self._information_schema_view(
-                "SCHEMATA", catalog=expr.database or None
-            ),
+            self._information_schema_view("SCHEMATA", catalog=expr.database or None),
             order_by=[self._catalog_column("SCHEMA_NAME")],
         )
 
@@ -840,9 +842,7 @@ class SnowflakeIntrospectionMixin:
         already exposes a ``SHOW`` result set through ``cursor.description``,
         which is per-cursor and cannot be displaced, so this backend reads that.
         """
-        return SnowflakeShowStatement(
-            self, SnowflakeShowObjectType.WAREHOUSES
-        ).to_sql()
+        return SnowflakeShowStatement(self, SnowflakeShowObjectType.WAREHOUSES).to_sql()
 
     def format_table_storage_metrics_query_statement(
         self, expr: SnowflakeTableStorageMetricsQueryStatement

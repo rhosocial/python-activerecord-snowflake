@@ -21,16 +21,17 @@ from datetime import datetime
 from typing import Any, List, Optional
 
 import pytest
-
 from rhosocial.activerecord.backend.errors import ConnectionError, QueryError
+
 from rhosocial.activerecord.backend.impl.snowflake.cli import introspect as cli_introspect
 from rhosocial.activerecord.backend.impl.snowflake.cli import output as cli_output
 from rhosocial.activerecord.backend.impl.snowflake.introspection import (
     SnowflakeDatabaseInfo,
+    SnowflakeTableStorageMetrics,
 )
 
-#: The three types that act on a named table. The rest take no positional.
-NAME_TYPES = ("columns", "indexes", "foreign-keys")
+#: The types that act on a named table, so the name is required.
+NAME_TYPES = ("columns", "indexes", "foreign-keys", "table-storage-metrics")
 
 
 class RecordingProvider:
@@ -77,6 +78,23 @@ class FakeIntrospector:
         self.calls.append(("foreign-keys", name, schema))
         return [{"CONSTRAINT_NAME": "FK_ORDERS"}]
 
+    def get_table_storage_metrics(self, table_name, schema=None):
+        self.calls.append(("table-storage-metrics", table_name, schema))
+        if table_name == "missing":
+            return None
+        return SnowflakeTableStorageMetrics(
+            table_name=table_name,
+            table_catalog="ANALYTICS",
+            table_schema=schema or "PUBLIC",
+            table_id=1,
+            active_bytes=1024,
+            time_travel_bytes=16,
+            failsafe_bytes=0,
+            retained_for_clone_bytes=0,
+            row_count=10,
+            clustering_key=None,
+        )
+
     def get_database_info(self):
         self.calls.append(("database",))
         return {"name": "ANALYTICS", "version": "8.0.0", "vendor": "Snowflake"}
@@ -113,6 +131,7 @@ class AsyncFacade:
             "list_columns",
             "list_indexes",
             "list_foreign_keys",
+            "get_table_storage_metrics",
             "get_database_info",
             "list_databases",
             "list_schemas",
@@ -155,9 +174,7 @@ def patch_sync_backend(
             self.disconnected = True
 
     monkeypatch.setattr(cli_introspect, "SnowflakeBackend", FakeSyncBackend)
-    monkeypatch.setattr(
-        cli_introspect, "resolve_connection_config_from_args", lambda args: None
-    )
+    monkeypatch.setattr(cli_introspect, "resolve_connection_config_from_args", lambda args: None)
     return instances
 
 
@@ -179,18 +196,14 @@ def patch_async_backend(monkeypatch, introspector: Any) -> List[Any]:
             self.disconnected = True
 
     monkeypatch.setattr(cli_introspect, "AsyncSnowflakeBackend", FakeAsyncBackend)
-    monkeypatch.setattr(
-        cli_introspect, "resolve_connection_config_from_args", lambda args: None
-    )
+    monkeypatch.setattr(cli_introspect, "resolve_connection_config_from_args", lambda args: None)
     return instances
 
 
 @pytest.fixture
 def provider(monkeypatch) -> RecordingProvider:
     rec = RecordingProvider()
-    monkeypatch.setattr(
-        cli_introspect, "create_provider", lambda fmt, ascii_borders=False: rec
-    )
+    monkeypatch.setattr(cli_introspect, "create_provider", lambda fmt, ascii_borders=False: rec)
     return rec
 
 
@@ -201,9 +214,7 @@ def provider(monkeypatch) -> RecordingProvider:
 
 class TestIntrospectParserContract:
     def test_defaults(self):
-        args = build_parser().parse_args(
-            ["introspect", "tables", "--account", "acct"]
-        )
+        args = build_parser().parse_args(["introspect", "tables", "--account", "acct"])
         assert args.type == "tables"
         assert args.name is None
         assert args.include_system is False
@@ -228,17 +239,35 @@ class TestIntrospectParserContract:
 
     def test_every_listed_type_is_accepted(self):
         for itype in cli_introspect.INTROSPECT_TYPES:
-            args = build_parser().parse_args(
-                ["introspect", itype, "--account", "acct"]
-            )
+            args = build_parser().parse_args(["introspect", itype, "--account", "acct"])
             assert args.type == itype
+
+    def test_the_advertised_types_are_the_capability_mapping(self):
+        """One source for the list: the mapping, not a second hand-written copy.
+
+        The list used to be written out separately from the capability
+        switches, so a type could be advertised while its family was not.
+        """
+        assert list(cli_introspect._TYPE_CAPABILITIES) == cli_introspect.INTROSPECT_TYPES
+
+    def test_every_type_names_a_switch_the_dialect_has(self):
+        """A type whose switch does not exist would be un-gated, not gated."""
+        from rhosocial.activerecord.backend.impl.snowflake.dialect import (
+            SnowflakeDialect,
+        )
+
+        dialect = SnowflakeDialect()
+        missing = [
+            (cli_type, switch)
+            for cli_type, switch in cli_introspect._TYPE_CAPABILITIES.items()
+            if not hasattr(dialect, switch)
+        ]
+        assert missing == []
 
     def test_a_type_that_is_not_listed_is_refused(self):
         """``table`` was the removed aggregate and is not a type anymore."""
         with pytest.raises(SystemExit):
-            build_parser().parse_args(
-                ["introspect", "table", "customers", "--account", "acct"]
-            )
+            build_parser().parse_args(["introspect", "table", "customers", "--account", "acct"])
 
     def test_help_lists_every_type_and_no_removed_aggregate(self, capsys):
         with pytest.raises(SystemExit):
@@ -292,15 +321,18 @@ class TestIntrospectSyncDispatch:
             ("columns", "customers", "Columns of customers"),
             ("indexes", "customers", "Indexes of customers"),
             ("foreign-keys", "orders", "Foreign Keys of orders"),
+            (
+                "table-storage-metrics",
+                "orders",
+                "Storage Metrics of orders",
+            ),
             ("database", None, "Database Info"),
             ("databases", None, "Databases"),
             ("schemas", None, "Schemas"),
             ("warehouses", None, "Warehouses"),
         ],
     )
-    def test_every_type_reaches_a_branch(
-        self, provider, monkeypatch, itype, name, title
-    ):
+    def test_every_type_reaches_a_branch(self, provider, monkeypatch, itype, name, title):
         patch_sync_backend(monkeypatch, FakeIntrospector())
         argv = ["introspect", itype, "--account", "acct"]
         if name:
@@ -346,12 +378,41 @@ class TestIntrospectSyncDispatch:
         assert excinfo.value.code == 1
         assert "Table name is required" in capsys.readouterr().err
 
-    def test_database_branch_wraps_one_row(self, provider, monkeypatch):
+    def test_storage_metrics_without_a_row_exits_one(self, provider, capsys, monkeypatch):
+        """``None`` is "no metrics row", not "no such table"."""
+        patch_sync_backend(monkeypatch, FakeIntrospector())
+        with pytest.raises(SystemExit) as excinfo:
+            cli_introspect.handle(
+                build_parser().parse_args(
+                    [
+                        "introspect",
+                        "table-storage-metrics",
+                        "missing",
+                        "--account",
+                        "acct",
+                    ]
+                )
+            )
+        assert excinfo.value.code == 1
+        assert "has no storage metrics" in capsys.readouterr().err
+        assert provider.results == []
+
+    def test_storage_metrics_answers_with_the_metrics_row(self, provider, monkeypatch):
         patch_sync_backend(monkeypatch, FakeIntrospector())
         cli_introspect.handle(
             build_parser().parse_args(
-                ["introspect", "database", "--account", "acct"]
+                ["introspect", "table-storage-metrics", "orders", "--account", "acct"]
             )
+        )
+        title, rows = provider.results[0]
+        assert title == "Storage Metrics of orders"
+        assert rows[0]["active_bytes"] == 1024
+        assert rows[0]["row_count"] == 10
+
+    def test_database_branch_wraps_one_row(self, provider, monkeypatch):
+        patch_sync_backend(monkeypatch, FakeIntrospector())
+        cli_introspect.handle(
+            build_parser().parse_args(["introspect", "database", "--account", "acct"])
         )
         title, rows = provider.results[0]
         assert title == "Database Info"
@@ -421,15 +482,18 @@ class TestIntrospectAsyncDispatch:
             ("columns", "customers", "Columns of customers"),
             ("indexes", "customers", "Indexes of customers"),
             ("foreign-keys", "orders", "Foreign Keys of orders"),
+            (
+                "table-storage-metrics",
+                "orders",
+                "Storage Metrics of orders",
+            ),
             ("database", None, "Database Info"),
             ("databases", None, "Databases"),
             ("schemas", None, "Schemas"),
             ("warehouses", None, "Warehouses"),
         ],
     )
-    def test_every_type_reaches_a_branch(
-        self, provider, monkeypatch, itype, name, title
-    ):
+    def test_every_type_reaches_a_branch(self, provider, monkeypatch, itype, name, title):
         patch_async_backend(monkeypatch, FakeIntrospector())
         argv = ["introspect", itype, "--account", "acct", "--use-async"]
         if name:
