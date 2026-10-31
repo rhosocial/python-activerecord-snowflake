@@ -52,12 +52,12 @@ from typing import ClassVar, Optional
 from rhosocial.activerecord.base import FieldProxy
 from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
 from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
-from rhosocial.activerecord.backend.expression import CreateTableExpression
+from rhosocial.activerecord.backend.expression import CreateTableStatement
 from rhosocial.activerecord.backend.expression.objects import Table
 from rhosocial.activerecord.backend.expression.statements import (
     ColumnConstraint,
-    ColumnConstraintType,
     ColumnDefinition,
+    ColumnPrimaryKeyConstraint,
 )
 from rhosocial.activerecord.backend.expression.types import VarCharType
 from rhosocial.activerecord.model import ActiveRecord
@@ -87,13 +87,15 @@ User.configure(
 )
 
 dialect = User.__backend__.dialect
-User.__backend__.execute(*CreateTableExpression(
+User.__backend__.execute(*CreateTableStatement(
     dialect,
     Table(dialect, "users"),
     columns=[
         ColumnDefinition(
             dialect, "id", VarCharType(dialect, 36),
-            constraints=[ColumnConstraint(dialect, ColumnConstraintType.PRIMARY_KEY)],
+            constraints=[ColumnConstraint(
+                dialect, branch=ColumnPrimaryKeyConstraint(dialect),
+            )],
         ),
         ColumnDefinition(dialect, "name", VarCharType(dialect, 100)),
         ColumnDefinition(dialect, "email", VarCharType(dialect, 255)),

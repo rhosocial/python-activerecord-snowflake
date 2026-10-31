@@ -20,20 +20,22 @@ from typing import List, Optional, Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
+from ..coercion import as_member
+
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
 
 __all__ = [
     "SnowflakeAlterTaskMode",
-    "SnowflakeCreateTaskExpression",
-    "SnowflakeAlterTaskExpression",
-    "SnowflakeExecuteTaskExpression",
-    "SnowflakeDropTaskExpression",
+    "SnowflakeCreateTaskStatement",
+    "SnowflakeAlterTaskStatement",
+    "SnowflakeExecuteTaskStatement",
+    "SnowflakeDropTaskStatement",
 ]
 
 
-class SnowflakeAlterTaskMode(Enum):
+class SnowflakeAlterTaskMode(str, Enum):
     """ALTER TASK action modes.
 
     RESUME:      resume a suspended task.
@@ -42,6 +44,12 @@ class SnowflakeAlterTaskMode(Enum):
     REMOVE_AFTER: remove predecessor task dependencies.
     SET:         change task properties (warehouse, schedule).
     """
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     RESUME = "RESUME"
     SUSPEND = "SUSPEND"
@@ -50,7 +58,7 @@ class SnowflakeAlterTaskMode(Enum):
     SET = "SET"
 
 
-class SnowflakeCreateTaskExpression(BaseExpression):
+class SnowflakeCreateTaskStatement(BaseExpression):
     """Snowflake CREATE [OR REPLACE] TASK statement expression.
 
     Attributes:
@@ -115,7 +123,7 @@ class SnowflakeCreateTaskExpression(BaseExpression):
         return self.dialect.format_create_task_statement(self)
 
 
-class SnowflakeAlterTaskExpression(BaseExpression):
+class SnowflakeAlterTaskStatement(BaseExpression):
     """Snowflake ALTER TASK statement expression.
 
     The ``mode`` selects one of the ALTER TASK forms: ``RESUME``,
@@ -150,7 +158,7 @@ class SnowflakeAlterTaskExpression(BaseExpression):
     ):
         super().__init__(dialect)
         self.name = name
-        self.mode = mode
+        self.mode = as_member(SnowflakeAlterTaskMode, mode, parameter="mode")
         self.if_exists = if_exists
         self.after = after
         self.warehouse = warehouse
@@ -168,7 +176,7 @@ class SnowflakeAlterTaskExpression(BaseExpression):
         return self.dialect.format_alter_task_statement(self)
 
 
-class SnowflakeExecuteTaskExpression(BaseExpression):
+class SnowflakeExecuteTaskStatement(BaseExpression):
     """Snowflake EXECUTE TASK statement expression.
 
     Attributes:
@@ -197,7 +205,7 @@ class SnowflakeExecuteTaskExpression(BaseExpression):
         return self.dialect.format_execute_task_statement(self)
 
 
-class SnowflakeDropTaskExpression(BaseExpression):
+class SnowflakeDropTaskStatement(BaseExpression):
     """Snowflake DROP TASK statement expression.
 
     Attributes:

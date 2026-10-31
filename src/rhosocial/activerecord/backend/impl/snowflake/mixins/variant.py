@@ -17,7 +17,7 @@ class SnowflakeVariantMixin:
         """Snowflake supports VARIANT type."""
         return True
 
-    def format_variant_path_access(
+    def format_variant_path_access_expression(
         self, expr: "SnowflakeVariantPathAccessExpression"
     ) -> Tuple[str, tuple]:
         """Format VARIANT path access expression using colon notation.
@@ -31,7 +31,7 @@ class SnowflakeVariantMixin:
         """
         return f'{expr.column}:{expr.path}', ()
 
-    def format_variant_cast(
+    def format_variant_cast_expression(
         self, expr: "SnowflakeVariantCastExpression"
     ) -> Tuple[str, tuple]:
         """Format VARIANT path access with explicit cast.
@@ -43,4 +43,7 @@ class SnowflakeVariantMixin:
             Tuple of (SQL string, empty params tuple).
 
         """
-        return f'{expr.column}:{expr.path}::{expr.target_type}', ()
+        from rhosocial.activerecord.backend.expression.types import DataType
+
+        target_sql, _ = DataType.as_type(self, expr.target_type).to_sql()
+        return f'{expr.column}:{expr.path}::{target_sql}', ()

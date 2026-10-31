@@ -1,13 +1,14 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/file_format.py
 """SnowflakeFileFormatMixin — file format DDL support."""
 
+from enum import Enum
 from typing import Any, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.file_format import (
-        SnowflakeAlterFileFormatExpression,
-        SnowflakeCreateFileFormatExpression,
-        SnowflakeDropFileFormatExpression,
+        SnowflakeAlterFileFormatStatement,
+        SnowflakeCreateFileFormatStatement,
+        SnowflakeDropFileFormatStatement,
     )
 
 
@@ -35,12 +36,12 @@ class SnowflakeFileFormatMixin:
         return True
 
     def format_create_file_format_statement(
-        self, expr: "SnowflakeCreateFileFormatExpression"
+        self, expr: "SnowflakeCreateFileFormatStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] FILE FORMAT statement.
 
         Args:
-            expr: :class:`SnowflakeCreateFileFormatExpression`.
+            expr: :class:`SnowflakeCreateFileFormatStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -54,25 +55,28 @@ class SnowflakeFileFormatMixin:
             parts.append("IF NOT EXISTS")
         parts.append(self.format_identifier(expr.name))
         if expr.type_ is not None:
-            type_value = getattr(expr.type_, "value", expr.type_)
+            # The declared type of ``type_`` admits the enum and the raw
+            # string; the enum's own value is the spelling, read off the
+            # member by name once the kind is known rather than probed for.
+            type_value = expr.type_.value if isinstance(expr.type_, Enum) else expr.type_
             parts.append(f"TYPE = {str(type_value).upper()}")
         for key, value in expr.options.items():
             parts.append(
-                f"{key} = {_format_ff_value(value, self._escape_sql_string)}"
+                f"{key} = {_format_ff_value(value, self.escape_sql_string)}"
             )
         if expr.comment is not None:
             parts.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         return " ".join(parts), ()
 
     def format_alter_file_format_statement(
-        self, expr: "SnowflakeAlterFileFormatExpression"
+        self, expr: "SnowflakeAlterFileFormatStatement"
     ) -> Tuple[str, tuple]:
         """Format ALTER FILE FORMAT SET statement.
 
         Args:
-            expr: :class:`SnowflakeAlterFileFormatExpression`.
+            expr: :class:`SnowflakeAlterFileFormatStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -83,11 +87,11 @@ class SnowflakeFileFormatMixin:
         options: list[str] = []
         for key, value in expr.options.items():
             options.append(
-                f"{key} = {_format_ff_value(value, self._escape_sql_string)}"
+                f"{key} = {_format_ff_value(value, self.escape_sql_string)}"
             )
         if expr.comment is not None:
             options.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         if not options:
             raise ValueError("ALTER FILE FORMAT SET requires a property")
@@ -100,12 +104,12 @@ class SnowflakeFileFormatMixin:
         return " ".join(parts), ()
 
     def format_drop_file_format_statement(
-        self, expr: "SnowflakeDropFileFormatExpression"
+        self, expr: "SnowflakeDropFileFormatStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP FILE FORMAT statement.
 
         Args:
-            expr: :class:`SnowflakeDropFileFormatExpression`.
+            expr: :class:`SnowflakeDropFileFormatStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).

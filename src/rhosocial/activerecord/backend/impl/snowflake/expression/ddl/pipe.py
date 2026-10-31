@@ -17,19 +17,21 @@ from typing import Optional, Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
+from ..coercion import as_member
+
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
 
 __all__ = [
     "SnowflakeAlterPipeMode",
-    "SnowflakeCreatePipeExpression",
-    "SnowflakeAlterPipeExpression",
-    "SnowflakeDropPipeExpression",
+    "SnowflakeCreatePipeStatement",
+    "SnowflakeAlterPipeStatement",
+    "SnowflakeDropPipeStatement",
 ]
 
 
-class SnowflakeAlterPipeMode(Enum):
+class SnowflakeAlterPipeMode(str, Enum):
     """ALTER PIPE action modes.
 
     REFRESH: manually refresh the pipe to load staged files.
@@ -37,6 +39,12 @@ class SnowflakeAlterPipeMode(Enum):
     PAUSE:   set ``PIPE_EXECUTION_PAUSED = TRUE``.
     RESUME:  set ``PIPE_EXECUTION_PAUSED = FALSE``.
     """
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     REFRESH = "REFRESH"
     SET = "SET"
@@ -44,7 +52,7 @@ class SnowflakeAlterPipeMode(Enum):
     RESUME = "RESUME"
 
 
-class SnowflakeCreatePipeExpression(BaseExpression):
+class SnowflakeCreatePipeStatement(BaseExpression):
     """Snowflake CREATE [OR REPLACE] PIPE statement expression.
 
     Attributes:
@@ -94,7 +102,7 @@ class SnowflakeCreatePipeExpression(BaseExpression):
         return self.dialect.format_create_pipe_statement(self)
 
 
-class SnowflakeAlterPipeExpression(BaseExpression):
+class SnowflakeAlterPipeStatement(BaseExpression):
     """Snowflake ALTER PIPE statement expression.
 
     The ``mode`` selects one of the ALTER PIPE forms: ``REFRESH``,
@@ -125,7 +133,7 @@ class SnowflakeAlterPipeExpression(BaseExpression):
     ):
         super().__init__(dialect)
         self.name = name
-        self.mode = mode
+        self.mode = as_member(SnowflakeAlterPipeMode, mode, parameter="mode")
         self.if_exists = if_exists
         self.modified_after = modified_after
         self.pipe_execution_paused = pipe_execution_paused
@@ -141,7 +149,7 @@ class SnowflakeAlterPipeExpression(BaseExpression):
         return self.dialect.format_alter_pipe_statement(self)
 
 
-class SnowflakeDropPipeExpression(BaseExpression):
+class SnowflakeDropPipeStatement(BaseExpression):
     """Snowflake DROP PIPE statement expression.
 
     Attributes:

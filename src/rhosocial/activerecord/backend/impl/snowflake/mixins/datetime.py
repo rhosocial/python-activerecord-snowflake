@@ -7,9 +7,9 @@ from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
     from rhosocial.activerecord.backend.expression.datetime import (
-        DateTimeAddExpression,
-        DateTimeDiffExpression,
-        DateTimeSubtractExpression,
+        DatetimeAddExpression,
+        DatetimeDiffExpression,
+        DatetimeSubtractExpression,
     )
 
 
@@ -27,7 +27,7 @@ class SnowflakeDateTimeMixin:
     """
 
     def format_datetime_add_expression(
-        self, expr: "DateTimeAddExpression"
+        self, expr: "DatetimeAddExpression"
     ) -> Tuple[str, tuple]:
         source_sql, source_params = expr.source.to_sql()
         unit = expr.interval.unit.value.upper()
@@ -37,7 +37,7 @@ class SnowflakeDateTimeMixin:
         )
 
     def format_datetime_subtract_expression(
-        self, expr: "DateTimeSubtractExpression"
+        self, expr: "DatetimeSubtractExpression"
     ) -> Tuple[str, tuple]:
         source_sql, source_params = expr.source.to_sql()
         unit = expr.interval.unit.value.upper()
@@ -47,7 +47,7 @@ class SnowflakeDateTimeMixin:
         )
 
     def format_datetime_diff_expression(
-        self, expr: "DateTimeDiffExpression"
+        self, expr: "DatetimeDiffExpression"
     ) -> Tuple[str, tuple]:
         start_sql, start_params = expr.start.to_sql()
         end_sql, end_params = expr.end.to_sql()

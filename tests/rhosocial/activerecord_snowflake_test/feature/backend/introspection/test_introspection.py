@@ -3,34 +3,24 @@
 
 Tests cover:
 - SnowflakeIntrospectionMixin format_*_query methods
-- SnowflakeIntrospectorMixin _parse_* methods
+- SnowflakeIntrospectorMixin parse_* methods
 - SyncSnowflakeIntrospector with mock backend
 - AsyncSnowflakeIntrospector with mock backend
 """
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
-from typing import Any, Dict, List, Optional
 
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
-from rhosocial.activerecord.backend.impl.snowflake.mixins import SnowflakeIntrospectionMixin
 from rhosocial.activerecord.backend.impl.snowflake.introspection import (
     SnowflakeIntrospectorMixin,
     SyncSnowflakeIntrospector,
     AsyncSnowflakeIntrospector,
 )
 from rhosocial.activerecord.backend.introspection.types import (
-    DatabaseInfo,
-    TableInfo,
+    IntrospectionDatabaseInfo,
     TableType,
-    ColumnInfo,
     ColumnNullable,
-    IndexInfo,
-    IndexColumnInfo,
-    IndexType,
-    ForeignKeyInfo,
     ReferentialAction,
-    ViewInfo,
-    TriggerInfo,
 )
 from rhosocial.activerecord.backend.introspection.executor import SyncIntrospectorExecutor
 
@@ -76,43 +66,39 @@ class TestSnowflakeIntrospectionSQLGeneration:
     """Test SQL generation for introspection queries."""
 
     def test_format_database_info_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import DatabaseInfoExpression
-        expr = DatabaseInfoExpression(dialect)
+        from rhosocial.activerecord.backend.expression.introspection import DatabaseInfoQueryStatement
+        expr = DatabaseInfoQueryStatement(dialect)
         sql, params = expr.to_sql()
         assert "CURRENT_DATABASE()" in sql
         assert "CURRENT_VERSION()" in sql
         assert params == ()
 
     def test_format_table_list_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import TableListExpression
-        expr = TableListExpression(dialect)
-        expr.schema("MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import TableListQueryStatement
+        expr = TableListQueryStatement(dialect, schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.TABLES" in sql
         assert "TABLE_SCHEMA = %s" in sql
         assert params == ("MY_SCHEMA",)
 
     def test_format_table_list_query_no_views(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import TableListExpression
-        expr = TableListExpression(dialect)
-        expr.schema("MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import TableListQueryStatement
+        expr = TableListQueryStatement(dialect, schema="MY_SCHEMA")
         # include_views defaults to True
         sql, params = expr.to_sql()
         # When include_views=True, no TABLE_TYPE filter should be present
         assert "TABLE_TYPE = 'BASE TABLE'" not in sql
 
     def test_format_column_info_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import ColumnInfoExpression
-        expr = ColumnInfoExpression(dialect, table_name="users")
-        expr.schema("MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import ColumnInfoQueryStatement
+        expr = ColumnInfoQueryStatement(dialect, table_name="users", schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.COLUMNS" in sql
         assert params == ("MY_SCHEMA", "users")
 
     def test_format_index_info_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import IndexInfoExpression
-        expr = IndexInfoExpression(dialect, table_name="users")
-        expr.schema("MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import IndexInfoQueryStatement
+        expr = IndexInfoQueryStatement(dialect, table_name="users", schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.TABLE_CONSTRAINTS" in sql
         assert "INFORMATION_SCHEMA.KEY_COLUMN_USAGE" in sql
@@ -120,9 +106,8 @@ class TestSnowflakeIntrospectionSQLGeneration:
         assert params == ("MY_SCHEMA", "users")
 
     def test_format_foreign_key_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import ForeignKeyExpression
-        expr = ForeignKeyExpression(dialect, table_name="orders")
-        expr.schema("MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import ForeignKeyQueryStatement
+        expr = ForeignKeyQueryStatement(dialect, table_name="orders", schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS" in sql
         assert "INFORMATION_SCHEMA.KEY_COLUMN_USAGE" in sql
@@ -131,26 +116,23 @@ class TestSnowflakeIntrospectionSQLGeneration:
         assert params == ("MY_SCHEMA", "orders")
 
     def test_format_view_list_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import ViewListExpression
-        expr = ViewListExpression(dialect)
-        expr.schema("MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import ViewListQueryStatement
+        expr = ViewListQueryStatement(dialect, schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.VIEWS" in sql
         assert params == ("MY_SCHEMA",)
 
     def test_format_view_info_query(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import ViewInfoExpression
-        expr = ViewInfoExpression(dialect, view_name="my_view")
-        expr.schema("MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import ViewInfoQueryStatement
+        expr = ViewInfoQueryStatement(dialect, view_name="my_view", schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "INFORMATION_SCHEMA.VIEWS" in sql
         assert "TABLE_NAME = %s" in sql
         assert params == ("MY_SCHEMA", "my_view")
 
     def test_format_trigger_list_query_returns_empty(self, dialect):
-        from rhosocial.activerecord.backend.expression.introspection import TriggerListExpression
-        expr = TriggerListExpression(dialect)
-        expr.schema("MY_SCHEMA")
+        from rhosocial.activerecord.backend.expression.introspection import TriggerListQueryStatement
+        expr = TriggerListQueryStatement(dialect, schema="MY_SCHEMA")
         sql, params = expr.to_sql()
         assert "1 = 0" in sql
 
@@ -160,16 +142,20 @@ class TestSnowflakeIntrospectionSQLGeneration:
 # ================================================================== #
 
 class TestSnowflakeIntrospectorParsing:
-    """Test _parse_* methods for converting raw rows to data structures."""
+    """Test parse_* methods for converting raw rows to data structures."""
 
     @pytest.fixture
     def introspector_mixin(self):
         """Create a minimal introspector mixin with mock backend."""
 
         class MockBackend:
+            dialect = SnowflakeDialect(version=(8, 32, 0))
             _version = (8, 32, 0)
             config = MagicMock()
             config.schema = "PUBLIC"
+
+            def get_cached_server_version(self):
+                return (8, 32, 0)
 
         mixin = SnowflakeIntrospectorMixin()
         mixin._backend = MockBackend()
@@ -179,29 +165,52 @@ class TestSnowflakeIntrospectorParsing:
         rows = [
             {"CATALOG_NAME": "MY_DB", "SERVER_VERSION": "8.32.0"},
         ]
-        result = introspector_mixin._parse_database_info(rows)
-        assert isinstance(result, DatabaseInfo)
+        result = introspector_mixin.parse_database_info(rows)
+        assert isinstance(result, IntrospectionDatabaseInfo)
         assert result.name == "MY_DB"
         assert result.vendor == "Snowflake"
         assert result.version_tuple == (8, 32, 0)
 
     def test_parse_database_info_empty_rows(self, introspector_mixin):
-        result = introspector_mixin._parse_database_info([])
-        assert isinstance(result, DatabaseInfo)
+        result = introspector_mixin.parse_database_info([])
+        assert isinstance(result, IntrospectionDatabaseInfo)
         assert result.vendor == "Snowflake"
+
+    def test_parse_database_info_reports_unknown_without_a_version(self):
+        class UnknownVersionBackend:
+            dialect = SnowflakeDialect(version=None)
+            config = MagicMock()
+            config.schema = "PUBLIC"
+
+            def get_cached_server_version(self):
+                return None
+
+        mixin = SnowflakeIntrospectorMixin()
+        mixin._backend = UnknownVersionBackend()
+
+        result = mixin.parse_database_info([])
+        assert result.version == "unknown"
+        assert result.version_tuple == (0, 0, 0)
 
     def test_parse_tables(self, introspector_mixin):
         rows = [
             {"TABLE_NAME": "users", "TABLE_TYPE": "BASE TABLE", "COMMENT": None},
             {"TABLE_NAME": "v_users", "TABLE_TYPE": "VIEW", "COMMENT": "user view"},
         ]
-        result = introspector_mixin._parse_tables(rows, "PUBLIC")
+        result = introspector_mixin.parse_tables(rows, "PUBLIC")
         assert len(result) == 2
         assert result[0].name == "users"
         assert result[0].table_type == TableType.BASE_TABLE
         assert result[1].name == "v_users"
         assert result[1].table_type == TableType.VIEW
         assert result[1].comment == "user view"
+
+    def test_parse_tables_keeps_materialized_views_distinct(self, introspector_mixin):
+        rows = [
+            {"TABLE_NAME": "mv_sales", "TABLE_TYPE": "MATERIALIZED VIEW"},
+        ]
+        result = introspector_mixin.parse_tables(rows, "PUBLIC")
+        assert result[0].table_type == TableType.MATERIALIZED_VIEW
 
     def test_parse_columns(self, introspector_mixin):
         rows = [
@@ -230,7 +239,7 @@ class TestSnowflakeIntrospectorParsing:
                 "COMMENT": "user name",
             },
         ]
-        result = introspector_mixin._parse_columns(rows, "users", "PUBLIC")
+        result = introspector_mixin.parse_columns(rows, "users", "PUBLIC")
         assert len(result) == 2
 
         assert result[0].name == "id"
@@ -303,7 +312,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
         }
 
     def _parsed(self, introspector_mixin, row):
-        columns = introspector_mixin._parse_columns([row], "t", "PUBLIC")
+        columns = introspector_mixin.parse_columns([row], "t", "PUBLIC")
         return columns[0].parsed_data_type
 
     @pytest.mark.parametrize("width", [1, 20, 50, 200, 134217728])
@@ -380,7 +389,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
 
         A ``NUMBER(10, 2)`` column used to answer a bare ``DecimalType``:
         ``NUMERIC_PRECISION`` and ``NUMERIC_SCALE`` were selected by the
-        query, recorded on ``ColumnInfo``, and then never read.
+        query, recorded on ``IntrospectionColumnInfo``, and then never read.
 
         ``(38, 0)`` is deliberately **not** in this list: it is the
         documented default and therefore the bare form, which the next test
@@ -480,13 +489,13 @@ class TestSnowflakeCatalogSizeReachesParseType:
             assert parsed == expected(dialect), f"{word} -> {parsed!r}"
 
     def test_data_type_full_carries_the_size_and_data_type_does_not(self, introspector_mixin):
-        """The two ``ColumnInfo`` fields finally differ, which is their purpose.
+        """The two ``IntrospectionColumnInfo`` fields finally differ, which is their purpose.
 
         ``data_type`` is the word core's differ falls back to when a type
         cannot be parsed; ``data_type_full`` is the spelling that says how
         wide the column is.
         """
-        columns = introspector_mixin._parse_columns(
+        columns = introspector_mixin.parse_columns(
             [self._row("VARCHAR", cml=50)], "t", "PUBLIC")
         assert columns[0].data_type == "varchar"
         assert columns[0].data_type_full == "VARCHAR(50)"
@@ -542,7 +551,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
             side_effect=ValueError("not a type this backend can read"),
         ):
             with pytest.warns(RuntimeWarning, match="could not read"):
-                columns = introspector_mixin._parse_columns(
+                columns = introspector_mixin.parse_columns(
                     [good], "t", "PUBLIC")
         assert len(columns) == 1
         assert columns[0].parsed_data_type is None
@@ -591,10 +600,20 @@ class TestSnowflakeCatalogSizeReachesParseType:
     def test_parse_indexes_as_constraints(self, introspector_mixin):
         """Snowflake maps PK/unique constraints to IndexInfo."""
         rows = [
-            {"CONSTRAINT_NAME": "PK_USERS", "CONSTRAINT_TYPE": "PRIMARY KEY", "COLUMN_NAME": "id", "ORDINAL_POSITION": 1},
-            {"CONSTRAINT_NAME": "UK_USERS_EMAIL", "CONSTRAINT_TYPE": "UNIQUE", "COLUMN_NAME": "email", "ORDINAL_POSITION": 1},
+            {
+                "CONSTRAINT_NAME": "PK_USERS",
+                "CONSTRAINT_TYPE": "PRIMARY KEY",
+                "COLUMN_NAME": "id",
+                "ORDINAL_POSITION": 1,
+            },
+            {
+                "CONSTRAINT_NAME": "UK_USERS_EMAIL",
+                "CONSTRAINT_TYPE": "UNIQUE",
+                "COLUMN_NAME": "email",
+                "ORDINAL_POSITION": 1,
+            },
         ]
-        result = introspector_mixin._parse_indexes(rows, "users", "PUBLIC")
+        result = introspector_mixin.parse_indexes(rows, "users", "PUBLIC")
         assert len(result) == 2
 
         pk = next(i for i in result if i.is_primary)
@@ -620,7 +639,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
                 "REFERENCED_COLUMN_NAME": "id",
             },
         ]
-        result = introspector_mixin._parse_foreign_keys(rows, "orders", "PUBLIC")
+        result = introspector_mixin.parse_foreign_keys(rows, "orders", "PUBLIC")
         assert len(result) == 1
         assert result[0].name == "FK_ORDERS_USER"
         assert result[0].columns == ["user_id"]
@@ -650,7 +669,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
                 "REFERENCED_COLUMN_NAME": "product_id",
             },
         ]
-        result = introspector_mixin._parse_foreign_keys(rows, "order_items", "PUBLIC")
+        result = introspector_mixin.parse_foreign_keys(rows, "order_items", "PUBLIC")
         assert len(result) == 1
         assert result[0].columns == ["order_id", "product_id"]
         assert result[0].referenced_columns == ["id", "product_id"]
@@ -664,7 +683,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
                 "IS_UPDATABLE": "NO",
             },
         ]
-        result = introspector_mixin._parse_views(rows, "PUBLIC")
+        result = introspector_mixin.parse_views(rows, "PUBLIC")
         assert len(result) == 1
         assert result[0].name == "v_active_users"
         assert result[0].definition == "SELECT * FROM users WHERE active = TRUE"
@@ -679,17 +698,17 @@ class TestSnowflakeCatalogSizeReachesParseType:
                 "IS_UPDATABLE": "NO",
             },
         ]
-        result = introspector_mixin._parse_view_info(rows, "v_active_users", "PUBLIC")
+        result = introspector_mixin.parse_view_info(rows, "v_active_users", "PUBLIC")
         assert result is not None
         assert result.name == "v_active_users"
 
     def test_parse_view_info_not_found(self, introspector_mixin):
-        result = introspector_mixin._parse_view_info([], "nonexistent", "PUBLIC")
+        result = introspector_mixin.parse_view_info([], "nonexistent", "PUBLIC")
         assert result is None
 
     def test_parse_triggers_always_empty(self, introspector_mixin):
         """Snowflake doesn't support triggers."""
-        result = introspector_mixin._parse_triggers([], "PUBLIC")
+        result = introspector_mixin.parse_triggers([], "PUBLIC")
         assert result == []
 
 
@@ -718,15 +737,15 @@ class TestSyncSnowflakeIntrospector:
     def introspector(self, mock_backend, mock_executor):
         return SyncSnowflakeIntrospector(mock_backend, mock_executor)
 
-    def test_get_default_schema(self, introspector):
-        assert introspector._get_default_schema() == "PUBLIC"
+    def test_default_schema(self, introspector):
+        assert introspector.default_schema == "PUBLIC"
 
     def test_get_database_info(self, introspector, mock_executor):
         mock_executor.execute.return_value = [
             {"CATALOG_NAME": "MY_DB", "SERVER_VERSION": "8.32.0"},
         ]
         info = introspector.get_database_info()
-        assert isinstance(info, DatabaseInfo)
+        assert isinstance(info, IntrospectionDatabaseInfo)
         assert info.vendor == "Snowflake"
         assert info.name == "MY_DB"
         mock_executor.execute.assert_called_once()
@@ -803,7 +822,7 @@ class TestAsyncSnowflakeIntrospector:
     @pytest.mark.asyncio
     async def test_get_database_info(self, introspector, mock_executor):
         info = await introspector.get_database_info()
-        assert isinstance(info, DatabaseInfo)
+        assert isinstance(info, IntrospectionDatabaseInfo)
         assert info.vendor == "Snowflake"
 
     @pytest.mark.asyncio

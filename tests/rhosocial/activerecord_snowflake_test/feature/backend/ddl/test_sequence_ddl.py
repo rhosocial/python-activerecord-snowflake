@@ -27,9 +27,9 @@ import pytest
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression.objects import Sequence, Table
 from rhosocial.activerecord.backend.expression.statements.ddl_sequence import (
-    AlterSequenceExpression,
-    CreateSequenceExpression,
-    DropSequenceExpression,
+    AlterSequenceStatement,
+    CreateSequenceStatement,
+    DropSequenceStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 
@@ -47,13 +47,13 @@ class TestCreateSequenceRendering:
     """``CREATE SEQUENCE`` in Snowflake's clause order."""
 
     def test_plain(self, dialect):
-        sql, params = CreateSequenceExpression(dialect, _seq(dialect)).to_sql()
+        sql, params = CreateSequenceStatement(dialect, _seq(dialect)).to_sql()
         assert sql == 'CREATE SEQUENCE "s"'
         assert params == ()
 
     def test_every_supported_option(self, dialect):
         """The maximal Snowflake-legal option set, in grammar order."""
-        sql, params = CreateSequenceExpression(
+        sql, params = CreateSequenceStatement(
             dialect,
             _seq(dialect),
             if_not_exists=True,
@@ -66,16 +66,16 @@ class TestCreateSequenceRendering:
 
     def test_no_order_renders_noorder(self, dialect):
         """``no_order`` is the parameter that spells Snowflake's ``NOORDER``."""
-        sql, _ = CreateSequenceExpression(dialect, _seq(dialect), no_order=True).to_sql()
+        sql, _ = CreateSequenceStatement(dialect, _seq(dialect), no_order=True).to_sql()
         assert sql == 'CREATE SEQUENCE "s" NOORDER'
 
     def test_order_pair_is_mutually_exclusive(self, dialect):
         with pytest.raises(ValueError, match="order and no_order are mutually exclusive"):
-            CreateSequenceExpression(dialect, _seq(dialect), order=True, no_order=True)
+            CreateSequenceStatement(dialect, _seq(dialect), order=True, no_order=True)
 
     def test_namespaced_name(self, dialect):
         """The sequence object renders its own namespace; the formatter does not."""
-        sql, _ = CreateSequenceExpression(
+        sql, _ = CreateSequenceStatement(
             dialect,
             Sequence(dialect, "s", schema_name="reporting", catalog_name="analytics"),
         ).to_sql()
@@ -86,12 +86,12 @@ class TestDropSequenceRendering:
     """``DROP SEQUENCE`` in Snowflake's grammar."""
 
     def test_plain(self, dialect):
-        sql, params = DropSequenceExpression(dialect, _seq(dialect)).to_sql()
+        sql, params = DropSequenceStatement(dialect, _seq(dialect)).to_sql()
         assert sql == 'DROP SEQUENCE "s"'
         assert params == ()
 
     def test_if_exists(self, dialect):
-        sql, _ = DropSequenceExpression(dialect, _seq(dialect), if_exists=True).to_sql()
+        sql, _ = DropSequenceStatement(dialect, _seq(dialect), if_exists=True).to_sql()
         assert sql == 'DROP SEQUENCE IF EXISTS "s"'
 
 
@@ -99,44 +99,44 @@ class TestAlterSequenceRendering:
     """``ALTER SEQUENCE`` in Snowflake's grammar."""
 
     def test_increment(self, dialect):
-        sql, _ = AlterSequenceExpression(dialect, _seq(dialect), increment=2).to_sql()
+        sql, _ = AlterSequenceStatement(dialect, _seq(dialect), increment=2).to_sql()
         assert sql == 'ALTER SEQUENCE "s" INCREMENT BY 2'
 
     def test_order(self, dialect):
-        sql, _ = AlterSequenceExpression(dialect, _seq(dialect), order=True).to_sql()
+        sql, _ = AlterSequenceStatement(dialect, _seq(dialect), order=True).to_sql()
         assert sql == 'ALTER SEQUENCE "s" ORDER'
 
     def test_noorder_is_one_word(self, dialect):
         """Snowflake spells it ``NOORDER``; core's shared renderer writes ``NO ORDER``."""
-        sql, _ = AlterSequenceExpression(dialect, _seq(dialect), no_order=True).to_sql()
+        sql, _ = AlterSequenceStatement(dialect, _seq(dialect), no_order=True).to_sql()
         assert sql == 'ALTER SEQUENCE "s" NOORDER'
         assert "NO ORDER" not in sql
 
     def test_increment_and_order(self, dialect):
-        sql, _ = AlterSequenceExpression(
+        sql, _ = AlterSequenceStatement(
             dialect, _seq(dialect), increment=2, no_order=True
         ).to_sql()
         assert sql == 'ALTER SEQUENCE "s" INCREMENT BY 2 NOORDER'
 
     def test_cycle_false_is_unspecified_and_emits_nothing(self, dialect):
         """``cycle=False`` is no longer a spelling: the unset pair emits nothing."""
-        sql, _ = AlterSequenceExpression(dialect, _seq(dialect), cycle=False).to_sql()
+        sql, _ = AlterSequenceStatement(dialect, _seq(dialect), cycle=False).to_sql()
         assert sql == 'ALTER SEQUENCE "s"'
 
     def test_no_cycle_is_refused_by_name(self, dialect):
         """``NO CYCLE`` is the words Snowflake rejects, so its parameter raises."""
         with pytest.raises(UnsupportedFeatureError) as exc_info:
-            AlterSequenceExpression(dialect, _seq(dialect), no_cycle=True).to_sql()
+            AlterSequenceStatement(dialect, _seq(dialect), no_cycle=True).to_sql()
         assert exc_info.value.feature_name == "ALTER SEQUENCE CYCLE"
 
     def test_no_cache_is_refused_by_name(self, dialect):
         with pytest.raises(UnsupportedFeatureError) as exc_info:
-            AlterSequenceExpression(dialect, _seq(dialect), no_cache=True).to_sql()
+            AlterSequenceStatement(dialect, _seq(dialect), no_cache=True).to_sql()
         assert exc_info.value.feature_name == "ALTER SEQUENCE CACHE"
 
     def test_order_pair_is_mutually_exclusive(self, dialect):
         with pytest.raises(ValueError, match="order and no_order are mutually exclusive"):
-            AlterSequenceExpression(dialect, _seq(dialect), order=True, no_order=True)
+            AlterSequenceStatement(dialect, _seq(dialect), order=True, no_order=True)
 
 
 #: ``(label, create_kwargs, alter_kwargs)`` for each clause Snowflake lacks.
@@ -171,7 +171,7 @@ class TestUnsupportedOptionsAreRefused:
         if create_kwargs is None:
             pytest.skip("no CREATE-side option for this row")
         with pytest.raises(UnsupportedFeatureError):
-            CreateSequenceExpression(dialect, _seq(dialect), **create_kwargs).to_sql()
+            CreateSequenceStatement(dialect, _seq(dialect), **create_kwargs).to_sql()
 
     @pytest.mark.parametrize(
         "label,create_kwargs,alter_kwargs",
@@ -180,7 +180,7 @@ class TestUnsupportedOptionsAreRefused:
     )
     def test_alter_refuses(self, dialect, label, create_kwargs, alter_kwargs):
         with pytest.raises(UnsupportedFeatureError):
-            AlterSequenceExpression(dialect, _seq(dialect), **alter_kwargs).to_sql()
+            AlterSequenceStatement(dialect, _seq(dialect), **alter_kwargs).to_sql()
 
 
 class TestAlterSequenceStartProbe:
@@ -199,7 +199,7 @@ class TestAlterSequenceStartProbe:
 
     def test_alter_start_is_refused_by_the_probe(self, dialect):
         with pytest.raises(UnsupportedFeatureError) as exc_info:
-            AlterSequenceExpression(dialect, _seq(dialect), start=5).to_sql()
+            AlterSequenceStatement(dialect, _seq(dialect), start=5).to_sql()
         assert "ALTER SEQUENCE START" in str(exc_info.value)
 
 
@@ -209,9 +209,9 @@ class TestWrongObjectKindIsRefused:
     @pytest.mark.parametrize(
         "build",
         [
-            lambda d, o: CreateSequenceExpression(d, o),
-            lambda d, o: DropSequenceExpression(d, o),
-            lambda d, o: AlterSequenceExpression(d, o),
+            lambda d, o: CreateSequenceStatement(d, o),
+            lambda d, o: DropSequenceStatement(d, o),
+            lambda d, o: AlterSequenceStatement(d, o),
         ],
         ids=["create", "drop", "alter"],
     )
@@ -348,8 +348,8 @@ class TestEverySequenceOptionProbeIsLoadBearing:
     @pytest.mark.parametrize(
         "statement,expression_cls",
         [
-            ("CREATE", CreateSequenceExpression),
-            ("ALTER", AlterSequenceExpression),
+            ("CREATE", CreateSequenceStatement),
+            ("ALTER", AlterSequenceStatement),
         ],
         ids=["create", "alter"],
     )

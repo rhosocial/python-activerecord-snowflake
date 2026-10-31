@@ -11,7 +11,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
 )
 from rhosocial.activerecord.backend.expression.objects import Type
 from rhosocial.activerecord.backend.expression.serialization import (
-    ExpressionRegistry,
+    default_registry,
     deserialize,
     deserialize_json,
     deserialize_xml,
@@ -20,9 +20,10 @@ from rhosocial.activerecord.backend.expression.serialization import (
     serialize_xml,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_type import (
-    AlterTypeExpression,
-    CreateTypeExpression,
-    DropTypeExpression,
+    AlterTypeStatement,
+    CreateTypeStatement,
+    DropTypeStatement,
+    TypeAlterAction,
     TypeDefinition,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
@@ -59,6 +60,43 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.types import (
 
 def _dialect(version=(10, 8, 0)):
     return SnowflakeDialect(version=version)
+
+
+#: Every expression class this backend's type DDL defines. Deserialising one
+#: of these kinds needs it in the registry the read goes through, and the
+#: framework's default registry holds only the packages the framework itself
+#: ships -- nothing registers this backend's classes on import any more. This
+#: file is the reader, so it assembles the classes it round-trips into that
+#: registry once; the resolution test below then pins the assembly.
+_SNOWFLAKE_TYPE_EXPRESSIONS = (
+    SnowflakeVarcharType,
+    SnowflakeNumberType,
+    SnowflakeFloatType,
+    SnowflakeBooleanType,
+    SnowflakeTimestampLtzType,
+    SnowflakeTimestampNtzType,
+    SnowflakeTimestampTzType,
+    SnowflakeDateType,
+    SnowflakeTimeType,
+    SnowflakeBinaryType,
+    SnowflakeVariantType,
+    SnowflakeObjectType,
+    SnowflakeArrayType,
+    SnowflakeGeographyType,
+    SnowflakeGeometryType,
+    SnowflakeUserDefinedType,
+    SnowflakeTypeField,
+    SnowflakeScalarTypeDefinition,
+    SnowflakeObjectTypeDefinition,
+    SnowflakeSetTypeCommentAction,
+    SnowflakeUnsetTypeCommentAction,
+    SnowflakeCreateTypeExpression,
+    SnowflakeAlterTypeExpression,
+    SnowflakeDropTypeExpression,
+)
+
+for _cls in _SNOWFLAKE_TYPE_EXPRESSIONS:
+    default_registry().register_node(_cls)
 
 
 def _snowflake_data_types(dialect):
@@ -135,9 +173,9 @@ def test_version_boundary_and_low_version_fail_fast():
     set_action = SnowflakeSetTypeCommentAction(dialect, "comment")
     reference = SnowflakeUserDefinedType(dialect, type_name="age")
     statements = [
-        CreateTypeExpression(dialect, Type(dialect, "age"), scalar),
-        AlterTypeExpression(dialect, Type(dialect, "age"), [set_action]),
-        DropTypeExpression(dialect, Type(dialect, "age")),
+        CreateTypeStatement(dialect, Type(dialect, "age"), scalar),
+        AlterTypeStatement(dialect, Type(dialect, "age"), [set_action]),
+        DropTypeStatement(dialect, Type(dialect, "age")),
     ]
 
     assert dialect.supports_type_objects() is False
@@ -166,7 +204,7 @@ def test_scalar_create_type_renders_schema_qualification():
         SnowflakeNumberType(dialect, precision=3, scale=0),
     )
 
-    expression = CreateTypeExpression(
+    expression = CreateTypeStatement(
         dialect,
         Type(dialect, "age", schema_name="app"),
         definition,
@@ -316,7 +354,7 @@ def test_alter_type_set_and_unset_comment_actions():
         [set_action],
         if_exists=True,
     )
-    unset_expression = AlterTypeExpression(
+    unset_expression = AlterTypeStatement(
         dialect,
         Type(dialect, "age", schema_name="APP"),
         [SnowflakeUnsetTypeCommentAction(dialect)],
@@ -335,7 +373,7 @@ def test_alter_type_set_and_unset_comment_actions():
 def test_alter_type_rejects_multiple_or_unknown_actions():
     dialect = _dialect()
 
-    expression = AlterTypeExpression(
+    expression = AlterTypeStatement(
         dialect,
         Type(dialect, "age"),
         [
@@ -345,7 +383,21 @@ def test_alter_type_rejects_multiple_or_unknown_actions():
     )
     with pytest.raises(UnsupportedFeatureError, match="multiple ALTER TYPE actions"):
         expression.to_sql()
-    with pytest.raises(UnsupportedFeatureError, match="ALTER TYPE action"):
+
+    class UnsupportedAction(TypeAlterAction):
+        """A well-formed action whose kind this dialect never registered."""
+
+        action_kind = "test.unsupported"
+
+    with pytest.raises(
+        UnsupportedFeatureError, match=r"ALTER TYPE action test\.unsupported"
+    ):
+        dialect.format_type_alter_action(UnsupportedAction(dialect))
+
+    # The kind is a declared field of the contract, read directly now: an
+    # input that is not a TypeAlterAction at all surfaces the missing
+    # attribute instead of the old probe's class-name fallback.
+    with pytest.raises(AttributeError, match="action_kind"):
         dialect.format_type_alter_action(object())
 
 
@@ -362,7 +414,7 @@ def test_drop_type_has_no_if_exists_cascade_or_restrict():
     )
 
     with pytest.raises(UnsupportedFeatureError, match="IF EXISTS"):
-        DropTypeExpression(dialect, Type(dialect, "age"), if_exists=True).to_sql()
+        DropTypeStatement(dialect, Type(dialect, "age"), if_exists=True).to_sql()
     with pytest.raises(UnsupportedFeatureError, match="CASCADE"):
         SnowflakeDropTypeExpression(
             dialect, Type(dialect, "age"), cascade=True
@@ -377,37 +429,18 @@ def test_drop_type_has_no_if_exists_cascade_or_restrict():
         expression.to_sql()
 
 
-def test_udt_expressions_are_explicitly_registered_for_serialization():
-    expression_types = (
-        SnowflakeVarcharType,
-        SnowflakeNumberType,
-        SnowflakeFloatType,
-        SnowflakeBooleanType,
-        SnowflakeTimestampLtzType,
-        SnowflakeTimestampNtzType,
-        SnowflakeTimestampTzType,
-        SnowflakeDateType,
-        SnowflakeTimeType,
-        SnowflakeBinaryType,
-        SnowflakeVariantType,
-        SnowflakeObjectType,
-        SnowflakeArrayType,
-        SnowflakeGeographyType,
-        SnowflakeGeometryType,
-        SnowflakeUserDefinedType,
-        SnowflakeTypeField,
-        SnowflakeScalarTypeDefinition,
-        SnowflakeObjectTypeDefinition,
-        SnowflakeSetTypeCommentAction,
-        SnowflakeUnsetTypeCommentAction,
-        SnowflakeCreateTypeExpression,
-        SnowflakeAlterTypeExpression,
-        SnowflakeDropTypeExpression,
-    )
+def test_udt_expressions_resolve_through_the_readers_registry():
+    """Every type-DDL class answers to its kind in the assembled registry.
 
-    for expression_type in expression_types:
-        fqn = f"{expression_type.__module__}.{expression_type.__name__}"
-        assert ExpressionRegistry.lookup(fqn) is expression_type
+    Deserialisation resolves a kind, never a dotted name, so what a reader
+    gets back is decided by ``kind()`` -- derived from the class name -- and
+    by the assembly at module import. A kind two classes claim would have
+    raised there; this pins that each class's own kind resolves to the class
+    itself.
+    """
+    registry = default_registry()
+    for expression_type in _SNOWFLAKE_TYPE_EXPRESSIONS:
+        assert registry.resolve_node(expression_type.kind()) is expression_type
 
 
 def test_udt_expression_dict_json_and_xml_round_trips():

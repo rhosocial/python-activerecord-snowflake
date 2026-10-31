@@ -9,7 +9,7 @@ from rhosocial.activerecord.backend.schema import (
     SchemaSnapshot, SchemaDiff,
 )
 from rhosocial.activerecord.backend.introspection.types import (
-    ColumnInfo, ColumnNullable, TableInfo, TableType, DatabaseInfo,
+    IntrospectionColumnInfo, ColumnNullable, IntrospectionTableInfo, TableType, IntrospectionDatabaseInfo,
 )
 from rhosocial.activerecord.backend.expression.types import (
     DecimalType, IntegerType, VarCharType,
@@ -20,7 +20,7 @@ from rhosocial.activerecord.backend.impl.snowflake.schema import SnowflakeSchema
 
 def _make_col(name, data_type, ordinal=1, nullable=ColumnNullable.NULLABLE,
               parsed_dt=None):
-    return ColumnInfo(
+    return IntrospectionColumnInfo(
         name=name,
         table_name="test",
         schema="PUBLIC",
@@ -37,7 +37,7 @@ def _make_snapshot(tables_dict):
     return SchemaSnapshot(
         dialect_class="SnowflakeDialect",
         captured_at=datetime.now(),
-        database_info=DatabaseInfo(
+        database_info=IntrospectionDatabaseInfo(
             name="test", version="8.0.0",
             version_tuple=(8, 0, 0), vendor="Snowflake",
         ),
@@ -48,11 +48,11 @@ def _make_snapshot(tables_dict):
 def _introspected_column(name, declared_type, dialect):
     """One column as the *catalog* reports it, through the real introspector.
 
-    Every other test in this file builds ``ColumnInfo`` by hand, which is right
+    Every other test in this file builds ``IntrospectionColumnInfo`` by hand, which is right
     for testing the differ and wrong for testing the round trip: the whole
     question here is what the introspector hands the differ, so the column is
     built by running the declaration's catalog row through
-    ``SnowflakeIntrospectorMixin._parse_columns`` and taking what comes out.
+    ``SnowflakeIntrospectorMixin.parse_columns`` and taking what comes out.
     """
     from unittest.mock import MagicMock
 
@@ -99,7 +99,7 @@ def _introspected_column(name, declared_type, dialect):
     backend.dialect = dialect
     mixin = SnowflakeIntrospectorMixin()
     mixin._backend = backend
-    return mixin._parse_columns([row], "t", "PUBLIC")[0]
+    return mixin.parse_columns([row], "t", "PUBLIC")[0]
 
 
 class TestSnowflakeSchemaDiffer:
@@ -107,7 +107,7 @@ class TestSnowflakeSchemaDiffer:
 
     def test_no_changes(self):
         col = _make_col("id", "NUMBER", ordinal=1, parsed_dt=IntegerType())
-        snap = _make_snapshot({"t": TableInfo(
+        snap = _make_snapshot({"t": IntrospectionTableInfo(
             name="t", schema="PUBLIC", table_type=TableType.BASE_TABLE,
             columns=[col],
         )})
@@ -120,11 +120,11 @@ class TestSnowflakeSchemaDiffer:
         new_col1 = _make_col("id", "NUMBER", ordinal=1)
         new_col2 = _make_col("name", "VARCHAR", ordinal=2)
 
-        old_snap = _make_snapshot({"t": TableInfo(
+        old_snap = _make_snapshot({"t": IntrospectionTableInfo(
             name="t", schema="PUBLIC", table_type=TableType.BASE_TABLE,
             columns=[old_col],
         )})
-        new_snap = _make_snapshot({"t": TableInfo(
+        new_snap = _make_snapshot({"t": IntrospectionTableInfo(
             name="t", schema="PUBLIC", table_type=TableType.BASE_TABLE,
             columns=[new_col1, new_col2],
         )})
@@ -143,11 +143,11 @@ class TestSnowflakeSchemaDiffer:
         old_col2 = _make_col("name", "VARCHAR", ordinal=2)
         new_col = _make_col("id", "NUMBER", ordinal=1)
 
-        old_snap = _make_snapshot({"t": TableInfo(
+        old_snap = _make_snapshot({"t": IntrospectionTableInfo(
             name="t", schema="PUBLIC", table_type=TableType.BASE_TABLE,
             columns=[old_col1, old_col2],
         )})
-        new_snap = _make_snapshot({"t": TableInfo(
+        new_snap = _make_snapshot({"t": IntrospectionTableInfo(
             name="t", schema="PUBLIC", table_type=TableType.BASE_TABLE,
             columns=[new_col],
         )})
@@ -165,11 +165,11 @@ class TestSnowflakeSchemaDiffer:
         new_col = _make_col("name", "VARCHAR", ordinal=1,
                             parsed_dt=VarCharType(length=200))
 
-        old_snap = _make_snapshot({"t": TableInfo(
+        old_snap = _make_snapshot({"t": IntrospectionTableInfo(
             name="t", schema="PUBLIC", table_type=TableType.BASE_TABLE,
             columns=[old_col],
         )})
-        new_snap = _make_snapshot({"t": TableInfo(
+        new_snap = _make_snapshot({"t": IntrospectionTableInfo(
             name="t", schema="PUBLIC", table_type=TableType.BASE_TABLE,
             columns=[new_col],
         )})
@@ -184,7 +184,7 @@ class TestSnowflakeSchemaDiffer:
     def test_added_table(self):
         old_snap = _make_snapshot({})
         col = _make_col("id", "NUMBER", ordinal=1)
-        new_snap = _make_snapshot({"new_table": TableInfo(
+        new_snap = _make_snapshot({"new_table": IntrospectionTableInfo(
             name="new_table", schema="PUBLIC", table_type=TableType.BASE_TABLE,
             columns=[col],
         )})
@@ -195,7 +195,7 @@ class TestSnowflakeSchemaDiffer:
 
     def test_removed_table(self):
         col = _make_col("id", "NUMBER", ordinal=1)
-        old_snap = _make_snapshot({"old_table": TableInfo(
+        old_snap = _make_snapshot({"old_table": IntrospectionTableInfo(
             name="old_table", schema="PUBLIC", table_type=TableType.BASE_TABLE,
             columns=[col],
         )})
@@ -215,8 +215,8 @@ class TestSnowflakeSchemaDifferRoundTrip:
     against the declaration that created it — a change on a column nobody
     touched, which is what this class asserts does not happen.
 
-    These go through the real ``_parse_columns``, not a hand-built
-    ``ColumnInfo``, because the type the differ sees is the one the
+    These go through the real ``parse_columns``, not a hand-built
+    ``IntrospectionColumnInfo``, because the type the differ sees is the one the
     introspector composed.
     """
 
@@ -228,7 +228,7 @@ class TestSnowflakeSchemaDifferRoundTrip:
         return SnowflakeDialect(version=(10, 2, 0))
 
     def _table(self, *columns):
-        return TableInfo(
+        return IntrospectionTableInfo(
             name="t", schema="PUBLIC", table_type=TableType.BASE_TABLE,
             columns=list(columns),
         )

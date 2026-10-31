@@ -53,7 +53,7 @@ class SnowflakeVariantPathAccessExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        sql, params = self.dialect.format_variant_path_access(self)
+        sql, params = self.dialect.format_variant_path_access_expression(self)
         return sql, ()
 
 
@@ -88,5 +88,5 @@ class SnowflakeVariantCastExpression(BaseExpression):
             Tuple of (SQL string, empty params tuple).
 
         """
-        sql, params = self.dialect.format_variant_cast(self)
+        sql, params = self.dialect.format_variant_cast_expression(self)
         return sql, ()

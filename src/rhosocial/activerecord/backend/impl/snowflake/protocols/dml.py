@@ -14,7 +14,7 @@ from typing import Protocol, runtime_checkable, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.statements import (
-        InsertExpression,
+        InsertStatement,
     )
 
 
@@ -27,13 +27,13 @@ class SnowflakeDMLSupport(Protocol):
         ...
 
     def format_insert_statement(
-        self, expr: "InsertExpression"
+        self, expr: "InsertStatement"
     ) -> Tuple[str, tuple]:
         """Format an INSERT statement (honours the ``overwrite`` option)."""
         ...
 
     def format_insert_overwrite_statement(
-        self, expr: "InsertExpression"
+        self, expr: "InsertStatement"
     ) -> Tuple[str, tuple]:
         """Format an INSERT OVERWRITE statement."""
         ...

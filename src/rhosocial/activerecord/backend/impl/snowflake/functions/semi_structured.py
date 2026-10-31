@@ -4,9 +4,15 @@
 from typing import Union, Optional, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression import bases, core
+from rhosocial.activerecord.backend.expression.functions import (
+    array_agg as _core_array_agg,
+)
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
+    from rhosocial.activerecord.backend.expression.functions.array import (
+        ArrayAggregateFunction,
+    )
 
 
 def _to_expr(dialect: "SQLDialectBase", expr: Union[str, "bases.BaseExpression"]):
@@ -106,12 +112,17 @@ def array_contains(
 def array_agg(
     dialect: "SQLDialectBase",
     expr: Union[str, "bases.BaseExpression"],
-) -> "core.FunctionCall":
-    """Create ARRAY_AGG aggregate function call.
+) -> "ArrayAggregateFunction":
+    """Create an ARRAY_AGG aggregate over *expr*.
 
-    Returns the input values, pivoted into an ARRAY.
+    The classed node core models for this aggregate (``ArrayAggregateFunction``)
+    replaces the bare ``FunctionCall`` this factory used to return: the node
+    carries DISTINCT and the window clauses every aggregate takes, and its
+    artifact names ``array_aggregate_function`` instead of a generic call.
+    The spelling is unchanged -- ``ARRAY_AGG(operand)`` -- and a bare string
+    still becomes a Column, exactly as before.
     """
-    return core.FunctionCall(dialect, "ARRAY_AGG", _to_expr(dialect, expr))
+    return _core_array_agg(dialect, expr)
 
 
 # ========== OBJECT Functions ==========

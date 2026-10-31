@@ -5,14 +5,14 @@ from typing import TYPE_CHECKING, Optional
 
 from rhosocial.activerecord.backend.expression.objects import Database
 from rhosocial.activerecord.backend.expression.statements.ddl_database import (
-    CreateDatabaseExpression,
+    CreateDatabaseStatement,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
 
-class SnowflakeCreateDatabaseExpression(CreateDatabaseExpression):
+class SnowflakeCreateDatabaseExpression(CreateDatabaseStatement):
     """A Snowflake CREATE DATABASE statement extending the generic one.
 
     Adds the Snowflake-only ``TRANSIENT`` qualifier and ``CLONE <source>``

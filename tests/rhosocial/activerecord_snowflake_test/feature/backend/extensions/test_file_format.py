@@ -11,9 +11,9 @@ from rhosocial.activerecord.backend.impl.snowflake.protocols import (
     SnowflakeFileFormatSupport,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
-    SnowflakeAlterFileFormatExpression,
-    SnowflakeCreateFileFormatExpression,
-    SnowflakeDropFileFormatExpression,
+    SnowflakeAlterFileFormatStatement,
+    SnowflakeCreateFileFormatStatement,
+    SnowflakeDropFileFormatStatement,
     SnowflakeFileFormatType,
 )
 
@@ -37,7 +37,7 @@ class TestSnowflakeCreateFileFormat:
     """CREATE [OR REPLACE] FILE FORMAT statement generation."""
 
     def test_create_file_format_basic(self, dialect):
-        expr = SnowflakeCreateFileFormatExpression(
+        expr = SnowflakeCreateFileFormatStatement(
             dialect, "my_csv", type_=SnowflakeFileFormatType.CSV
         )
         sql, params = expr.to_sql()
@@ -45,7 +45,7 @@ class TestSnowflakeCreateFileFormat:
         assert params == ()
 
     def test_create_file_format_full_options(self, dialect):
-        expr = SnowflakeCreateFileFormatExpression(
+        expr = SnowflakeCreateFileFormatStatement(
             dialect,
             "my_csv",
             type_=SnowflakeFileFormatType.CSV,
@@ -65,7 +65,7 @@ class TestSnowflakeCreateFileFormat:
         )
 
     def test_create_file_format_or_replace(self, dialect):
-        expr = SnowflakeCreateFileFormatExpression(
+        expr = SnowflakeCreateFileFormatStatement(
             dialect,
             "my_json",
             or_replace=True,
@@ -79,7 +79,7 @@ class TestSnowflakeCreateFileFormat:
         )
 
     def test_create_file_format_parquet(self, dialect):
-        expr = SnowflakeCreateFileFormatExpression(
+        expr = SnowflakeCreateFileFormatStatement(
             dialect, "my_pq", type_="PARQUET"
         )
         sql, _ = expr.to_sql()
@@ -87,14 +87,14 @@ class TestSnowflakeCreateFileFormat:
 
     def test_create_file_format_all_types_accepted(self, dialect):
         for t in SnowflakeFileFormatType:
-            expr = SnowflakeCreateFileFormatExpression(
+            expr = SnowflakeCreateFileFormatStatement(
                 dialect, "fmt", type_=t
             )
             sql, _ = expr.to_sql()
             assert f"TYPE = {t.value}" in sql
 
     def test_create_file_format_string_escaped(self, dialect):
-        expr = SnowflakeCreateFileFormatExpression(
+        expr = SnowflakeCreateFileFormatStatement(
             dialect,
             "my_csv",
             type_=SnowflakeFileFormatType.CSV,
@@ -108,7 +108,7 @@ class TestSnowflakeAlterFileFormat:
     """ALTER FILE FORMAT ... SET statement generation."""
 
     def test_alter_file_format_set(self, dialect):
-        expr = SnowflakeAlterFileFormatExpression(
+        expr = SnowflakeAlterFileFormatStatement(
             dialect, "my_csv", options={"SKIP_HEADER": 2}
         )
         sql, params = expr.to_sql()
@@ -116,7 +116,7 @@ class TestSnowflakeAlterFileFormat:
         assert params == ()
 
     def test_alter_file_format_set_comment(self, dialect):
-        expr = SnowflakeAlterFileFormatExpression(
+        expr = SnowflakeAlterFileFormatStatement(
             dialect, "my_csv", comment="updated"
         )
         sql, _ = expr.to_sql()
@@ -125,7 +125,7 @@ class TestSnowflakeAlterFileFormat:
         )
 
     def test_alter_file_format_without_property_raises(self, dialect):
-        expr = SnowflakeAlterFileFormatExpression(dialect, "my_csv")
+        expr = SnowflakeAlterFileFormatStatement(dialect, "my_csv")
         with pytest.raises(ValueError):
             expr.to_sql()
 
@@ -134,13 +134,13 @@ class TestSnowflakeDropFileFormat:
     """DROP FILE FORMAT statement generation."""
 
     def test_drop_file_format(self, dialect):
-        expr = SnowflakeDropFileFormatExpression(dialect, "my_csv")
+        expr = SnowflakeDropFileFormatStatement(dialect, "my_csv")
         sql, params = expr.to_sql()
         assert sql == 'DROP FILE FORMAT "my_csv"'
         assert params == ()
 
     def test_drop_file_format_if_exists(self, dialect):
-        expr = SnowflakeDropFileFormatExpression(
+        expr = SnowflakeDropFileFormatStatement(
             dialect, "my_csv", if_exists=True
         )
         sql, _ = expr.to_sql()

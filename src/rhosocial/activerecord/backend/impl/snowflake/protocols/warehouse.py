@@ -18,9 +18,9 @@ from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.warehouse import (
-        SnowflakeAlterWarehouseExpression,
-        SnowflakeCreateWarehouseExpression,
-        SnowflakeDropWarehouseExpression,
+        SnowflakeAlterWarehouseStatement,
+        SnowflakeCreateWarehouseStatement,
+        SnowflakeDropWarehouseStatement,
     )
 
 
@@ -33,13 +33,13 @@ class SnowflakeWarehouseSupport(Protocol):
         ...
 
     def format_create_warehouse_statement(
-        self, expr: "SnowflakeCreateWarehouseExpression"
+        self, expr: "SnowflakeCreateWarehouseStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE WAREHOUSE statement."""
         ...
 
     def format_alter_warehouse_statement(
-        self, expr: "SnowflakeAlterWarehouseExpression"
+        self, expr: "SnowflakeAlterWarehouseStatement"
     ) -> Tuple[str, tuple]:
         """Format ALTER WAREHOUSE statement.
 
@@ -49,7 +49,7 @@ class SnowflakeWarehouseSupport(Protocol):
         ...
 
     def format_drop_warehouse_statement(
-        self, expr: "SnowflakeDropWarehouseExpression"
+        self, expr: "SnowflakeDropWarehouseStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP WAREHOUSE statement."""
         ...

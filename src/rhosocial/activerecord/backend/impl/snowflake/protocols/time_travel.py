@@ -11,7 +11,7 @@ using AT/BEFORE clauses:
 - BEFORE(STATEMENT => 'uuid'): Query data before a statement
 - BEFORE(TIMESTAMP => 'timestamp'): Query data before a timestamp
 
-The clause is rendered by ``format_temporal_options``, the same hook the
+The clause is rendered by ``format_temporal_options_expression``, the same hook the
 shared ``format_named_relation`` uses, so a three-level name and its time-travel
 suffix stay separate concerns.
 
@@ -38,6 +38,6 @@ class SnowflakeTimeTravelSupport(Protocol):
         """Render a single AT/BEFORE clause."""
         ...
 
-    def format_temporal_options(self, expr: "TemporalOptionsExpression") -> Tuple[str, tuple]:
+    def format_temporal_options_expression(self, expr: "TemporalOptionsExpression") -> Tuple[str, tuple]:
         """Render the time-travel clause of a relation reference."""
         ...

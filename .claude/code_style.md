@@ -630,7 +630,7 @@ class DefaultCustomTimestampMixin(CustomTimestampMixin):
 
 1. **Proper Inheritance**:
    - All expression classes must inherit from `BaseExpression`
-   - Value expressions inherit from `SQLValueExpression`
+   - Value expressions inherit from `SQLValue`
    - Predicate expressions inherit from `SQLPredicate`
    - Use appropriate mixins for functionality (e.g., `ArithmeticMixin`, `ComparisonMixin`)
 
@@ -691,7 +691,7 @@ from . import bases, mixins
 if TYPE_CHECKING:  # pragma: no cover
     from ..dialect import SQLDialectBase
 
-class MyExpression(mixins.ArithmeticMixin, mixins.ComparisonMixin, bases.SQLValueExpression):
+class MyExpression(mixins.ArithmeticMixin, mixins.ComparisonMixin, bases.SQLValue):
     """Represents a custom SQL expression."""
     def __init__(self, dialect: "SQLDialectBase", value: str):
         super().__init__(dialect)

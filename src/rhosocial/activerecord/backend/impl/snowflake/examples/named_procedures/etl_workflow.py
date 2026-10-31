@@ -8,7 +8,7 @@ Demonstrates a multi-step ETL procedure using the imperative Procedure API:
 Usage:
     from rhosocial.activerecord.backend.impl.snowflake.examples.named_procedures.etl_workflow import DataLoadProcedure
     from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
-    from rhosocial.activerecord.backend.named_query.procedure import ProcedureRunner
+    from rhosocial.activerecord.backend.named_expression import ProcedureRunner
 
     backend = SnowflakeBackend(connection_config=config)
     backend.connect()
@@ -22,7 +22,7 @@ Usage:
 """
 from typing import Dict, Any
 
-from rhosocial.activerecord.backend.named_query.procedure import Procedure, ProcedureContext
+from rhosocial.activerecord.backend.named_expression import Procedure, ProcedureContext
 
 
 class DataLoadProcedure(Procedure):

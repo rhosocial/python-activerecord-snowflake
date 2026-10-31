@@ -16,12 +16,12 @@ Three differences force this dialect to state its own formatters:
 * ``ALTER SEQUENCE`` cannot change the initial value. The reference's usage
   notes say the first value cannot be changed after the sequence is created,
   and the command has neither a ``START`` nor a ``RESTART`` clause. An
-  ``AlterSequenceExpression`` asking for either is refused rather than
+  ``AlterSequenceStatement`` asking for either is refused rather than
   rendered.
 * The order spelling is ``NOORDER``, one word, where core's shared renderer
   writes ``NO ORDER``.
 
-``COMMENT`` is a Snowflake-only option that core's ``CreateSequenceExpression``
+``COMMENT`` is a Snowflake-only option that core's ``CreateSequenceStatement``
 has no field for. It is recorded here rather than carried: adding a field to a
 core expression is core's decision, not this backend's. When core grows one,
 the clause belongs after ``ORDER`` / ``NOORDER``, as the reference grammar
@@ -43,17 +43,18 @@ from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeature
 
 if TYPE_CHECKING:  # pragma: no cover
     from rhosocial.activerecord.backend.expression.statements import (
-        AlterSequenceExpression,
-        CreateSequenceExpression,
-        DropSequenceExpression,
+        AlterSequenceStatement,
+        CreateSequenceStatement,
+        DropSequenceStatement,
     )
+    from ..expression.sequence import SnowflakeNextvalExpression
 
 
 class SnowflakeSequenceMixin:
     """Snowflake's own ``CREATE`` / ``ALTER`` / ``DROP SEQUENCE`` renderers."""
 
     def format_create_sequence_statement(
-        self, expr: "CreateSequenceExpression"
+        self, expr: "CreateSequenceStatement"
     ) -> Tuple[str, tuple]:
         """Render ``CREATE SEQUENCE`` in Snowflake's grammar.
 
@@ -67,7 +68,7 @@ class SnowflakeSequenceMixin:
               [ COMMENT = '<string_literal>' ]
 
         ``OR REPLACE`` and ``COMMENT`` have no field on core's
-        ``CreateSequenceExpression`` and so are never emitted here; the class
+        ``CreateSequenceStatement`` and so are never emitted here; the class
         docstring above says where ``COMMENT`` belongs when core grows one.
 
         Every option is answered by its own capability probe: ``start`` by
@@ -189,7 +190,7 @@ class SnowflakeSequenceMixin:
         return " ".join(parts), ()
 
     def format_drop_sequence_statement(
-        self, expr: "DropSequenceExpression"
+        self, expr: "DropSequenceStatement"
     ) -> Tuple[str, tuple]:
         """Render ``DROP SEQUENCE`` in Snowflake's grammar.
 
@@ -198,7 +199,7 @@ class SnowflakeSequenceMixin:
             DROP SEQUENCE [ IF EXISTS ] <name> [ CASCADE | RESTRICT ]
 
         ``CASCADE`` / ``RESTRICT`` have no field on core's
-        ``DropSequenceExpression`` and are not emitted; Snowflake accepts the
+        ``DropSequenceStatement`` and are not emitted; Snowflake accepts the
         words but does not act on them, so omitting them changes nothing.
 
         Raises:
@@ -222,7 +223,7 @@ class SnowflakeSequenceMixin:
         return " ".join(parts), ()
 
     def format_alter_sequence_statement(
-        self, expr: "AlterSequenceExpression"
+        self, expr: "AlterSequenceStatement"
     ) -> Tuple[str, tuple]:
         """Render ``ALTER SEQUENCE`` in Snowflake's grammar.
 
@@ -240,7 +241,7 @@ class SnowflakeSequenceMixin:
             ALTER SEQUENCE [ IF EXISTS ] <name> UNSET COMMENT
 
         ``RENAME TO`` and ``UNSET COMMENT`` have no field on core's
-        ``AlterSequenceExpression``; ``IF EXISTS`` has none either, so it is
+        ``AlterSequenceStatement``; ``IF EXISTS`` has none either, so it is
         never emitted.
 
         ``ALTER SEQUENCE`` cannot change the initial value: the reference's
@@ -379,6 +380,25 @@ class SnowflakeSequenceMixin:
                 )
             parts.append("ORDER" if expr.order else "NOORDER")
         return " ".join(parts), ()
+
+    def format_snowflake_nextval_expression(
+        self, expr: "SnowflakeNextvalExpression"
+    ) -> Tuple[str, tuple]:
+        """Render ``<sequence>.NEXTVAL [AS <alias>]``.
+
+        Snowflake reads a sequence's next value as a *pseudo-column* on the
+        sequence (``seq.nextval``), not through the SQL-standard
+        ``NEXT VALUE FOR`` and not through PostgreSQL's ``nextval('seq')``
+        function form. The sequence name goes through
+        :meth:`format_identifier`, so a quoted or namespaced name is written
+        once, in the one place that knows how.
+
+        https://docs.snowflake.com/en/sql-reference/functions/nextval
+        """
+        sql = f"{self.format_identifier(expr.sequence)}.NEXTVAL"
+        if expr.alias:
+            sql = f"{sql} AS {self.format_identifier(expr.alias)}"
+        return sql, ()
 
 
 __all__ = ["SnowflakeSequenceMixin"]

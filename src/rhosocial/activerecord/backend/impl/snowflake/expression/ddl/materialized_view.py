@@ -7,7 +7,7 @@ CREATE [OR REPLACE] MATERIALIZED VIEW statements with optional column
 aliases, CLUSTER BY keys and COMMENT.
 
 The expression extends the core
-:class:`~rhosocial.activerecord.backend.expression.statements.ddl_view.CreateMaterializedViewExpression`
+:class:`~rhosocial.activerecord.backend.expression.statements.ddl_view.CreateMaterializedViewStatement`
 so the generic MV API works on Snowflake, and layers the Snowflake-specific
 options on top.
 
@@ -25,11 +25,11 @@ Feature Source: Snowflake native (not SQL standard)
 Official Documentation:
 - CREATE MATERIALIZED VIEW: https://docs.snowflake.com/en/sql-reference/sql/create-materialized-view
 """
-from typing import Any, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.objects import MaterializedView
 from rhosocial.activerecord.backend.expression.statements.ddl_view import (
-    CreateMaterializedViewExpression,
+    CreateMaterializedViewStatement,
 )
 
 if TYPE_CHECKING:
@@ -37,11 +37,11 @@ if TYPE_CHECKING:
 
 
 __all__ = [
-    "SnowflakeCreateMaterializedViewExpression",
+    "SnowflakeCreateMaterializedViewStatement",
 ]
 
 
-class SnowflakeCreateMaterializedViewExpression(CreateMaterializedViewExpression):
+class SnowflakeCreateMaterializedViewStatement(CreateMaterializedViewStatement):
     """Snowflake CREATE [OR REPLACE] MATERIALIZED VIEW statement expression.
 
     Accepts both the Snowflake field names (``name`` / ``as_query`` /
@@ -53,7 +53,7 @@ class SnowflakeCreateMaterializedViewExpression(CreateMaterializedViewExpression
     Attributes:
         view: The ``MaterializedView`` object being created; a bare name is
             accepted and wrapped in one.
-        query: Defining query — a ``QueryExpression`` or a raw SQL string.
+        query: Defining query — a ``QueryStatement`` or a raw SQL string.
         column_aliases: Optional column alias list.
         or_replace: Emit ``OR REPLACE`` (mutually exclusive with ``if_not_exists``).
         if_not_exists: Emit ``IF NOT EXISTS``.
@@ -76,7 +76,18 @@ class SnowflakeCreateMaterializedViewExpression(CreateMaterializedViewExpression
         comment: Optional[str] = None,
         or_replace: bool = False,
         if_not_exists: bool = False,
-        **core_kwargs: Any,
+        # The base statement's own options, named rather than caught. The
+        # artifact reader matches parameters by name (spec 4.11.4) and refuses
+        # a ``**kwargs`` catch-all outright -- a parameter whose identity
+        # depends on how many extras arrived cannot be validated on read --
+        # so the four options the base declares are forwarded here by the
+        # names it knows. Snowflake has none of these clauses and the
+        # formatter refuses them; they exist to reach that refusal, not to
+        # be spelled.
+        tablespace: Optional[str] = None,
+        with_data: bool = False,
+        no_data: bool = False,
+        storage_options: Optional[Dict[str, Any]] = None,
     ):
         resolved_view = view if view is not None else view_name
         if resolved_view is None:
@@ -96,7 +107,10 @@ class SnowflakeCreateMaterializedViewExpression(CreateMaterializedViewExpression
             view=resolved_view,
             query=resolved_query,
             column_aliases=resolved_columns,
-            **core_kwargs,
+            tablespace=tablespace,
+            with_data=with_data,
+            no_data=no_data,
+            storage_options=storage_options,
         )
         if or_replace and if_not_exists:
             raise ValueError(
@@ -128,8 +142,7 @@ class SnowflakeCreateMaterializedViewExpression(CreateMaterializedViewExpression
         The default introspection reads this class's ``__init__`` signature,
         which lists *both* spellings of every aliased field: ``name`` and
         ``view``, ``as_query`` and ``query``, ``column_list`` and
-        ``column_aliases``, plus the ``core_kwargs`` catch-all that has no
-        attribute to read. Reconstruction therefore handed the constructor both
+        ``column_aliases``. Reconstruction therefore handed the constructor both
         halves of each pair, and ``column_aliases is not None and column_list is
         not None`` is exactly the disagreement this class refuses -- so
         serialising any instance of it raised and it could not be deserialised at

@@ -17,18 +17,20 @@ from typing import Any, Optional, Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
+from ..coercion import as_member
+
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
 
 __all__ = [
     "SnowflakeStreamObjectType",
-    "SnowflakeCreateStreamExpression",
-    "SnowflakeDropStreamExpression",
+    "SnowflakeCreateStreamStatement",
+    "SnowflakeDropStreamStatement",
 ]
 
 
-class SnowflakeStreamObjectType(Enum):
+class SnowflakeStreamObjectType(str, Enum):
     """Source object kinds supported by CREATE STREAM.
 
     TABLE:        table stream (default).
@@ -36,6 +38,12 @@ class SnowflakeStreamObjectType(Enum):
     EXTERNAL_TABLE: external table stream.
     STAGE:        stage stream.
     """
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     TABLE = "TABLE"
     VIEW = "VIEW"
@@ -43,7 +51,7 @@ class SnowflakeStreamObjectType(Enum):
     STAGE = "STAGE"
 
 
-class SnowflakeCreateStreamExpression(BaseExpression):
+class SnowflakeCreateStreamStatement(BaseExpression):
     """Snowflake CREATE [OR REPLACE] STREAM statement expression.
 
     Attributes:
@@ -83,7 +91,7 @@ class SnowflakeCreateStreamExpression(BaseExpression):
         self.name = name
         self.or_replace = or_replace
         self.if_not_exists = if_not_exists
-        self.object_type = object_type
+        self.object_type = as_member(SnowflakeStreamObjectType, object_type, parameter="object_type")
         self.object_name = object_name
         self.append_only = append_only
         self.insert_only = insert_only
@@ -103,7 +111,7 @@ class SnowflakeCreateStreamExpression(BaseExpression):
         return self.dialect.format_create_stream_statement(self)
 
 
-class SnowflakeDropStreamExpression(BaseExpression):
+class SnowflakeDropStreamStatement(BaseExpression):
     """Snowflake DROP STREAM statement expression.
 
     Attributes:

@@ -17,19 +17,21 @@ from typing import Any, Optional, Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
+from ..coercion import as_member
+
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.dialect import SQLDialectBase
 
 
 __all__ = [
     "SnowflakeAlterWarehouseMode",
-    "SnowflakeCreateWarehouseExpression",
-    "SnowflakeAlterWarehouseExpression",
-    "SnowflakeDropWarehouseExpression",
+    "SnowflakeCreateWarehouseStatement",
+    "SnowflakeAlterWarehouseStatement",
+    "SnowflakeDropWarehouseStatement",
 ]
 
 
-class SnowflakeAlterWarehouseMode(Enum):
+class SnowflakeAlterWarehouseMode(str, Enum):
     """ALTER WAREHOUSE action modes.
 
     SUSPEND: shut down (suspend) the warehouse.
@@ -37,6 +39,12 @@ class SnowflakeAlterWarehouseMode(Enum):
     SET:     change one or more warehouse properties.
     RENAME:  rename the warehouse.
     """
+    #: A member *is* the word it carries: ``str()`` and f-string
+    #: interpolation must yield the value, not ``ClassName.MEMBER``, or the
+    #: rendered SQL and the artifact would carry the Python spelling.
+    #: ``(str, Enum)`` alone does not give that -- ``Enum.__str__`` wins --
+    #: so it is stated here once.
+    __str__ = str.__str__
 
     SUSPEND = "SUSPEND"
     RESUME = "RESUME"
@@ -44,7 +52,7 @@ class SnowflakeAlterWarehouseMode(Enum):
     RENAME = "RENAME"
 
 
-class SnowflakeCreateWarehouseExpression(BaseExpression):
+class SnowflakeCreateWarehouseStatement(BaseExpression):
     """Snowflake CREATE WAREHOUSE statement expression.
 
     Attributes:
@@ -97,7 +105,7 @@ class SnowflakeCreateWarehouseExpression(BaseExpression):
         return self.dialect.format_create_warehouse_statement(self)
 
 
-class SnowflakeAlterWarehouseExpression(BaseExpression):
+class SnowflakeAlterWarehouseStatement(BaseExpression):
     """Snowflake ALTER WAREHOUSE statement expression.
 
     The ``mode`` selects one of the four ALTER WAREHOUSE forms:
@@ -137,7 +145,7 @@ class SnowflakeAlterWarehouseExpression(BaseExpression):
     ):
         super().__init__(dialect)
         self.name = name
-        self.mode = mode
+        self.mode = as_member(SnowflakeAlterWarehouseMode, mode, parameter="mode")
         self.new_name = new_name
         self.warehouse_size = warehouse_size
         self.max_cluster_count = max_cluster_count
@@ -157,7 +165,7 @@ class SnowflakeAlterWarehouseExpression(BaseExpression):
         return self.dialect.format_alter_warehouse_statement(self)
 
 
-class SnowflakeDropWarehouseExpression(BaseExpression):
+class SnowflakeDropWarehouseStatement(BaseExpression):
     """Snowflake DROP WAREHOUSE statement expression.
 
     Attributes:

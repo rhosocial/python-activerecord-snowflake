@@ -25,7 +25,7 @@ if TYPE_CHECKING:  # pragma: no cover
 class SnowflakeTimeTravelMixin:
     """Mixin for Snowflake time travel query support.
 
-    Implements ``format_temporal_options``, the clause hook that the shared
+    Implements ``format_temporal_options_expression``, the clause hook that the shared
     ``format_named_relation`` calls when a reference carries temporal options.
     Snowflake deliberately does not claim the generic
     :class:`~...dialect.protocols.TemporalTableSupport`: that protocol is the
@@ -77,17 +77,17 @@ class SnowflakeTimeTravelMixin:
         kind = str(kind).upper()
         if kind == "OFFSET":
             return f"{clause}(OFFSET => {int(value)})"
-        escaped = self._escape_sql_string(str(value))
+        escaped = self.escape_sql_string(str(value))
         return f"{clause}({kind} => '{escaped}')"
 
-    def format_temporal_options(
+    def format_temporal_options_expression(
         self, expr: "TemporalOptionsExpression"
     ) -> Tuple[str, tuple]:
         """Render a relation's time-travel clause.
 
         The options mapping is a single ``at`` or ``before`` key whose value is
         a ``(kind, value)`` pair -- the same shape
-        :class:`~...expression.ddl.stream.SnowflakeCreateStreamExpression`
+        :class:`~...expression.ddl.stream.SnowflakeCreateStreamStatement`
         takes, so one point definition serves both statements.
 
         Args:
@@ -100,11 +100,11 @@ class SnowflakeTimeTravelMixin:
             ValueError: no temporal options were given.
             UnsupportedFeatureError: an option Snowflake cannot express.
         """
-        options: Dict[str, Any] = getattr(expr, "options", None) or {}
+        options: Dict[str, Any] = expr.options or {}
         if not options:
             raise ValueError(
                 "Temporal options cannot be empty. If no temporal options are needed, "
-                "don't call format_temporal_options."
+                "don't call format_temporal_options_expression."
             )
         if len(options) > 1:
             raise UnsupportedFeatureError(

@@ -5,8 +5,8 @@ from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.stream import (
-        SnowflakeCreateStreamExpression,
-        SnowflakeDropStreamExpression,
+        SnowflakeCreateStreamStatement,
+        SnowflakeDropStreamStatement,
     )
 
 
@@ -18,12 +18,12 @@ class SnowflakeStreamMixin:
         return True
 
     def format_create_stream_statement(
-        self, expr: "SnowflakeCreateStreamExpression"
+        self, expr: "SnowflakeCreateStreamStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] STREAM statement.
 
         Args:
-            expr: :class:`SnowflakeCreateStreamExpression`.
+            expr: :class:`SnowflakeCreateStreamStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -65,17 +65,17 @@ class SnowflakeStreamMixin:
             parts.append(f"COPY_GRANTS = {str(bool(expr.copy_grants)).upper()}")
         if expr.comment is not None:
             parts.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         return " ".join(parts), ()
 
     def format_drop_stream_statement(
-        self, expr: "SnowflakeDropStreamExpression"
+        self, expr: "SnowflakeDropStreamStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP STREAM statement.
 
         Args:
-            expr: :class:`SnowflakeDropStreamExpression`.
+            expr: :class:`SnowflakeDropStreamStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).

@@ -11,9 +11,9 @@ from rhosocial.activerecord.backend.impl.snowflake.protocols import (
     SnowflakeRoutineSupport,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
-    SnowflakeCreateFunctionExpression,
-    SnowflakeCreateProcedureExpression,
-    SnowflakeDropRoutineExpression,
+    SnowflakeCreateFunctionStatement,
+    SnowflakeCreateProcedureStatement,
+    SnowflakeDropRoutineStatement,
     SnowflakeRoutineExecuteAs,
     SnowflakeRoutineLanguage,
     SnowflakeRoutineType,
@@ -39,7 +39,7 @@ class TestSnowflakeCreateProcedure:
     """CREATE [OR REPLACE] PROCEDURE statement generation."""
 
     def test_create_procedure_basic(self, dialect):
-        expr = SnowflakeCreateProcedureExpression(
+        expr = SnowflakeCreateProcedureStatement(
             dialect,
             "p",
             args=[("x", "NUMBER")],
@@ -55,7 +55,7 @@ class TestSnowflakeCreateProcedure:
         assert params == ()
 
     def test_create_procedure_or_replace(self, dialect):
-        expr = SnowflakeCreateProcedureExpression(
+        expr = SnowflakeCreateProcedureStatement(
             dialect,
             "p",
             or_replace=True,
@@ -70,7 +70,7 @@ class TestSnowflakeCreateProcedure:
         )
 
     def test_create_procedure_javascript_language(self, dialect):
-        expr = SnowflakeCreateProcedureExpression(
+        expr = SnowflakeCreateProcedureStatement(
             dialect,
             "p",
             args=[("x", "NUMBER")],
@@ -85,7 +85,7 @@ class TestSnowflakeCreateProcedure:
         )
 
     def test_create_procedure_execute_as_caller(self, dialect):
-        expr = SnowflakeCreateProcedureExpression(
+        expr = SnowflakeCreateProcedureStatement(
             dialect,
             "p",
             returns="VARCHAR",
@@ -99,7 +99,7 @@ class TestSnowflakeCreateProcedure:
         )
 
     def test_create_procedure_multiple_args(self, dialect):
-        expr = SnowflakeCreateProcedureExpression(
+        expr = SnowflakeCreateProcedureStatement(
             dialect,
             "p",
             args=[("a", "NUMBER"), (None, "VARCHAR")],
@@ -117,7 +117,7 @@ class TestSnowflakeCreateFunction:
     """CREATE [OR REPLACE] FUNCTION statement generation."""
 
     def test_create_function_basic(self, dialect):
-        expr = SnowflakeCreateFunctionExpression(
+        expr = SnowflakeCreateFunctionStatement(
             dialect,
             "f",
             args=[("x", "NUMBER")],
@@ -133,7 +133,7 @@ class TestSnowflakeCreateFunction:
         assert params == ()
 
     def test_create_function_volatile(self, dialect):
-        expr = SnowflakeCreateFunctionExpression(
+        expr = SnowflakeCreateFunctionStatement(
             dialect,
             "f",
             returns="NUMBER",
@@ -148,7 +148,7 @@ class TestSnowflakeCreateFunction:
 
     def test_create_function_unspecified_volatility_omits_the_clause(self, dialect):
         """Neither parameter set: the optional clause is absent (server default)."""
-        expr = SnowflakeCreateFunctionExpression(
+        expr = SnowflakeCreateFunctionStatement(
             dialect,
             "f",
             returns="NUMBER",
@@ -163,7 +163,7 @@ class TestSnowflakeCreateFunction:
         with pytest.raises(
             ValueError, match="immutable and volatile are mutually exclusive"
         ):
-            SnowflakeCreateFunctionExpression(
+            SnowflakeCreateFunctionStatement(
                 dialect,
                 "f",
                 returns="NUMBER",
@@ -173,7 +173,7 @@ class TestSnowflakeCreateFunction:
             )
 
     def test_create_function_execute_as_owner(self, dialect):
-        expr = SnowflakeCreateFunctionExpression(
+        expr = SnowflakeCreateFunctionStatement(
             dialect,
             "f",
             returns="NUMBER",
@@ -187,7 +187,7 @@ class TestSnowflakeCreateFunction:
         )
 
     def test_create_function_or_replace(self, dialect):
-        expr = SnowflakeCreateFunctionExpression(
+        expr = SnowflakeCreateFunctionStatement(
             dialect,
             "f",
             or_replace=True,
@@ -201,7 +201,7 @@ class TestSnowflakeCreateFunction:
         )
 
     def test_create_function_python_language(self, dialect):
-        expr = SnowflakeCreateFunctionExpression(
+        expr = SnowflakeCreateFunctionStatement(
             dialect,
             "f",
             returns="NUMBER",
@@ -219,7 +219,7 @@ class TestSnowflakeDropRoutine:
     """DROP PROCEDURE / FUNCTION statement generation."""
 
     def test_drop_procedure(self, dialect):
-        expr = SnowflakeDropRoutineExpression(
+        expr = SnowflakeDropRoutineStatement(
             dialect, "p", routine_type=SnowflakeRoutineType.PROCEDURE
         )
         sql, params = expr.to_sql()
@@ -227,7 +227,7 @@ class TestSnowflakeDropRoutine:
         assert params == ()
 
     def test_drop_function_if_exists(self, dialect):
-        expr = SnowflakeDropRoutineExpression(
+        expr = SnowflakeDropRoutineStatement(
             dialect,
             "f",
             routine_type=SnowflakeRoutineType.FUNCTION,
@@ -237,6 +237,6 @@ class TestSnowflakeDropRoutine:
         assert sql == 'DROP FUNCTION IF EXISTS "f"'
 
     def test_drop_routine_defaults_to_procedure(self, dialect):
-        expr = SnowflakeDropRoutineExpression(dialect, "p")
+        expr = SnowflakeDropRoutineStatement(dialect, "p")
         sql, _ = expr.to_sql()
         assert sql == 'DROP PROCEDURE "p"'

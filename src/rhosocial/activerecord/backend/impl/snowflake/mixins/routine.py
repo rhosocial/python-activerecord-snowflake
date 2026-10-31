@@ -5,9 +5,9 @@ from typing import Dict, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.routine import (
-        SnowflakeCreateFunctionExpression,
-        SnowflakeCreateProcedureExpression,
-        SnowflakeDropRoutineExpression,
+        SnowflakeCreateFunctionStatement,
+        SnowflakeCreateProcedureStatement,
+        SnowflakeDropRoutineStatement,
     )
 
 
@@ -28,12 +28,12 @@ class SnowflakeRoutineMixin:
         return {}
 
     def format_create_procedure_statement(
-        self, expr: "SnowflakeCreateProcedureExpression"
+        self, expr: "SnowflakeCreateProcedureStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] PROCEDURE statement.
 
         Args:
-            expr: :class:`SnowflakeCreateProcedureExpression`.
+            expr: :class:`SnowflakeCreateProcedureStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -44,20 +44,28 @@ class SnowflakeRoutineMixin:
             parts.append("OR REPLACE")
         parts.append("PROCEDURE")
         parts.append(self.format_identifier(expr.name))
+        from rhosocial.activerecord.backend.expression.types import DataType
+
         if not expr.args:
             parts.append("()")
         else:
             rendered = []
             for arg in expr.args:
                 arg_name, arg_type = arg
+                if arg_type is not None:
+                    arg_type, _ = DataType.as_type(self, arg_type).to_sql()
+                arg_type_sql = arg_type
                 if arg_name:
                     rendered.append(
-                        f"{self.format_identifier(arg_name)} {arg_type}"
+                        f"{self.format_identifier(arg_name)} {arg_type_sql}"
                     )
                 else:
-                    rendered.append(str(arg_type))
+                    rendered.append(arg_type_sql)
             parts.append("(" + ", ".join(rendered) + ")")
-        parts.append(f"RETURNS {expr.returns}")
+        returns = expr.returns
+        if returns is not None:
+            returns, _ = DataType.as_type(self, returns).to_sql()
+        parts.append(f"RETURNS {returns}")
         parts.append(f"LANGUAGE {expr.language.value}")
         if expr.execute_as is not None:
             parts.append(f"EXECUTE AS {expr.execute_as.value}")
@@ -65,17 +73,17 @@ class SnowflakeRoutineMixin:
             parts.append(f"AS $$ {expr.body} $$")
         if expr.comment is not None:
             parts.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         return " ".join(parts), ()
 
     def format_create_function_statement(
-        self, expr: "SnowflakeCreateFunctionExpression"
+        self, expr: "SnowflakeCreateFunctionStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] FUNCTION statement.
 
         Args:
-            expr: :class:`SnowflakeCreateFunctionExpression`.
+            expr: :class:`SnowflakeCreateFunctionStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -86,20 +94,28 @@ class SnowflakeRoutineMixin:
             parts.append("OR REPLACE")
         parts.append("FUNCTION")
         parts.append(self.format_identifier(expr.name))
+        from rhosocial.activerecord.backend.expression.types import DataType
+
         if not expr.args:
             parts.append("()")
         else:
             rendered = []
             for arg in expr.args:
                 arg_name, arg_type = arg
+                if arg_type is not None:
+                    arg_type, _ = DataType.as_type(self, arg_type).to_sql()
+                arg_type_sql = arg_type
                 if arg_name:
                     rendered.append(
-                        f"{self.format_identifier(arg_name)} {arg_type}"
+                        f"{self.format_identifier(arg_name)} {arg_type_sql}"
                     )
                 else:
-                    rendered.append(str(arg_type))
+                    rendered.append(arg_type_sql)
             parts.append("(" + ", ".join(rendered) + ")")
-        parts.append(f"RETURNS {expr.returns}")
+        returns = expr.returns
+        if returns is not None:
+            returns, _ = DataType.as_type(self, returns).to_sql()
+        parts.append(f"RETURNS {returns}")
         parts.append(f"LANGUAGE {expr.language.value}")
         if expr.immutable:
             parts.append("IMMUTABLE")
@@ -111,17 +127,17 @@ class SnowflakeRoutineMixin:
             parts.append(f"AS $$ {expr.body} $$")
         if expr.comment is not None:
             parts.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         return " ".join(parts), ()
 
     def format_drop_routine_statement(
-        self, expr: "SnowflakeDropRoutineExpression"
+        self, expr: "SnowflakeDropRoutineStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP PROCEDURE / FUNCTION statement.
 
         Args:
-            expr: :class:`SnowflakeDropRoutineExpression`.
+            expr: :class:`SnowflakeDropRoutineStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).

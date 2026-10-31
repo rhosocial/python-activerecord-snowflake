@@ -7,9 +7,9 @@ from ..expression.ddl.pipe import SnowflakeAlterPipeMode
 
 if TYPE_CHECKING:
     from ..expression.ddl.pipe import (
-        SnowflakeAlterPipeExpression,
-        SnowflakeCreatePipeExpression,
-        SnowflakeDropPipeExpression,
+        SnowflakeAlterPipeStatement,
+        SnowflakeCreatePipeStatement,
+        SnowflakeDropPipeStatement,
     )
 
 
@@ -21,12 +21,12 @@ class SnowflakePipeMixin:
         return True
 
     def format_create_pipe_statement(
-        self, expr: "SnowflakeCreatePipeExpression"
+        self, expr: "SnowflakeCreatePipeStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE [OR REPLACE] PIPE statement.
 
         Args:
-            expr: :class:`SnowflakeCreatePipeExpression`.
+            expr: :class:`SnowflakeCreatePipeStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -52,21 +52,21 @@ class SnowflakePipeMixin:
             )
         if expr.aws_sns_topic is not None:
             parts.append(
-                f"AWS_SNS_TOPIC = '{self._escape_sql_string(expr.aws_sns_topic)}'"
+                f"AWS_SNS_TOPIC = '{self.escape_sql_string(expr.aws_sns_topic)}'"
             )
         if expr.integration is not None:
             parts.append(
-                f"INTEGRATION = '{self._escape_sql_string(expr.integration)}'"
+                f"INTEGRATION = '{self.escape_sql_string(expr.integration)}'"
             )
         if expr.comment is not None:
             parts.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         parts.extend(["AS", str(expr.copy_sql)])
         return " ".join(parts), ()
 
     def format_alter_pipe_statement(
-        self, expr: "SnowflakeAlterPipeExpression"
+        self, expr: "SnowflakeAlterPipeStatement"
     ) -> Tuple[str, tuple]:
         """Format ALTER PIPE statement.
 
@@ -74,7 +74,7 @@ class SnowflakePipeMixin:
         :attr:`expr.mode`.
 
         Args:
-            expr: :class:`SnowflakeAlterPipeExpression`.
+            expr: :class:`SnowflakeAlterPipeStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -90,7 +90,7 @@ class SnowflakePipeMixin:
         if mode is SnowflakeAlterPipeMode.REFRESH:
             parts.append("REFRESH")
             if expr.modified_after is not None:
-                value = self._escape_sql_string(str(expr.modified_after))
+                value = self.escape_sql_string(str(expr.modified_after))
                 parts.append(f"MODIFIED_AFTER => '{value}'")
             return " ".join(parts), ()
         if mode is SnowflakeAlterPipeMode.PAUSE:
@@ -107,7 +107,7 @@ class SnowflakePipeMixin:
             )
         if expr.comment is not None:
             options.append(
-                f"COMMENT = '{self._escape_sql_string(expr.comment)}'"
+                f"COMMENT = '{self.escape_sql_string(expr.comment)}'"
             )
         if not options:
             raise ValueError("ALTER PIPE SET requires at least one property")
@@ -116,12 +116,12 @@ class SnowflakePipeMixin:
         return " ".join(parts), ()
 
     def format_drop_pipe_statement(
-        self, expr: "SnowflakeDropPipeExpression"
+        self, expr: "SnowflakeDropPipeStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP PIPE statement.
 
         Args:
-            expr: :class:`SnowflakeDropPipeExpression`.
+            expr: :class:`SnowflakeDropPipeStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).

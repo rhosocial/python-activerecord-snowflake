@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from typing import Tuple, TYPE_CHECKING
 
-from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression.objects import Database
+
+from ..expression.database import SnowflakeCreateDatabaseExpression
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.statements.ddl_database import (
-        AlterDatabaseExpression,
-        CreateDatabaseExpression,
-        DropDatabaseExpression,
+        AlterDatabaseStatement,
+        CreateDatabaseStatement,
+        DropDatabaseStatement,
     )
 
 
@@ -86,7 +87,7 @@ class SnowflakeDatabaseMixin:
         return True
 
     def format_create_database_statement(
-        self, expr: CreateDatabaseExpression
+        self, expr: CreateDatabaseStatement
     ) -> Tuple[str, tuple]:
         # The object-kind check belongs to the formatter that consumes the
         # object, not to the constructor. An object carries its own
@@ -101,22 +102,24 @@ class SnowflakeDatabaseMixin:
         parts = ["CREATE"]
         if expr.or_replace:
             parts.append("OR REPLACE")
-        if getattr(expr, "transient", False):
+        # ``TRANSIENT`` and ``CLONE`` are Snowflake's own grammar; the core
+        # statement documents that they live on this backend's subclass, so
+        # the subclass is asked by name rather than probed for.
+        if isinstance(expr, SnowflakeCreateDatabaseExpression) and expr.transient:
             parts.append("TRANSIENT")
         parts.append("DATABASE")
         if expr.if_not_exists:
             parts.append("IF NOT EXISTS")
         parts.append(expr.database.to_sql()[0])
-        clone_source = getattr(expr, "clone", None)
-        if clone_source:
-            parts.append(f"CLONE {self.format_identifier(clone_source)}")
+        if isinstance(expr, SnowflakeCreateDatabaseExpression) and expr.clone:
+            parts.append(f"CLONE {self.format_identifier(expr.clone)}")
         if expr.comment:
             escaped_comment = expr.comment.replace("'", "''")
             parts.append(f"COMMENT = '{escaped_comment}'")
         return " ".join(parts), ()
 
     def format_drop_database_statement(
-        self, expr: DropDatabaseExpression
+        self, expr: DropDatabaseStatement
     ) -> Tuple[str, tuple]:
         if not isinstance(expr.database, Database):
             raise TypeError(
@@ -130,7 +133,7 @@ class SnowflakeDatabaseMixin:
         return " ".join(parts), ()
 
     def format_alter_database_statement(
-        self, expr: AlterDatabaseExpression
+        self, expr: AlterDatabaseStatement
     ) -> Tuple[str, tuple]:
         from rhosocial.activerecord.backend.expression.statements.ddl_database import AlterDatabaseAction
         if not isinstance(expr.database, Database):

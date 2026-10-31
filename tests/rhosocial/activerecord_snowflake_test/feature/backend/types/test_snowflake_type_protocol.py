@@ -300,13 +300,17 @@ class TestSingleInheritance:
     def test_the_family_is_not_empty(self):
         """Guard the guard: an empty scan would pass every assertion below.
 
-        Sixteen of these used to be ``(SnowflakeDataTypeMixin, CoreType)``;
-        ``SnowflakeUserDefinedType`` already sat directly on ``DataType``, and
+        Seventeen, measured. Thirteen derive from a core type;
         ``SnowflakeUuidType`` was added for the native ``UUID`` that arrived in
-        server release 10.2 — both are here to keep the count honest.
+        server release 10.2, and ``SnowflakeGeographyType``,
+        ``SnowflakeGeometryType`` and ``SnowflakeUserDefinedType`` sit directly
+        on ``DataType`` because core has no concept for them. The count was
+        eighteen while ``SnowflakeDataTypeMixin`` still existed; that mixin is
+        gone (every type now inherits its core class directly), and this number
+        is what keeps the arithmetic from drifting back.
         """
         found = self._all_snowflake_types()
-        assert len(found) == 18
+        assert len(found) == 17
         assert SnowflakeUserDefinedType in found
         assert SnowflakeUuidType in found
 

@@ -50,5 +50,5 @@ class SnowflakeIdentifierExpression(BaseExpression):
             Tuple of (SQL string, identifier parameter tuple).
 
         """
-        sql = self.dialect.format_identifier_dynamic(self.identifier)
+        sql = self.dialect.format_snowflake_identifier_expression(self.identifier)
         return sql, (self.identifier,)

@@ -15,8 +15,8 @@ from typing import Any, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.transaction import (
-        BeginTransactionExpression,
-        SetTransactionExpression,
+        BeginTransactionStatement,
+        SetTransactionStatement,
     )
 
 from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
@@ -174,15 +174,34 @@ from .mixins import (
     SnowflakeSetOperationMixin,
     SnowflakeDQLMixin,
     SnowflakeCapabilityMixin,
+    SnowflakeConstraintMixin,
     SnowflakeILIKEMixin,
     SnowflakeTrimMixin,
     SnowflakeGeneratedColumnMixin,
     SnowflakeOrderedSetAggregationMixin,
     SnowflakeTruncateMixin,
+    SnowflakeWildcardMixin,
+    SnowflakeLiteralValueMixin,
 )
 
 
 class SnowflakeDialect(
+    # The bases below come in bundles: a backend mixin, then the core bundle
+    # it stands in for. The backend's answer has to come first -- a mixin
+    # placed after the class it overrides never wins -- so a new mixin goes
+    # immediately before the core mixin it overrides, and the pairing is read
+    # off the list. Two positions sit outside that pairing and are called out
+    # where they occur: a mixin that overrides a method ``SQLDialectBase``
+    # defines has to precede the base, and a mixin that subclasses a core
+    # mixin has to precede it too (C3: a subclass precedes its base).
+    # Ahead of ``SQLDialectBase``, unlike every other mixin here. Those add
+    # methods the base does not have, so their position is a readability
+    # choice; this one overrides ``format_literal``, and a mixin placed after
+    # the class it overrides never wins. It resolves Snowflake's two tier-2
+    # spellings -- binary and UUID -- and leaves the base's portable forms and
+    # the literal-construction protocol to it. INTERVAL has no branch there on
+    # purpose, so the base's explicit failure is the answer.
+    SnowflakeLiteralValueMixin,
     SQLDialectBase,
     RelationSourceMixin,
     # The whole naming side, stated once: which namespace levels a name may
@@ -221,9 +240,18 @@ class SnowflakeDialect(
     SnowflakeSetOperationMixin,
     SnowflakeDQLMixin,
     SnowflakeCapabilityMixin,
+    # Constraint capabilities: every answer core's constraint probes and
+    # renderers consult, declared in this package. Placed well before the core
+    # ``ConstraintMixin`` / ``DDLColumnMixin`` (below) so the local answers win
+    # over the shared defaults.
+    SnowflakeConstraintMixin,
     SnowflakeILIKEMixin,
     SnowflakeGeneratedColumnMixin,
     SnowflakeOrderedSetAggregationMixin,
+    # The wildcard split: core gives each asterisk position its own formatter,
+    # and Snowflake spells both of them with an optional filter. Placed before
+    # the core ``ExpressionMixin`` (below) so its overrides win.
+    SnowflakeWildcardMixin,
     # TRIM/LPAD/RPAD/REPEAT are nodes with default formatters. LPAD, RPAD and
     # REPEAT are the shared spellings verbatim on Snowflake, so the generic
     # mixins are the answer for those three; TRIM differs and is overridden by
@@ -406,12 +434,12 @@ class SnowflakeDialect(
         """Snowflake supports IDENTIFIER() dynamic binding."""
         return True
 
-    def format_identifier_dynamic(self, identifier: str) -> str:
+    def format_snowflake_identifier_expression(self, identifier: str) -> str:
         """Format an IDENTIFIER(placeholder) dynamic object reference."""
         placeholder = self.get_parameter_placeholder()
         return f"IDENTIFIER({placeholder})"
 
-    def format_begin_transaction(self, expr: "BeginTransactionExpression") -> Tuple[str, tuple]:
+    def format_begin_transaction_statement(self, expr: "BeginTransactionStatement") -> Tuple[str, tuple]:
         """Format BEGIN TRANSACTION for Snowflake, consuming its mode pairs.
 
         Snowflake's BEGIN takes no transaction characteristics; in particular
@@ -443,9 +471,9 @@ class SnowflakeDialect(
                 "BEGIN TRANSACTION NOT DEFERRABLE",
                 suggestion="Snowflake does not support DEFERRABLE transactions.",
             )
-        return super().format_begin_transaction(expr)
+        return super().format_begin_transaction_statement(expr)
 
-    def format_set_transaction(self, expr: "SetTransactionExpression") -> Tuple[str, tuple]:
+    def format_set_transaction_statement(self, expr: "SetTransactionStatement") -> Tuple[str, tuple]:
         """Format SET TRANSACTION statement for Snowflake.
 
         Snowflake only supports READ COMMITTED isolation level, so

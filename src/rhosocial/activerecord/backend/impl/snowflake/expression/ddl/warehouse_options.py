@@ -10,7 +10,7 @@ Official Documentation:
 - CREATE WAREHOUSE: https://docs.snowflake.com/en/sql-reference/sql/create-warehouse
 - ALTER WAREHOUSE:  https://docs.snowflake.com/en/sql-reference/sql/alter-warehouse
 """
-from typing import Any, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
@@ -64,44 +64,8 @@ class SnowflakeWarehouseOptionsExpression(BaseExpression):
         self.initially_suspended = initially_suspended
         self.comment = comment
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate warehouse options SQL tokens.
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders these options."""
+        return "format_warehouse_options_expression"
 
-        Returns:
-            Tuple of (options SQL string, empty params tuple).
-
-        """
-        parts: list[str] = []
-        if self.warehouse_size is not None:
-            parts.append(
-                f"WAREHOUSE_SIZE = "
-                f"'{self.dialect._escape_sql_string(self.warehouse_size)}'"
-            )
-        if self.max_cluster_count is not None:
-            parts.append(f"MAX_CLUSTER_COUNT = {int(self.max_cluster_count)}")
-        if self.min_cluster_count is not None:
-            parts.append(f"MIN_CLUSTER_COUNT = {int(self.min_cluster_count)}")
-        if self.scaling_policy is not None:
-            parts.append(
-                f"SCALING_POLICY = "
-                f"'{self.dialect._escape_sql_string(self.scaling_policy)}'"
-            )
-        if self.auto_suspend is not None:
-            if isinstance(self.auto_suspend, bool):
-                parts.append(f"AUTO_SUSPEND = {str(self.auto_suspend).upper()}")
-            else:
-                parts.append(f"AUTO_SUSPEND = {int(self.auto_suspend)}")
-        if self.auto_resume is not None:
-            parts.append(
-                f"AUTO_RESUME = {str(bool(self.auto_resume)).upper()}"
-            )
-        if self.initially_suspended is not None:
-            parts.append(
-                f"INITIALLY_SUSPENDED = "
-                f"{str(bool(self.initially_suspended)).upper()}"
-            )
-        if self.comment is not None:
-            parts.append(
-                f"COMMENT = '{self.dialect._escape_sql_string(self.comment)}'"
-            )
-        return " ".join(parts), ()

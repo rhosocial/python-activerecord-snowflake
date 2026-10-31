@@ -9,8 +9,8 @@ from rhosocial.activerecord.backend.expression.objects import Schema
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.statements.ddl_schema import (
-        CreateSchemaExpression,
-        DropSchemaExpression,
+        CreateSchemaStatement,
+        DropSchemaStatement,
     )
 
 
@@ -77,7 +77,7 @@ class SnowflakeSchemaMixin:
         """Whether ``ALTER SCHEMA`` is supported.
 
         Snowflake natively supports ALTER SCHEMA, but there is no
-        ``AlterSchemaExpression`` / formatter yet, so the capability is
+        ``ALTER SCHEMA`` statement node or formatter yet, so the capability is
         advertised as unsupported to avoid a dead, unrenderable switch.
         """
         return False
@@ -102,7 +102,7 @@ class SnowflakeSchemaMixin:
         """Snowflake supports UNDROP SCHEMA."""
         return True
 
-    def format_create_schema_statement(self, expr: CreateSchemaExpression) -> Tuple[str, tuple]:
+    def format_create_schema_statement(self, expr: CreateSchemaStatement) -> Tuple[str, tuple]:
         # The object kind is checked here rather than in the constructor: an
         # object renders itself through its own ``format_method``, so a Table
         # handed here would produce a well-formed ``CREATE SCHEMA "users"``.
@@ -129,7 +129,7 @@ class SnowflakeSchemaMixin:
             parts.append(f"AUTHORIZATION {self.format_identifier(expr.authorization)}")
         return " ".join(parts), ()
 
-    def format_drop_schema_statement(self, expr: DropSchemaExpression) -> Tuple[str, tuple]:
+    def format_drop_schema_statement(self, expr: DropSchemaStatement) -> Tuple[str, tuple]:
         if not isinstance(expr.schema, Schema):
             raise TypeError(
                 f"{type(expr).__name__}.schema must be a Schema, "

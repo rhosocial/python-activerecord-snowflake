@@ -5,23 +5,23 @@ These leverage Snowflake-specific features like QUALIFY, time travel,
 VARIANT path access, and MERGE.
 
 Usage:
-    from rhosocial.activerecord.backend.named_query import resolve_named_query
+    from rhosocial.activerecord.backend.named_expression import resolve_named_expression
     from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 
     dialect = SnowflakeDialect(version=(8, 0, 0))
-    expr, sql, params = resolve_named_query(
+    expr = resolve_named_expression(
         "rhosocial.activerecord.backend.impl.snowflake.examples.named_queries.snow_queries.daily_sales_report",
         dialect=dialect,
         user_params={"report_date": "2024-01-15"},
     )
-    print(sql, params)
+    print(expr.to_sql())
 """
 from typing import Optional
 
 from rhosocial.activerecord.backend.expression.core import Column, Literal
 from rhosocial.activerecord.backend.expression.predicates import ComparisonPredicate
-from rhosocial.activerecord.backend.expression.statements.dql import QueryExpression
-from rhosocial.activerecord.backend.expression.statements.dml import MergeExpression, MergeAction, MergeActionType
+from rhosocial.activerecord.backend.expression.statements.dql import QueryStatement
+from rhosocial.activerecord.backend.expression.statements.dml import MergeStatement, MergeAction, MergeActionType
 
 
 def daily_sales_report(dialect, report_date: str):
@@ -35,7 +35,7 @@ def daily_sales_report(dialect, report_date: str):
         dialect: SnowflakeDialect instance.
         report_date: Date string for the report (YYYY-MM-DD).
     """
-    return QueryExpression(
+    return QueryStatement(
         dialect=dialect,
         select=[
             Column(dialect, 'store_name'),
@@ -59,7 +59,7 @@ def time_travel_query(dialect, table: str, timestamp: str):
         table: Table name to query.
         timestamp: ISO 8601 timestamp string for the historical point.
     """
-    return QueryExpression(
+    return QueryStatement(
         dialect=dialect,
         select=[Column(dialect, '*')],
         from_=table,
@@ -76,7 +76,7 @@ def variant_data_query(dialect, table: str):
         dialect: SnowflakeDialect instance.
         table: Table name containing VARIANT columns.
     """
-    return QueryExpression(
+    return QueryStatement(
         dialect=dialect,
         select=[Column(dialect, 'id'), Column(dialect, 'raw_data')],
         from_=table,
@@ -95,7 +95,7 @@ def merge_upsert(dialect, source: str, target: str, key_column: str = "id"):
         target: Target table name.
         key_column: Column used for match condition.
     """
-    return MergeExpression(
+    return MergeStatement(
         dialect=dialect,
         target_table=target,
         source=source,
@@ -132,7 +132,7 @@ def three_part_query(dialect, database: str, schema: str, table: str):
         table: Table name.
     """
     qualified_name = f'"{database}"."{schema}"."{table}"'
-    return QueryExpression(
+    return QueryStatement(
         dialect=dialect,
         select=[Column(dialect, '*')],
         from_=qualified_name,

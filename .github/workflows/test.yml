@@ -34,14 +34,21 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
           pip install git+https://github.com/rhosocial/python-activerecord.git@release/v1.0.0.dev30#egg=rhosocial-activerecord
-          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@release/v1.0.0.dev17#egg=rhosocial-activerecord-testsuite
+          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@fix/column-constraint-gates#egg=rhosocial-activerecord-testsuite
 
       - name: Install package
         run: |
           pip install -e . --no-deps
 
       - name: Run tests with coverage (unit only, no Snowflake instance)
+        # PYTHONPATH=src:tests puts the repository-local plugin
+        # (``-p plugins.expression_xdist``, registered in pyproject.toml) and
+        # the scenario providers on the path. pytest resolves ``-p`` before the
+        # ``pythonpath`` ini option is applied on older 8.x releases, so the
+        # environment variable -- which is how the sibling backends do it --
+        # is the reliable spelling rather than a second path mechanism.
         run: |
+          export PYTHONPATH=src:tests
           pytest tests/ -k "not integration" --ignore=tests/snowflake_fakesnow --tb=short
           coverage run --source=src -m pytest tests/ -k "not integration" --ignore=tests/snowflake_fakesnow --tb=short
           coverage xml
@@ -78,7 +85,7 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
           pip install git+https://github.com/rhosocial/python-activerecord.git@release/v1.0.0.dev30#egg=rhosocial-activerecord
-          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@release/v1.0.0.dev17#egg=rhosocial-activerecord-testsuite
+          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@fix/column-constraint-gates#egg=rhosocial-activerecord-testsuite
 
       - name: Install package
         run: |
@@ -86,6 +93,7 @@ jobs:
 
       - name: Run tests (unit only, no Snowflake instance)
         run: |
+          export PYTHONPATH=src:tests
           pytest tests/ -k "not integration" --ignore=tests/snowflake_fakesnow --tb=short
 
   test-free-threaded:
@@ -110,7 +118,7 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
           pip install git+https://github.com/rhosocial/python-activerecord.git@release/v1.0.0.dev30#egg=rhosocial-activerecord
-          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@release/v1.0.0.dev17#egg=rhosocial-activerecord-testsuite
+          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@fix/column-constraint-gates#egg=rhosocial-activerecord-testsuite
 
       - name: Install package
         run: |
@@ -118,4 +126,5 @@ jobs:
 
       - name: Run tests (unit only, no Snowflake instance)
         run: |
+          export PYTHONPATH=src:tests
           pytest tests/ -k "not integration" --ignore=tests/snowflake_fakesnow --tb=short

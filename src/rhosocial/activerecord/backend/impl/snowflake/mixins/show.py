@@ -4,7 +4,7 @@
 from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..expression.show import SnowflakeShowExpression
+    from ..expression.show import SnowflakeShowStatement
 
 
 class SnowflakeShowMixin:
@@ -15,7 +15,7 @@ class SnowflakeShowMixin:
         return True
 
     def format_show_statement(
-        self, expr: "SnowflakeShowExpression"
+        self, expr: "SnowflakeShowStatement"
     ) -> Tuple[str, tuple]:
         """Format a SHOW statement.
 
@@ -23,7 +23,7 @@ class SnowflakeShowMixin:
         [name]] [LIMIT n]`` (clause order follows the Snowflake docs).
 
         Args:
-            expr: :class:`SnowflakeShowExpression`.
+            expr: :class:`SnowflakeShowStatement`.
 
         Returns:
             Tuple of (SQL string, empty params tuple).
@@ -31,7 +31,7 @@ class SnowflakeShowMixin:
         """
         parts = ["SHOW", expr.object_type.value]
         if expr.like is not None:
-            parts.append(f"LIKE '{self._escape_sql_string(expr.like)}'")
+            parts.append(f"LIKE '{self.escape_sql_string(expr.like)}'")
         if expr.in_scope is not None:
             clause = f"IN {expr.in_scope.value}"
             if expr.in_name:

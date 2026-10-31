@@ -11,7 +11,7 @@ from rhosocial.activerecord.backend.impl.snowflake.protocols import (
     SnowflakeShowSupport,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
-    SnowflakeShowExpression,
+    SnowflakeShowStatement,
     SnowflakeShowObjectType,
     SnowflakeShowScope,
 )
@@ -57,7 +57,7 @@ class TestSnowflakeShowBasic:
         ],
     )
     def test_show_object_type(self, dialect, object_type, expected):
-        expr = SnowflakeShowExpression(dialect, object_type)
+        expr = SnowflakeShowStatement(dialect, object_type)
         sql, params = expr.to_sql()
         assert sql == expected
         assert params == ()
@@ -67,7 +67,7 @@ class TestSnowflakeShowScope:
     """SHOW statement IN scope generation."""
 
     def test_show_in_schema_with_name(self, dialect):
-        expr = SnowflakeShowExpression(
+        expr = SnowflakeShowStatement(
             dialect,
             SnowflakeShowObjectType.TABLES,
             in_scope=SnowflakeShowScope.SCHEMA,
@@ -77,7 +77,7 @@ class TestSnowflakeShowScope:
         assert sql == 'SHOW TABLES IN SCHEMA "my_schema"'
 
     def test_show_in_schema_no_name(self, dialect):
-        expr = SnowflakeShowExpression(
+        expr = SnowflakeShowStatement(
             dialect,
             SnowflakeShowObjectType.TABLES,
             in_scope=SnowflakeShowScope.SCHEMA,
@@ -86,7 +86,7 @@ class TestSnowflakeShowScope:
         assert sql == "SHOW TABLES IN SCHEMA"
 
     def test_show_in_database_with_name(self, dialect):
-        expr = SnowflakeShowExpression(
+        expr = SnowflakeShowStatement(
             dialect,
             SnowflakeShowObjectType.SCHEMAS,
             in_scope=SnowflakeShowScope.DATABASE,
@@ -96,7 +96,7 @@ class TestSnowflakeShowScope:
         assert sql == 'SHOW SCHEMAS IN DATABASE "my_db"'
 
     def test_show_in_account(self, dialect):
-        expr = SnowflakeShowExpression(
+        expr = SnowflakeShowStatement(
             dialect,
             SnowflakeShowObjectType.ROLES,
             in_scope=SnowflakeShowScope.ACCOUNT,
@@ -109,7 +109,7 @@ class TestSnowflakeShowFilters:
     """SHOW statement LIKE / LIMIT generation."""
 
     def test_show_like(self, dialect):
-        expr = SnowflakeShowExpression(
+        expr = SnowflakeShowStatement(
             dialect,
             SnowflakeShowObjectType.TABLES,
             like="emp%",
@@ -118,7 +118,7 @@ class TestSnowflakeShowFilters:
         assert sql == "SHOW TABLES LIKE 'emp%'"
 
     def test_show_like_escaped(self, dialect):
-        expr = SnowflakeShowExpression(
+        expr = SnowflakeShowStatement(
             dialect,
             SnowflakeShowObjectType.TABLES,
             like="it's",
@@ -127,7 +127,7 @@ class TestSnowflakeShowFilters:
         assert sql == "SHOW TABLES LIKE 'it''s'"
 
     def test_show_limit(self, dialect):
-        expr = SnowflakeShowExpression(
+        expr = SnowflakeShowStatement(
             dialect,
             SnowflakeShowObjectType.TABLES,
             limit=100,
@@ -136,7 +136,7 @@ class TestSnowflakeShowFilters:
         assert sql == "SHOW TABLES LIMIT 100"
 
     def test_show_full_options(self, dialect):
-        expr = SnowflakeShowExpression(
+        expr = SnowflakeShowStatement(
             dialect,
             SnowflakeShowObjectType.TABLES,
             in_scope=SnowflakeShowScope.SCHEMA,

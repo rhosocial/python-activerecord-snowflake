@@ -8,11 +8,10 @@ from rhosocial.activerecord.backend.expression.bases import BaseExpression
 # ``Type`` is the schema object naming a user-defined type; aliased because the
 # TYPE statements name their parameter ``type`` for the core's sake.
 from rhosocial.activerecord.backend.expression.objects import Type as TypeObject
-from rhosocial.activerecord.backend.expression.serialization import ExpressionRegistry
 from rhosocial.activerecord.backend.expression.statements.ddl_type import (
-    AlterTypeExpression,
-    CreateTypeExpression,
-    DropTypeExpression,
+    AlterTypeStatement,
+    CreateTypeStatement,
+    DropTypeStatement,
     TypeAlterAction,
     TypeDefinition,
 )
@@ -149,7 +148,7 @@ class SnowflakeUnsetTypeCommentAction(TypeAlterAction):
     action_kind = "snowflake.unset_type_comment"
 
 
-class SnowflakeCreateTypeExpression(CreateTypeExpression):
+class SnowflakeCreateTypeExpression(CreateTypeStatement):
     """CREATE TYPE expression with Snowflake qualification and comment syntax."""
 
     def __init__(
@@ -174,7 +173,7 @@ class SnowflakeCreateTypeExpression(CreateTypeExpression):
         self.comment = comment
 
 
-class SnowflakeAlterTypeExpression(AlterTypeExpression):
+class SnowflakeAlterTypeExpression(AlterTypeStatement):
     """ALTER TYPE expression over the Snowflake TYPE object."""
 
     def __init__(
@@ -193,7 +192,7 @@ class SnowflakeAlterTypeExpression(AlterTypeExpression):
         )
 
 
-class SnowflakeDropTypeExpression(DropTypeExpression):
+class SnowflakeDropTypeExpression(DropTypeStatement):
     """DROP TYPE expression over the Snowflake TYPE object."""
 
     def __init__(
@@ -230,18 +229,10 @@ class SnowflakeDropTypeExpression(DropTypeExpression):
         self.restrict = False
 
 
-_EXPRESSION_TYPES = (
-    SnowflakeTypeField,
-    SnowflakeScalarTypeDefinition,
-    SnowflakeObjectTypeDefinition,
-    SnowflakeSetTypeCommentAction,
-    SnowflakeUnsetTypeCommentAction,
-    SnowflakeCreateTypeExpression,
-    SnowflakeAlterTypeExpression,
-    SnowflakeDropTypeExpression,
-)
-for _expression_type in _EXPRESSION_TYPES:
-    ExpressionRegistry.register(_expression_type)
+# No registration loop, for the reason ``expression/types.py`` gives at its
+# tail: serializing needs no registry and reading is the reader's assembly.
+# The classes stay exported below; a reader that wants their kinds in a
+# registry registers them itself.
 
 
 __all__ = [

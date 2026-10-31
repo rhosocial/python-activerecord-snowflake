@@ -51,14 +51,16 @@ that never found a formatter names the formatting method. The shape of
 How the classes are found
 =========================
 
-``collect_expression_classes`` walks each package. It does **not** read
-``ExpressionRegistry._registry``: that dict is process-global and grows as
-sibling test modules import their own backends, so a matrix built from it would
-cover a different set of classes depending on which files pytest happened to
-import first. ``_auto_register_builtins`` is still called, because deserialising
-a core class needs it registered -- a separate concern from deciding what to
-test -- and :func:`register_all` registers what was collected so a Snowflake
-expression can be found again on the way back.
+``collect_expression_classes`` walks each package. It does **not** read a
+process-global class index: that dict grows as sibling test modules import their
+own backends, so a matrix built from it would cover a different set of classes
+depending on which files pytest happened to import first.
+Reading is a separate concern from deciding what to test: deserialising a
+Snowflake kind needs it in the registry the read goes through, and the
+framework's default registry holds only the packages the framework itself
+ships -- nothing registers this backend's classes on import. What the walk
+collected is therefore assembled into that registry at module level, so a
+Snowflake expression can be found again on the way back.
 
 And when a class cannot be constructed
 =====================================
@@ -112,15 +114,32 @@ from rhosocial.activerecord.backend.expression.advanced_functions import (
     WindowDefinition,
     WindowSpecification,
 )
-from rhosocial.activerecord.backend.expression.collation import CollateExpression
+from rhosocial.activerecord.backend.expression.collation import CollateFunction
 from rhosocial.activerecord.backend.expression.core import Column, Literal
 from rhosocial.activerecord.backend.expression.datetime import (
+    ExtractFieldExpression,
     TemporalOptionsExpression,
+    _ExtractBase,
+)
+from rhosocial.activerecord.backend.expression.functions.string import (
+    ChrFunction,
+    LeftFunction,
+    OverlayExpression,
+    RightFunction,
+    SpaceFunction,
+    SubstringExpression,
 )
 from rhosocial.activerecord.backend.expression.predicates import ComparisonPredicate
+from rhosocial.activerecord.backend.expression.predicates import LikeOperator
+from rhosocial.activerecord.backend.expression.predicates import (
+    ILikePredicate,
+    LikePredicate,
+)
 from rhosocial.activerecord.backend.expression.query_parts import JoinClause
+from rhosocial.activerecord.backend.expression.operators import ArithmeticOperation
+from rhosocial.activerecord.backend.expression.query_sources import SetOperation
 from rhosocial.activerecord.backend.expression.serialization import (
-    ExpressionRegistry,
+    default_registry,
     deserialize,
     deserialize_json,
     deserialize_xml,
@@ -154,12 +173,12 @@ from rhosocial.activerecord.backend.expression.statements.ddl_domain import (
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_table import (
     ColumnConstraint,
-    ColumnConstraintType,
+    ColumnNotNullConstraint,
     ForeignKeyConstraint,
     IndexDefinition,
     ReferencesClause,
     TableConstraint,
-    TableConstraintType,
+    TablePrimaryKeyConstraint,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_trigger import (
     TriggerEvent,
@@ -169,13 +188,14 @@ from rhosocial.activerecord.backend.expression.statements.dml import (
     MergeAction,
     MergeActionType,
 )
-from rhosocial.activerecord.backend.expression.statements.dql import QueryExpression
+from rhosocial.activerecord.backend.expression.statements.dql import QueryStatement
 from rhosocial.activerecord.backend.expression.types import (
     ArrayType,
     IntegerType,
     VarCharType,
 )
 from rhosocial.activerecord.backend.expression.xml import (
+    PassingClause,
     XMLAttribute,
     XMLAttributesExpression,
     XMLConcatExpression,
@@ -184,19 +204,19 @@ from rhosocial.activerecord.backend.expression.xml import (
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.file_format import (
-    SnowflakeAlterFileFormatExpression,
+    SnowflakeAlterFileFormatStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.materialized_view import (  # noqa: E501
-    SnowflakeCreateMaterializedViewExpression,
+    SnowflakeCreateMaterializedViewStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.pipe import (
-    SnowflakeCreatePipeExpression,
+    SnowflakeCreatePipeStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.stage import (
-    SnowflakeAlterStageExpression,
+    SnowflakeAlterStageStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.stream import (
-    SnowflakeCreateStreamExpression,
+    SnowflakeCreateStreamStatement,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.ddl.type import (
     SnowflakeAlterTypeExpression,
@@ -215,11 +235,11 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.sample import (
     SnowflakeSampleExpression,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.show import (
-    SnowflakeShowExpression,
+    SnowflakeShowStatement,
     SnowflakeShowObjectType,
     SnowflakeShowScope,
 )
-from rhosocial.activerecord.testsuite.utils.expression import (
+from expression_roundtrip_harness import (
     assert_params_equal,
     collect_expression_classes,
     make_instance,
@@ -251,7 +271,6 @@ def _collect_matrix_classes():
     names are keyed by the first name in sorted order, so a class aliased four
     ways is not tested four times.
     """
-    ExpressionRegistry._auto_register_builtins()
     collected: Dict[str, type] = {}
     for package in (SNOWFLAKE_EXPR_PKG, CORE_EXPR_PKG):
         collected.update(collect_expression_classes(package))
@@ -267,8 +286,15 @@ def _collect_matrix_classes():
 
 
 REGISTERED = _collect_matrix_classes()
-# Deserialising a Snowflake expression needs it registered; nothing registers
-# this package's classes on import.
+# Deserialising a Snowflake expression needs its kind in the registry the read
+# goes through, and the framework's default registry holds only the packages
+# the framework itself ships -- nothing registers this backend's classes on
+# import. This file is the reader, so it assembles what it collected into that
+# default: every deserialize below then resolves every kind the matrix names.
+# A kind two classes claim raises here, at assembly time, rather than
+# resolving to the wrong class somewhere inside a round-trip. The package's
+# enums ride inside artifacts under their short class names, which the
+# whitelist resolves separately, so they are registered beside the classes.
 register_all(REGISTERED)
 
 
@@ -307,7 +333,7 @@ def _column_predicate(dialect):
 
 def _one_column_query(dialect):
     """A single-column ``SELECT`` over a table."""
-    return QueryExpression(
+    return QueryStatement(
         dialect, select=[Column(dialect, "id")], from_=_table_obj(dialect)
     )
 
@@ -324,6 +350,16 @@ def _integer_column(dialect, name="col"):
 
 def register_specials():
     """Replace every introspective guess that would cost a real assertion."""
+    # -- the predicate the whole file is built on ----------------------------
+    # ``op`` normalises through the operator enum at construction, so the
+    # guess's bare ``"x"`` is refused there and the class reported as
+    # unbuildable. Two columns over a table is the shape every DDL position
+    # wants as well: it renders with no bind parameters at all.
+    register_special_constructor(
+        "predicates.ComparisonPredicate",
+        lambda d: _column_predicate(d),
+    )
+
 
     # -- the FROM side -------------------------------------------------------
     register_special_constructor(
@@ -342,100 +378,100 @@ def register_specials():
 
     # -- tables and columns --------------------------------------------------
     register_special_constructor(
-        "statements.ddl_table.CreateTableExpression",
-        lambda d: ddl_table.CreateTableExpression(d, _table_obj(d), [_integer_column(d)]),
+        "statements.ddl_table.CreateTableStatement",
+        lambda d: ddl_table.CreateTableStatement(d, _table_obj(d), [_integer_column(d)]),
     )
     register_special_constructor(
-        "statements.ddl_table.DropTableExpression",
-        lambda d: ddl_table.DropTableExpression(d, _table_obj(d)),
+        "statements.ddl_table.DropTableStatement",
+        lambda d: ddl_table.DropTableStatement(d, _table_obj(d)),
     )
     register_special_constructor(
-        "statements.ddl_table.CreateTableLikeExpression",
-        lambda d: ddl_table.CreateTableLikeExpression(d, _table_obj(d), Table(d, "other")),
+        "statements.ddl_table.CreateTableLikeStatement",
+        lambda d: ddl_table.CreateTableLikeStatement(d, _table_obj(d), Table(d, "other")),
     )
     register_special_constructor(
-        "statements.ddl_table.CreateTableCloneExpression",
-        lambda d: ddl_table.CreateTableCloneExpression(
+        "statements.ddl_table.CreateTableCloneStatement",
+        lambda d: ddl_table.CreateTableCloneStatement(
             d, _table_obj(d), Table(d, "other")
         ),
     )
     register_special_constructor(
-        "statements.ddl_table.CreateTableAsExpression",
-        lambda d: ddl_table.CreateTableAsExpression(d, _table_obj(d), _one_column_query(d)),
+        "statements.ddl_table.CreateTableAsStatement",
+        lambda d: ddl_table.CreateTableAsStatement(d, _table_obj(d), _one_column_query(d)),
     )
     register_special_constructor(
-        "statements.ddl_table.CreateTableFromTemplateExpression",
-        lambda d: ddl_table.CreateTableFromTemplateExpression(
+        "statements.ddl_table.CreateTableFromTemplateStatement",
+        lambda d: ddl_table.CreateTableFromTemplateStatement(
             d, _table_obj(d), _one_column_query(d)
         ),
     )
     register_special_constructor(
-        "statements.ddl_truncate.TruncateExpression",
-        lambda d: ddl_truncate.TruncateExpression(d, _table_obj(d)),
+        "statements.ddl_truncate.TruncateStatement",
+        lambda d: ddl_truncate.TruncateStatement(d, _table_obj(d)),
     )
     # Overrides the shared testsuite factory, which binds no dialect to its type.
     register_special_constructor("statements.ddl_table.ColumnDefinition", _integer_column)
 
     # -- indexes -------------------------------------------------------------
     register_special_constructor(
-        "statements.ddl_index.CreateIndexExpression",
-        lambda d: ddl_index.CreateIndexExpression(
+        "statements.ddl_index.CreateIndexStatement",
+        lambda d: ddl_index.CreateIndexStatement(
             d, index=Index(d, "i"), table=_table_obj(d), columns=["a"]
         ),
     )
     register_special_constructor(
-        "statements.ddl_index.DropIndexExpression",
-        lambda d: ddl_index.DropIndexExpression(d, index=Index(d, "i")),
+        "statements.ddl_index.DropIndexStatement",
+        lambda d: ddl_index.DropIndexStatement(d, index=Index(d, "i")),
     )
     register_special_constructor(
-        "statements.ddl_index.CreateFulltextIndexExpression",
-        lambda d: ddl_index.CreateFulltextIndexExpression(
+        "statements.ddl_index.CreateFulltextIndexStatement",
+        lambda d: ddl_index.CreateFulltextIndexStatement(
             d, index=Index(d, "i"), table=_table_obj(d), columns=["a"]
         ),
     )
     register_special_constructor(
-        "statements.ddl_index.DropFulltextIndexExpression",
-        lambda d: ddl_index.DropFulltextIndexExpression(
+        "statements.ddl_index.DropFulltextIndexStatement",
+        lambda d: ddl_index.DropFulltextIndexStatement(
             d, index=Index(d, "i"), table=_table_obj(d)
         ),
     )
     register_special_constructor(
-        "statements.ddl_alter.DropIndex",
-        lambda d: ddl_alter.DropIndex(d, Index(d, "i")),
+        "statements.ddl_alter.DropIndexAction",
+        lambda d: ddl_alter.DropIndexAction(d, Index(d, "i")),
     )
 
     # -- schemas, sequences, databases, domains, types -----------------------
     register_special_constructor(
-        "statements.ddl_schema.CreateSchemaExpression",
-        lambda d: ddl_schema.CreateSchemaExpression(d, Schema(d, "s")),
+        "statements.ddl_schema.CreateSchemaStatement",
+        lambda d: ddl_schema.CreateSchemaStatement(d, Schema(d, "s")),
     )
     register_special_constructor(
-        "statements.ddl_schema.DropSchemaExpression",
-        lambda d: ddl_schema.DropSchemaExpression(d, Schema(d, "s")),
+        "statements.ddl_schema.DropSchemaStatement",
+        lambda d: ddl_schema.DropSchemaStatement(d, Schema(d, "s")),
     )
     register_special_constructor(
-        "statements.ddl_sequence.CreateSequenceExpression",
-        lambda d: ddl_sequence.CreateSequenceExpression(d, Sequence(d, "s")),
+        "statements.ddl_sequence.CreateSequenceStatement",
+        lambda d: ddl_sequence.CreateSequenceStatement(d, Sequence(d, "s")),
     )
     register_special_constructor(
-        "statements.ddl_sequence.AlterSequenceExpression",
-        lambda d: ddl_sequence.AlterSequenceExpression(d, Sequence(d, "s"), restart=1),
+        "statements.ddl_sequence.AlterSequenceStatement",
+        lambda d: ddl_sequence.AlterSequenceStatement(d, Sequence(d, "s"), restart=1),
     )
     register_special_constructor(
-        "statements.ddl_sequence.DropSequenceExpression",
-        lambda d: ddl_sequence.DropSequenceExpression(d, Sequence(d, "s")),
+        "statements.ddl_sequence.DropSequenceStatement",
+        lambda d: ddl_sequence.DropSequenceStatement(d, Sequence(d, "s")),
     )
     register_special_constructor(
-        "statements.ddl_database.CreateDatabaseExpression",
-        lambda d: ddl_database.CreateDatabaseExpression(d, Database(d, "db")),
+        "statements.ddl_database.CreateDatabaseStatement",
+        lambda d: ddl_database.CreateDatabaseStatement(d, Database(d, "db")),
     )
     register_special_constructor(
-        "statements.ddl_database.DropDatabaseExpression",
-        lambda d: ddl_database.DropDatabaseExpression(d, Database(d, "db")),
+        "statements.ddl_database.DropDatabaseStatement",
+        lambda d: ddl_database.DropDatabaseStatement(d, Database(d, "db")),
     )
     register_special_constructor(
-        "statements.ddl_database.AlterDatabaseExpression",
-        lambda d: ddl_database.AlterDatabaseExpression(
+        "statements.ddl_database.AlterDatabaseStatement",
+        lambda d: ddl_database.AlterDatabaseStatement(
             d,
             Database(d, "db"),
             action=AlterDatabaseAction.RENAME_TO,
@@ -443,16 +479,16 @@ def register_specials():
         ),
     )
     register_special_constructor(
-        "statements.ddl_domain.CreateDomainExpression",
-        lambda d: ddl_domain.CreateDomainExpression(d, Domain(d, "dom"), IntegerType(d)),
+        "statements.ddl_domain.CreateDomainStatement",
+        lambda d: ddl_domain.CreateDomainStatement(d, Domain(d, "dom"), IntegerType(d)),
     )
     register_special_constructor(
-        "statements.ddl_domain.DropDomainExpression",
-        lambda d: ddl_domain.DropDomainExpression(d, Domain(d, "dom")),
+        "statements.ddl_domain.DropDomainStatement",
+        lambda d: ddl_domain.DropDomainStatement(d, Domain(d, "dom")),
     )
     register_special_constructor(
-        "statements.ddl_domain.AlterDomainExpression",
-        lambda d: ddl_domain.AlterDomainExpression(
+        "statements.ddl_domain.AlterDomainStatement",
+        lambda d: ddl_domain.AlterDomainStatement(
             d, Domain(d, "dom"), [RenameDomainAction(d, "other")]
         ),
     )
@@ -463,36 +499,36 @@ def register_specials():
         lambda d: DomainCheckConstraint(d, _column_predicate(d), name="chk"),
     )
     register_special_constructor(
-        "statements.ddl_type.CreateTypeExpression",
-        lambda d: ddl_type.CreateTypeExpression(
+        "statements.ddl_type.CreateTypeStatement",
+        lambda d: ddl_type.CreateTypeStatement(
             d, type=Type(d, "t"), definition=IntegerType(d)
         ),
     )
     register_special_constructor(
-        "statements.ddl_type.AlterTypeExpression",
-        lambda d: ddl_type.AlterTypeExpression(
+        "statements.ddl_type.AlterTypeStatement",
+        lambda d: ddl_type.AlterTypeStatement(
             d, type=Type(d, "t"), actions=[SnowflakeSetTypeCommentAction(d, "a note")]
         ),
     )
     register_special_constructor(
-        "statements.ddl_type.DropTypeExpression",
-        lambda d: ddl_type.DropTypeExpression(d, type=Type(d, "t")),
+        "statements.ddl_type.DropTypeStatement",
+        lambda d: ddl_type.DropTypeStatement(d, type=Type(d, "t")),
     )
 
     # -- routines, triggers, comments ----------------------------------------
     register_special_constructor(
-        "statements.ddl_function.CreateFunctionExpression",
-        lambda d: ddl_function.CreateFunctionExpression(
+        "statements.ddl_function.CreateFunctionStatement",
+        lambda d: ddl_function.CreateFunctionStatement(
             d, Function(d, "fn"), returns="integer", body="SELECT 1"
         ),
     )
     register_special_constructor(
-        "statements.ddl_function.DropFunctionExpression",
-        lambda d: ddl_function.DropFunctionExpression(d, Function(d, "fn")),
+        "statements.ddl_function.DropFunctionStatement",
+        lambda d: ddl_function.DropFunctionStatement(d, Function(d, "fn")),
     )
     register_special_constructor(
-        "statements.ddl_trigger.CreateTriggerExpression",
-        lambda d: ddl_trigger.CreateTriggerExpression(
+        "statements.ddl_trigger.CreateTriggerStatement",
+        lambda d: ddl_trigger.CreateTriggerStatement(
             d,
             trigger=Trigger(d, "trg"),
             table=_table_obj(d),
@@ -502,48 +538,48 @@ def register_specials():
         ),
     )
     register_special_constructor(
-        "statements.ddl_trigger.DropTriggerExpression",
-        lambda d: ddl_trigger.DropTriggerExpression(d, trigger=Trigger(d, "trg")),
+        "statements.ddl_trigger.DropTriggerStatement",
+        lambda d: ddl_trigger.DropTriggerStatement(d, trigger=Trigger(d, "trg")),
     )
     register_special_constructor(
-        "statements.ddl_comment.CommentOnExpression",
-        lambda d: ddl_comment.CommentOnExpression(d, "table", _table_obj(d), comment="c"),
+        "statements.ddl_comment.CommentOnStatement",
+        lambda d: ddl_comment.CommentOnStatement(d, "table", _table_obj(d), comment="c"),
     )
 
     # -- views ---------------------------------------------------------------
     register_special_constructor(
-        "statements.ddl_view.DropViewExpression",
-        lambda d: ddl_view.DropViewExpression(d, View(d, "v")),
+        "statements.ddl_view.DropViewStatement",
+        lambda d: ddl_view.DropViewStatement(d, View(d, "v")),
     )
     register_special_constructor(
-        "statements.ddl_view.CreateMaterializedViewExpression",
-        lambda d: ddl_view.CreateMaterializedViewExpression(
+        "statements.ddl_view.CreateMaterializedViewStatement",
+        lambda d: ddl_view.CreateMaterializedViewStatement(
             d, MaterializedView(d, "mv"), _one_column_query(d)
         ),
     )
     register_special_constructor(
-        "statements.ddl_view.DropMaterializedViewExpression",
-        lambda d: ddl_view.DropMaterializedViewExpression(d, MaterializedView(d, "mv")),
+        "statements.ddl_view.DropMaterializedViewStatement",
+        lambda d: ddl_view.DropMaterializedViewStatement(d, MaterializedView(d, "mv")),
     )
     register_special_constructor(
-        "statements.ddl_view.RefreshMaterializedViewExpression",
-        lambda d: ddl_view.RefreshMaterializedViewExpression(d, MaterializedView(d, "mv")),
+        "statements.ddl_view.RefreshMaterializedViewStatement",
+        lambda d: ddl_view.RefreshMaterializedViewStatement(d, MaterializedView(d, "mv")),
     )
 
     # -- DML -----------------------------------------------------------------
     register_special_constructor(
-        "statements.dml.InsertExpression",
-        lambda d: dml.InsertExpression(
+        "statements.dml.InsertStatement",
+        lambda d: dml.InsertStatement(
             d, into=_table_obj(d), source=dml.ValuesSource(d, [[Literal(d, 1)]])
         ),
     )
     register_special_constructor(
-        "statements.dml.DeleteExpression",
-        lambda d: dml.DeleteExpression(d, _table_obj(d)),
+        "statements.dml.DeleteStatement",
+        lambda d: dml.DeleteStatement(d, _table_obj(d)),
     )
     register_special_constructor(
-        "statements.dml.MergeExpression",
-        lambda d: dml.MergeExpression(
+        "statements.dml.MergeStatement",
+        lambda d: dml.MergeStatement(
             d,
             target_table=_table_obj(d),
             source=NamedRelationRef(d, Table(d, "src")),
@@ -573,12 +609,14 @@ def register_specials():
     # -- constraints and column pieces ---------------------------------------
     register_special_constructor(
         "statements.ddl_table.ColumnConstraint",
-        lambda d: ColumnConstraint(d, ColumnConstraintType.NOT_NULL, name="c"),
+        lambda d: ColumnConstraint(
+            d, branch=ColumnNotNullConstraint(d), name="c"
+        ),
     )
     register_special_constructor(
         "statements.ddl_table.TableConstraint",
         lambda d: TableConstraint(
-            d, TableConstraintType.PRIMARY_KEY, name="c", columns=["a"]
+            d, branch=TablePrimaryKeyConstraint(d, ["a"]), name="c"
         ),
     )
     register_special_constructor(
@@ -596,28 +634,107 @@ def register_specials():
         lambda d: ReferencesClause(d, Table(d, "other"), ["b"]),
     )
     register_special_constructor(
-        "statements.ddl_alter.AddColumn",
-        lambda d: ddl_alter.AddColumn(d, _integer_column(d)),
+        "statements.ddl_alter.AddColumnAction",
+        lambda d: ddl_alter.AddColumnAction(d, _integer_column(d)),
     )
     register_special_constructor(
-        "statements.ddl_alter.ModifyColumn",
-        lambda d: ddl_alter.ModifyColumn(d, _integer_column(d)),
+        "statements.ddl_alter.ModifyColumnAction",
+        lambda d: ddl_alter.ModifyColumnAction(d, _integer_column(d)),
     )
     register_special_constructor(
-        "statements.ddl_alter.AddIndex",
-        lambda d: ddl_alter.AddIndex(d, IndexDefinition(d, "i", ["a"])),
+        "statements.ddl_alter.AddIndexAction",
+        lambda d: ddl_alter.AddIndexAction(d, IndexDefinition(d, "i", ["a"])),
     )
     register_special_constructor(
-        "statements.ddl_alter.AddTableConstraint",
-        lambda d: ddl_alter.AddTableConstraint(
+        "statements.ddl_alter.AddTableConstraintAction",
+        lambda d: ddl_alter.AddTableConstraintAction(
             d,
             TableConstraint(
-                d, TableConstraintType.PRIMARY_KEY, name="c", columns=["a"]
+                d, branch=TablePrimaryKeyConstraint(d, ["a"]), name="c"
             ),
         ),
     )
 
-    # -- expressions that need at least one member --------------------------
+    # -- declared-result annotations ----------------------------------------
+    # An annotation renders what it annotates, and ``format_declared_result``
+    # reads an alias off both the source and the annotation itself. The ten
+    # surface classes each gain one through their value-type base, so they
+    # render; the shared base ``_Annotation`` declares no alias and the
+    # formatter reads one anyway, which is pinned in LEGITIMATE_NON_RENDERS
+    # rather than papered over here. One aliasable source serves the base and
+    # every surface class. The guess hands the slot a ``Literal`` (from its
+    # "Expression"-shaped annotation), and a literal is the one thing in the
+    # tree with nothing to name.
+    from rhosocial.activerecord.backend.expression import declared as declared_mod
+    from rhosocial.activerecord.backend.expression.core import FunctionCall
+
+    def _aliasable_source(d):
+        return FunctionCall(d, "FUNC", niladic=True)
+
+    register_special_constructor(
+        "declared._Annotation",
+        lambda d: declared_mod._Annotation(d, _aliasable_source(d)),
+    )
+    for _name in (
+        "ArrayAnnotation",
+        "BinaryAnnotation",
+        "BooleanAnnotation",
+        "IntegerAnnotation",
+        "JSONAnnotation",
+        "NumberAnnotation",
+        "TemporalAnnotation",
+        "TextAnnotation",
+        "UUIDAnnotation",
+        "XMLAnnotation",
+    ):
+        register_special_constructor(
+            f"declared.{_name}",
+            lambda d, _n=_name: getattr(declared_mod, _n)(d, _aliasable_source(d)),
+        )
+
+    # -- predicates whose operands are value nodes --------------------------
+    # A LIKE/ILIKE operand is a value node, and the introspective guess fills
+    # the slot with a bare string; the formatter then asks the string for
+    # ``to_sql()``. Core's own dummy2 matrix registers both, and core's
+    # wildcard split notes that these two need it, so the registration is
+    # copied rather than re-derived from the failure.
+    register_special_constructor(
+        "predicates.LikePredicate",
+        lambda d: LikePredicate(d, LikeOperator.LIKE, Column(d, "a"), Literal(d, "%x%")),
+    )
+    register_special_constructor(
+        "predicates.ILikePredicate",
+        lambda d: ILikePredicate(d, Column(d, "a"), "%x%"),
+    )
+
+    # -- XML PASSING ----------------------------------------------------------
+    # The clause carries a list of value expressions; a bare "x" string is not
+    # one. Snowflake has no SQL/XML, so the class lands in the unmodelled table
+    # either way -- but it has to construct first for that answer to be reached.
+    register_special_constructor(
+        "xml.PassingClause",
+        lambda d: PassingClause(d, [Column(d, "a")]),
+    )
+
+    # -- closed word sets: the guess supplies a bare string -------------------
+    # ``op`` on both nodes is a closed set checked at construction, so the
+    # introspective guess ("x" for every str-annotated parameter) raises
+    # ValueError before a formatter is ever reached.
+    register_special_constructor(
+        "operators.ArithmeticOperation",
+        lambda d: ArithmeticOperation(d, "add", Column(d, "a"), Column(d, "b")),
+    )
+    register_special_constructor(
+        "query_sources.SetOperation",
+        lambda d: SetOperation(
+            d,
+            op="union",
+            left=QueryStatement(d, select=[Column(d, "id")]),
+            right=QueryStatement(d, select=[Column(d, "id")]),
+        ),
+    )
+
+# -- expressions that need at least one member --------------------------
     register_special_constructor(
         "advanced_functions.CaseExpression",
         lambda d: CaseExpression(
@@ -700,7 +817,10 @@ def register_specials():
         lambda d: XMLConcatExpression(d, [Literal(d, "a"), Literal(d, "b")]),
     )
     register_special_constructor(
-        "types.array.ArrayType", lambda d: ArrayType(d, VarCharType(d, 10))
+        # element_type is keyword-only on the core class: a positional call
+        # is the pre-keyword spelling and no longer constructs.
+        "types.array.ArrayType",
+        lambda d: ArrayType(d, element_type=VarCharType(d, 10)),
     )
 
     # -- a value the guess cannot know ---------------------------------------
@@ -708,8 +828,8 @@ def register_specials():
     # the placeholder ``"x"``. This is the only parameter in the two packages
     # that is a string *belonging to a closed set* rather than free text.
     register_special_constructor(
-        "collation.CollateExpression",
-        lambda d: CollateExpression(d, Column(d, "name"), "en-ci"),
+        "collation.CollateFunction",
+        lambda d: CollateFunction(d, Column(d, "name"), "en-ci"),
     )
 
     # -- Snowflake's own expressions -----------------------------------------
@@ -717,8 +837,8 @@ def register_specials():
     # guess skips it, or of a kind the guess fills with a bare string. All are
     # backend-owned, so their shape is this repository's business.
     register_special_constructor(
-        "ddl.materialized_view.SnowflakeCreateMaterializedViewExpression",
-        lambda d: SnowflakeCreateMaterializedViewExpression(
+        "ddl.materialized_view.SnowflakeCreateMaterializedViewStatement",
+        lambda d: SnowflakeCreateMaterializedViewStatement(
             d, "mv", as_query="SELECT 1"
         ),
     )
@@ -743,28 +863,28 @@ def register_specials():
         lambda d: SnowflakeExternalPartitionClause(d, [Column(d, "c1")]),
     )
     register_special_constructor(
-        "ddl.pipe.SnowflakeCreatePipeExpression",
-        lambda d: SnowflakeCreatePipeExpression(d, "p", copy_sql="COPY INTO t FROM @s"),
+        "ddl.pipe.SnowflakeCreatePipeStatement",
+        lambda d: SnowflakeCreatePipeStatement(d, "p", copy_sql="COPY INTO t FROM @s"),
     )
     register_special_constructor(
-        "ddl.stream.SnowflakeCreateStreamExpression",
-        lambda d: SnowflakeCreateStreamExpression(d, "s", object_name="t"),
+        "ddl.stream.SnowflakeCreateStreamStatement",
+        lambda d: SnowflakeCreateStreamStatement(d, "s", object_name="t"),
     )
     register_special_constructor(
-        "ddl.file_format.SnowflakeAlterFileFormatExpression",
-        lambda d: SnowflakeAlterFileFormatExpression(d, "f", options={"TYPE": "CSV"}),
+        "ddl.file_format.SnowflakeAlterFileFormatStatement",
+        lambda d: SnowflakeAlterFileFormatStatement(d, "f", options={"TYPE": "CSV"}),
     )
     register_special_constructor(
-        "ddl.stage.SnowflakeAlterStageExpression",
-        lambda d: SnowflakeAlterStageExpression(d, "s", url="s3://bucket/path"),
+        "ddl.stage.SnowflakeAlterStageStatement",
+        lambda d: SnowflakeAlterStageStatement(d, "s", url="s3://bucket/path"),
     )
     register_special_constructor(
         "sample.SnowflakeSampleExpression",
         lambda d: SnowflakeSampleExpression(d, 10),
     )
     register_special_constructor(
-        "show.SnowflakeShowExpression",
-        lambda d: SnowflakeShowExpression(
+        "show.SnowflakeShowStatement",
+        lambda d: SnowflakeShowStatement(
             d, SnowflakeShowObjectType.TABLES,
             in_scope=SnowflakeShowScope.DATABASE,
             limit=10,
@@ -776,20 +896,85 @@ def register_specials():
             d, _table_obj(d), dml.ValuesSource(d, [[Literal(d, 1)]])
         ),
     )
-    # CUSTOM. Its ``raw`` slot exists to carry the SQL type name and defaults
-    # to the empty string, which the filler skips and the class refuses while
-    # constructing. Handed a real name it builds and renders, so it is a
-    # constructor rather than a skip -- and for that same reason it is absent
-    # from LEGITIMATE_NON_RENDERS, which would pin a rendering nothing could
-    # ask for.
+    # CUSTOM. Its ``raw`` slot carries the SQL type name; core made it a
+    # required keyword-only parameter (the empty-string default this factory
+    # used to lean on let a type with no name through, so there is no default
+    # left for the filler to skip). Handed a real name it builds and renders,
+    # so it is a constructor rather than a skip -- and for that same reason
+    # it is absent from LEGITIMATE_NON_RENDERS, which would pin a rendering
+    # nothing could ask for.
     def _custom_type(dialect):
         from rhosocial.activerecord.backend.expression.types.custom import (
             CustomType,
         )
 
-        return CustomType(dialect, "VARCHAR")
+        return CustomType(dialect, raw="VARCHAR")
 
     register_special_constructor("types.custom.CustomType", _custom_type)
+
+    # -- the one value node needs no constructor ----------------------------
+    #
+    # A literal carries ``value`` and ``inline`` and nothing else. Its kind is
+    # read off the host value rather than declared, so the guess's "x" is a
+    # real ``string_value`` and the row is a real one; the other kinds are the
+    # same node with a different host value, which is what
+    # ``expression/test_snowflake_literal_values.py`` pins per kind. There is
+    # no class per kind left to register here, and no inline position either:
+    # the matrix exercises the bind path a data position takes.
+
+    # -- the extract family's new member and the shape it shares ------------
+    #
+    # ExtractFieldExpression is the field-named spelling (``YEAR(ts)``) the
+    # value wave split out of ExtractExpression; ``_ExtractBase`` is the
+    # field-and-source shape both spellings share. The guess cannot supply
+    # the field: its "x" is not a datetime field, and the class normalises
+    # the field before storing it. A real field over a column source is what
+    # both are constructed from, and both render through the same
+    # ``format_extract_expression`` the two classed spellings already did.
+    register_special_constructor(
+        "datetime.ExtractFieldExpression",
+        lambda d: ExtractFieldExpression(d, "YEAR", Column(d, "created_at")),
+    )
+    register_special_constructor(
+        "datetime._ExtractBase",
+        lambda d: _ExtractBase(d, "YEAR", Column(d, "created_at")),
+    )
+
+    # -- the scalar string set: counts are ints, the guess's filler is not --
+    #
+    # Each of these normalises its count operands through IntegerValue, and
+    # the guess hands a parameter it cannot classify the string "x" --
+    # ``IntegerValue takes a int, not a str``. Real operands make each one
+    # render the spelling Snowflake documents: CHR, LEFT, RIGHT, SPACE,
+    # SUBSTRING (Snowflake's SUBSTR alias), OVERLAY.
+    register_special_constructor(
+        "functions.string.ChrFunction",
+        lambda d: ChrFunction(d, 65),
+    )
+    register_special_constructor(
+        "functions.string.LeftFunction",
+        lambda d: LeftFunction(d, Column(d, "name"), 3),
+    )
+    register_special_constructor(
+        "functions.string.RightFunction",
+        lambda d: RightFunction(d, Column(d, "name"), 3),
+    )
+    register_special_constructor(
+        "functions.string.SpaceFunction",
+        lambda d: SpaceFunction(d, 4),
+    )
+    register_special_constructor(
+        "functions.string.SubstringExpression",
+        lambda d: SubstringExpression(
+            d, Column(d, "name"), Literal(d, 2), Literal(d, 3)
+        ),
+    )
+    register_special_constructor(
+        "functions.string.OverlayExpression",
+        lambda d: OverlayExpression(
+            d, Column(d, "name"), Literal(d, "ab"), Literal(d, 2), Literal(d, 3)
+        ),
+    )
 
 
 register_specials()
@@ -818,19 +1003,16 @@ register_specials()
 #: object and handed the parameter a ``Sequence`` instead of a list of columns.
 #: The class was fine and the harness was wrong. It constructs now, and what it
 #: reports is a real answer: Snowflake has no SQL/XML at all, so the dispatch finds
-#: no ``format_xmltable_expression``. That is why the method is in
+#: no ``format_xml_table_expression``. That is why the method is in
 #: :data:`UNMODELLED_FORMATTERS` under SQL/XML rather than the class staying pinned
 #: here -- the matrix could not find that out while the class could not be built.
 UNCONSTRUCTIBLE = (
-    # ALTER CONSTRAINT. ``name`` and ``constraint_type`` sit behind defaulted
+    # ALTER CONSTRAINT. ``name`` and ``constraint_kind`` sit behind defaulted
     # positionals and are keyword-only, so the introspective constructor skips
     # them and the class refuses an incomplete action (`ValueError:
     # constraint_name must be a non-empty string`, because the defaulted
     # ``constraint_name`` stays None).
-    "rhosocial.activerecord.backend.expression.statements.ddl_alter.AlterConstraint",
-    # VALIDATE CONSTRAINT. The same shape: the required ``name`` is keyword-only
-    # behind a defaulted positional.
-    "rhosocial.activerecord.backend.expression.statements.ddl_alter.ValidateConstraint",
+    "rhosocial.activerecord.backend.expression.statements.ddl_alter.AlterConstraintAction",
     # ADD DOMAIN CHECK. Widens a ``SQLPredicate`` into a ``DomainCheckConstraint``
     # and needs one. The guess supplies a bare *string*: the annotation names a
     # ``DomainCheckConstraint``, whose ``\bDomain\b`` fragment does not match
@@ -843,16 +1025,12 @@ UNCONSTRUCTIBLE = (
     # be an ``UnsupportedFeatureError`` whatever it was built from. Building it
     # would buy no assertion.
     "rhosocial.activerecord.backend.expression.statements.ddl_domain.AddDomainCheckAction",
-    # ENUM type. Its ``values`` list is keyword-only behind a defaulted
-    # positional, so the constructor skips it and the type declares no members
-    # (``ValueError: EnumType requires values``).
-    "rhosocial.activerecord.backend.expression.types.enum_.EnumType",
     # The three UUID nodes refuse in __init__, not in to_sql(): Snowflake
     # spells no UUID SQL, so the answer is the same for every argument and no
     # registered constructor can change it. Measured with valid arguments --
     # an invalid ``which`` raises ValueError first and hides the dialect's
     # answer, which is how the nil/max constant was first misread as rescuable.
-    "rhosocial.activerecord.backend.expression.uuid.UUIDCastExpression",
+    "rhosocial.activerecord.backend.expression.uuid.UUIDCastFunction",
     "rhosocial.activerecord.backend.expression.uuid.UUIDConstantExpression",
     "rhosocial.activerecord.backend.expression.uuid.UUIDGenerationExpression",
 )
@@ -876,7 +1054,7 @@ UNCONSTRUCTIBLE = (
 #: graphs, no triggers, no DOMAIN" says what the dialect is.
 UNMODELLED_FORMATTERS = {
     # --- SQL/XML: Snowflake implements no part of SQL/XML -------------------
-    # Thirteen. ``format_xmltable_expression`` is the one that arrived last and
+    # Thirteen. ``format_xml_table_expression`` is the one that arrived last and
     # the one worth explaining: ``XMLTableExpression`` was pinned in
     # UNCONSTRUCTIBLE until the testsuite's introspective constructor stopped
     # reading ``columns: Sequence[XMLTableColumn]`` as a request for a
@@ -888,26 +1066,33 @@ UNMODELLED_FORMATTERS = {
     "SQL/XML (no XMLAGG, XMLATTRIBUTES, XMLCOMMENT, XMLCONCAT, XMLELEMENT, "
     "XMLEXISTS, XMLFOREST, XMLPARSE, XMLPI, XMLQUERY, XMLROOT, XMLSERIALIZE or "
     "XMLTABLE)": (
-        "format_xmlagg_expression",
-        "format_xmlattributes_expression",
-        "format_xmlcomment_expression",
-        "format_xmlconcat_expression",
-        "format_xmlelement_expression",
-        "format_xmlexists_expression",
-        "format_xmlforest_expression",
-        "format_xmlparse_expression",
+        "format_xml_agg_expression",
+        "format_xml_attributes_expression",
+        "format_xml_comment_expression",
+        "format_xml_concat_expression",
+        "format_xml_element_expression",
+        "format_xmlexists_predicate",
+        "format_xml_forest_expression",
+        "format_xml_parse_expression",
         "format_xmlpi_expression",
-        "format_xmlquery_expression",
-        "format_xmlroot_expression",
-        "format_xmlserialize_expression",
-        "format_xmltable_expression",
+        "format_xml_query_expression",
+        "format_xml_root_expression",
+        "format_xml_serialize_expression",
+        "format_xml_table_expression",
+        "format_passing_clause",
     ),
     # --- SQL/PGQ property graphs: no graph tables, no MATCH ---------------
+    # ``format_edge_table_definition`` arrived when core split the edge table's
+    # declaration out of ``EdgeTable`` into its own ``EdgeTableDefinition``
+    # node, which took the formatter need with it: the matrix's classes now
+    # ask for the definition node's method alone, and ``format_edge_table``
+    # is no longer named by anything. The refusal itself is the one Snowflake
+    # has always given -- no property graphs, no MATCH.
     "SQL/PGQ property graphs (Snowflake has no GRAPH_TABLE and no Cypher)": (
         "format_alter_property_graph_statement",
         "format_create_property_graph_statement",
         "format_drop_property_graph_statement",
-        "format_edge_table",
+        "format_edge_table_definition",
         "format_graph_columns_clause",
         "format_graph_edge",
         "format_graph_table_expression",
@@ -938,7 +1123,7 @@ UNMODELLED_FORMATTERS = {
     # Snowflake *does* have procedures and functions, and it renders them -- but
     # through ``SnowflakeRoutineMixin`` and the ``SnowflakeRoutineSupport``
     # protocol, whose expressions carry a bare name. The core SQL/PSM statements
-    # are not what Snowflake's formatters read. ``CreateFunctionExpression``
+    # are not what Snowflake's formatters read. ``CreateFunctionStatement``
     # is pinned separately below because it fails differently: this dialect's
     # override shadows the core formatter, so the dispatch finds a formatter,
     # calls it, and it raises reading an attribute the core statement lacks --
@@ -960,13 +1145,13 @@ UNMODELLED_FORMATTERS = {
     ),
     # --- PIVOT / UNPIVOT as core expressions ------------------------------
     # Snowflake has PIVOT, and renders it -- through ``SnowflakePivotExpression``
-    # and ``SnowflakePivotSupport``. The core ``PivotExpression`` names formatters
-    # this dialect does not declare, because the Snowflake clause is spelled from
-    # different fields.
+    # and ``SnowflakePivotSupport``. The core ``Pivot`` / ``Unpivot`` name
+    # formatters this dialect does not declare, because the Snowflake clause is
+    # spelled from different fields.
     "the core PIVOT / UNPIVOT expressions (Snowflake spells the clause from "
     "SnowflakePivotExpression instead)": (
-        "format_pivot_expression",
-        "format_unpivot_expression",
+        "format_pivot",
+        "format_unpivot",
     ),
     # --- the root of the row-source tree ----------------------------------
     # Every concrete row source declares its own ``format_method`` and overrides
@@ -1056,11 +1241,23 @@ LEGITIMATE_NON_RENDERS = {
         NotImplementedError,
         _NO_FORMAT_METHOD_NAME,
     ),
-    "rhosocial.activerecord.backend.expression.bases.SQLValueExpression": (
+    # The shared base of the declared-result annotations (``as_text()`` and
+    # its siblings). Unlike the roots above it *names* a formatter -- the
+    # concrete annotations all render through ``format_declared_result`` --
+    # but it carries no surface of its own, and that surface is where the
+    # alias the formatter reads comes from. So the base constructs and its
+    # render dies on the missing attribute, which is a fact about the base
+    # and not about the dialect: the concrete annotations are the renderable
+    # nodes, and each renders by delegating to the source it annotates.
+    "rhosocial.activerecord.backend.expression.declared._Annotation": (
+        AttributeError,
+        "has no attribute 'alias'",
+    ),
+    "rhosocial.activerecord.backend.expression.bases.SQLValue": (
         NotImplementedError,
         _NO_FORMAT_METHOD_NAME,
     ),
-    "rhosocial.activerecord.backend.expression.datetime._TemporalValueExpression": (
+    "rhosocial.activerecord.backend.expression.datetime._TemporalValue": (
         NotImplementedError,
         _NO_FORMAT_METHOD_NAME,
     ),
@@ -1092,16 +1289,16 @@ LEGITIMATE_NON_RENDERS = {
         NotImplementedError,
         _NO_FORMAT_METHOD_NAME,
     ),
-    "rhosocial.activerecord.backend.expression.transaction.TransactionExpression": (
+    "rhosocial.activerecord.backend.expression.transaction.TransactionStatement": (
         NotImplementedError,
         _NO_FORMAT_METHOD_NAME,
     ),
     # An introspection query base rather than a DDL or DML one: it names a
     # category ("ask the server about something") and each concrete subclass
     # supplies its own query. The message is the base's own, not the shared one.
-    "rhosocial.activerecord.backend.expression.introspection.TableInfoExpression": (
+    "rhosocial.activerecord.backend.expression.introspection.TableInfoQueryStatement": (
         NotImplementedError,
-        "Subclass must implement format_table_info_query",
+        "Subclass must implement format_table_info_query_statement",
     ),
     # ---- a protocol answering where a formatter belongs -------------------
     # The root of the type tree answers ``format_domain_object`` through the
@@ -1129,7 +1326,7 @@ LEGITIMATE_NON_RENDERS = {
     ),
     # ---- the core routine statement under this dialect's override ---------
     # ``SnowflakeRoutineMixin`` overrides ``format_create_function_statement``
-    # for ``SnowflakeCreateFunctionExpression``, which carries a bare ``name``.
+    # for ``SnowflakeCreateFunctionStatement``, which carries a bare ``name``.
     # The core statement carries a ``Function`` object and has no ``name``, so
     # the override -- which shadows the core formatter -- reads an attribute that
     # is not there. Pinned with its exact message so a change in what happens
@@ -1142,18 +1339,39 @@ LEGITIMATE_NON_RENDERS = {
     # declares a formatter for the core class and that formatter cannot render
     # it. Two different bugs would need two different fixes, and only one of them
     # is here.
-    "rhosocial.activerecord.backend.expression.statements.ddl_function.CreateFunctionExpression": (  # noqa: E501
+    "rhosocial.activerecord.backend.expression.statements.ddl_function.CreateFunctionStatement": (  # noqa: E501
         AttributeError,
-        "'CreateFunctionExpression' object has no attribute 'name'",
+        "'CreateFunctionStatement' object has no attribute 'name'",
+    ),
+    # --- the two constraint branch roots and the column-clause root ---------
+    # Each names a *level* rather than a renderable construct: the branch roots
+    # hold the per-kind nodes, and ``ColumnClause`` holds collation, identity,
+    # the inline comment and the like.  They deliberately declare no
+    # ``format_method`` -- the shared getter raises -- so ``to_sql()`` reports
+    # that there is nothing to dispatch, which is the same answer every other
+    # abstract root in this table gives.  Pinned per class so one of them
+    # starting to render fails here instead of passing quietly.
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.ColumnClause": (
+        NotImplementedError,
+        _NO_FORMAT_METHOD_NAME,
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.ColumnConstraintBranch": (
+        NotImplementedError,
+        _NO_FORMAT_METHOD_NAME,
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.TableConstraintBranch": (
+        NotImplementedError,
+        _NO_FORMAT_METHOD_NAME,
     ),
     # ---- the root of the type tree: incomplete rather than unsupported ----
     # Every concrete type declares its own generic ``name``, which is what
-    # ``format_data_type`` dispatches on; the root declares none. TypeError, not
-    # UnsupportedFeatureError, because the class is incomplete rather than the
-    # dialect being unable.
+    # ``format_data_type`` dispatches on; the root declares none, so the
+    # dispatcher is asked for ``format_data_type_None`` and refuses by name.
+    # TypeError, not UnsupportedFeatureError, because the class is incomplete
+    # rather than the dialect being unable.
     "rhosocial.activerecord.backend.expression.types._base.DataType": (
         TypeError,
-        "does not declare a valid generic type name",
+        _NO_GENERIC_TYPE,
     ),
     # ---- generic types Snowflake spells differently -----------------------
     # Snowflake's data types carry their own names (``snowflake_varchar``,
@@ -1177,6 +1395,14 @@ LEGITIMATE_NON_RENDERS = {
         TypeError,
         _NO_GENERIC_TYPE,
     ),
+    # ENUM. MySQL/MariaDB native; core suggests text elsewhere, and this
+    # dialect's dispatcher says which spelling to use instead -- the refusal
+    # names VarCharType. It became reachable when the constructor started
+    # supplying a real values list.
+    "rhosocial.activerecord.backend.expression.types.enum_.EnumType": (
+        TypeError,
+        _NO_GENERIC_TYPE,
+    ),
     "rhosocial.activerecord.backend.expression.types.json_.JsonBType": (
         TypeError,
         _NO_GENERIC_TYPE,
@@ -1190,6 +1416,218 @@ LEGITIMATE_NON_RENDERS = {
         _NO_GENERIC_TYPE,
     ),
 }
+
+
+# ---------------------------------------------------------------------------
+# The artifact gap: a parameter core's writer or reader cannot carry
+# ---------------------------------------------------------------------------
+#
+# Every class is written and read back through the three channels -- dict,
+# JSON and XML -- because an artifact that only survives one of them is an
+# artifact with three incantations instead of one shape. What fails is core's
+# own layer, and it fails in three distinguishable ways:
+#
+# * **the writer refuses the parameter** -- ``encode_artifact`` asks
+#   ``LiteralKind.of`` what kind a value belongs to, and that vocabulary is the
+#   closed set of *value* types. A dataclass is not in it and is refused by
+#   name. Every channel fails, including dict, because the failure is on the
+#   write.
+# * **the constructor refuses its own wire form** -- the JSON and XML channels
+#   write the member's *value*, a plain string, and the constructor answers
+#   "must be a <Enum>". The artifact is unreadable by the node that produced it.
+# * **the constructor does not normalise on read** -- same write, same read,
+#   and the value survives while the host type does not: the parameter comes
+#   back as a ``str`` where an enum member went in. ``assert_params_equal``
+#   reports it as a type mismatch naming the member type.
+#
+# A fourth block used to be here: the XML channel spelled a ``str``-enum member
+# as ``str(member)`` -- ``"DateTimeField.YEAR"`` rather than ``"year"`` -- so
+# the reader handed the constructor a word that is neither a member's value nor
+# a member's name. That was the missing ``__str__ = str.__str__`` on nine
+# ``(str, Enum)`` declarations in core, and core has since added it; the nine
+# datetime/interval rows it produced are gone, and every one of those classes
+# now round-trips through all three channels. For the same reason the bare
+# ``Enum`` spellings that made the writer reject an enum outright
+# (``GeneratedColumnType``, ``ReferentialAction``, ``TriggerEvent`` and the
+# rest) are ``(str, Enum)`` now, so three rows moved from "the writer refuses"
+# to "the constructor does not normalise", which is what they measure today.
+#
+# The writer and the reader are core's, so no row here can be fixed from a
+# backend repository. Each row pins exactly the channel(s) that fail and the
+# witness they fail with, so that the day core fixes one,
+# ``test_pinned_serialization_gap_really_fails`` reports the row as stale and
+# it is deleted. A class that starts failing *without* a row fails its own
+# assertion instead. When the last row goes, this table, its guards and the
+# branches that read it go with it.
+#
+# This backend's own enums cannot appear in any of the three blocks: they
+# inherit ``str`` and their constructors normalise the word back through
+# ``expression/coercion.as_member``, which is why no row names a
+# ``Snowflake*`` enum.
+#
+# Shape: ``fqn -> (channels, witness)``. ``channels`` is the tuple, in
+# ``("dict", "json", "xml")`` order, of the channels that cannot round-trip;
+# every channel not named must round-trip. ``witness`` is either a
+# ``(exception type, message fragment)`` pair -- the channel raises it -- or a
+# string, which is the fragment of the parameter comparison the channel fails
+# instead.
+SERIALIZATION_GAP = {
+    # ---- the writer refuses the parameter (all three channels) -------------
+    "rhosocial.activerecord.backend.expression.graph.GraphTableExpression": (
+        ("dict", "json", "xml"),
+        (TypeError, "GraphColumn is not one of the value kinds"),
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_view.CreateViewStatement": (
+        ("dict", "json", "xml"),
+        (TypeError, "ViewOptions is not one of the value kinds"),
+    ),
+    "rhosocial.activerecord.backend.expression.xml.XMLAttributesExpression": (
+        ("dict", "json", "xml"),
+        (TypeError, "XMLAttribute is not one of the value kinds"),
+    ),
+    "rhosocial.activerecord.backend.expression.xml.XMLForestExpression": (
+        ("dict", "json", "xml"),
+        (TypeError, "XMLForestItem is not one of the value kinds"),
+    ),
+    # ---- the constructor refuses its own wire form (json and xml) ----------
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.CreateTableCloneStatement": (
+        ("json", "xml"),
+        (TypeError, "mode must be a CreateTableCloneMode"),
+    ),
+    # ---- the constructor does not normalise on read (json and xml) ---------
+    # The value survives and the host type does not, so the witness is the
+    # comparison the harness reports rather than an exception.
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.ColumnGeneratedConstraint": (
+        ("json", "xml"),
+        "type mismatch str vs GeneratedColumnType",
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_table.ForeignKeyConstraint": (
+        ("json", "xml"),
+        "type mismatch str vs ReferentialAction",
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_trigger.CreateTriggerStatement": (
+        ("json", "xml"),
+        "type mismatch str vs TriggerTiming",
+    ),
+    "rhosocial.activerecord.backend.expression.graph.GraphEdge": (
+        ("json", "xml"),
+        "type mismatch str vs GraphEdgeDirection",
+    ),
+    "rhosocial.activerecord.backend.expression.graph.QuantifiedPath": (
+        ("json", "xml"),
+        "type mismatch str vs GraphEdgeDirection",
+    ),
+    "rhosocial.activerecord.backend.expression.statements.ddl_database.AlterDatabaseStatement": (
+        ("json", "xml"),
+        "type mismatch str vs AlterDatabaseAction",
+    ),
+    "rhosocial.activerecord.backend.expression.statements.dml.MergeAction": (
+        ("json", "xml"),
+        "type mismatch str vs MergeActionType",
+    ),
+    "rhosocial.activerecord.backend.expression.statements.dml.MergeStatement": (
+        ("json", "xml"),
+        "type mismatch str vs MergeActionType",
+    ),
+    "rhosocial.activerecord.backend.expression.xml.XMLParseExpression": (
+        ("json", "xml"),
+        "type mismatch str vs XMLParseDocumentType",
+    ),
+    "rhosocial.activerecord.backend.expression.xml.XMLSerializeExpression": (
+        ("json", "xml"),
+        "type mismatch str vs XMLSerializeDocumentType",
+    ),
+}
+
+_CHANNELS = ("dict", "json", "xml")
+
+
+def _restore_channel(channel, instance, dialect):
+    """Serialize *instance* and read it back through one channel."""
+    if channel == "dict":
+        return deserialize(serialize(instance), dialect)
+    if channel == "json":
+        return deserialize_json(serialize_json(instance), dialect)
+    return deserialize_xml(serialize_xml(instance), dialect)
+
+
+def _run_channel(fqn, channel, instance, dialect):
+    """One channel's round-trip, as an outcome a caller can classify.
+
+    Returns ``("ok", restored)``, ``("raises", exception)`` or
+    ``("degrades", message)``. A channel that is not named in a class's
+    :data:`SERIALIZATION_GAP` row must return the first; a channel that is
+    named must return one of the other two, and the row's witness says which
+    and what it must look like.
+    """
+    try:
+        restored = _restore_channel(channel, instance, dialect)
+    except Exception as exc:  # noqa: BLE001 -- classified by the caller
+        return "raises", exc
+    try:
+        assert_params_equal(restored.get_params(), instance.get_params(), fqn)
+    except AssertionError as exc:
+        return "degrades", str(exc)
+    return "ok", restored
+
+
+def _assert_roundtrip_or_gap(fqn, instance, dialect):
+    """Assert all three channels, against the pinned gap table.
+
+    Returns ``{channel: restored}`` for the channels that round-tripped. A
+    channel whose class has no pinned gap must round-trip, and a pinned
+    channel must fail exactly the way its witness says -- so neither a new
+    failure nor a stale row can pass quietly.
+    """
+    gap = SERIALIZATION_GAP.get(fqn)
+    restored_ok = {}
+    failing = []
+    for channel in _CHANNELS:
+        outcome, detail = _run_channel(fqn, channel, instance, dialect)
+        if outcome == "ok":
+            restored_ok[channel] = detail
+            continue
+        failing.append(channel)
+        what = (
+            f"raised {type(detail).__name__}: {detail}"
+            if outcome == "raises"
+            else f"lost a parameter type: {detail}"
+        )
+        assert gap is not None, (
+            f"{fqn}: the {channel} channel {what}, and the class is not in "
+            f"SERIALIZATION_GAP. If core's writer or reader learned to carry "
+            f"the parameter, the row is no longer needed; if it has not, the "
+            f"class needs a row naming the channel and the witness."
+        )
+        channels, witness = gap
+        assert channel in channels, (
+            f"{fqn}: the {channel} channel failed but the pinned gap names "
+            f"{channels}. Either the pin is wrong about which channels fail, or "
+            f"core's behaviour changed and the row must be re-measured."
+        )
+        if isinstance(witness, tuple):
+            expected_type, fragment = witness
+            assert outcome == "raises", (
+                f"{fqn}: the pinned gap says the {channel} channel raises "
+                f"{expected_type.__name__} saying {fragment!r}, but it {what}."
+            )
+            assert type(detail) is expected_type and fragment in str(detail), (
+                f"{fqn}: the {channel} channel was pinned to raise "
+                f"{expected_type.__name__} saying {fragment!r}, but it {what}."
+            )
+        else:
+            assert outcome == "degrades" and witness in str(detail), (
+                f"{fqn}: the pinned gap says the {channel} channel loses the "
+                f"parameter type reported as {witness!r}, but it {what}."
+            )
+    if gap is not None:
+        channels, _witness = gap
+        assert set(failing) == set(channels), (
+            f"{fqn}: the pinned gap names {channels} as the channels that fail, "
+            f"but {failing} failed. A row that names a channel which now works "
+            f"is stale and must go."
+        )
+    return restored_ok
 
 
 # ---------------------------------------------------------------------------
@@ -1274,11 +1712,17 @@ def assert_sql_roundtrip_classified(fqn, instance, dialect):
         )
 
     expected_sql, expected_params = rendered
-    for channel, decoded in (
-        ("dict", deserialize(serialize(instance), dialect)),
-        ("json", deserialize_json(serialize_json(instance), dialect)),
-        ("xml", deserialize_xml(serialize_xml(instance), dialect)),
-    ):
+    # Only the channels that carry this class's parameters intact can be asked
+    # for SQL: a channel that loses a parameter type or refuses it on the write
+    # is already recorded in ``SERIALIZATION_GAP``, and re-deriving SQL from a
+    # node whose parameter never arrived would fail for the pinned reason
+    # instead of asserting anything about the rendering.
+    gap = SERIALIZATION_GAP.get(fqn)
+    whole = set(_CHANNELS) - set(gap[0] if gap else ())
+    for channel in _CHANNELS:
+        if channel not in whole:
+            continue
+        decoded = _restore_channel(channel, instance, dialect)
         decoded_sql, decoded_params = decoded.to_sql()
         assert decoded_sql == expected_sql, (
             f"{fqn}: {channel} round-trip changed the SQL.\n"
@@ -1343,17 +1787,15 @@ class TestExpressionRoundtripAll:
     """All constructible expression classes round-trip through all encodings."""
 
     def test_get_params_roundtrip_across_encodings(self, expr_case, dialect):
+        """Every parameter survives all three channels -- or its gap is pinned.
+
+        A channel that fails for a class with no row in
+        :data:`SERIALIZATION_GAP` fails here, and so does a row that names a
+        channel which now round-trips. See the table's comment for what the
+        rows are and whose defect they record.
+        """
         fqn, instance = expr_case
-        original = instance.get_params()
-
-        restored_dict = deserialize(serialize(instance), dialect)
-        assert_params_equal(restored_dict.get_params(), original, fqn)
-
-        restored_json = deserialize_json(serialize_json(instance), dialect)
-        assert_params_equal(restored_json.get_params(), original, fqn)
-
-        restored_xml = deserialize_xml(serialize_xml(instance), dialect)
-        assert_params_equal(restored_xml.get_params(), original, fqn)
+        _assert_roundtrip_or_gap(fqn, instance, dialect)
 
     def test_to_sql_roundtrip_classified(self, expr_case, dialect):
         """A render must survive the round-trip; a non-render must be classified."""
@@ -1411,6 +1853,52 @@ class TestMatrixIntegrity:
         assert not unknown, (
             f"LEGITIMATE_NON_RENDERS names uncollected classes: {sorted(unknown)}"
         )
+        unknown = set(SERIALIZATION_GAP) - collected
+        assert not unknown, (
+            f"SERIALIZATION_GAP names uncollected classes: {sorted(unknown)}"
+        )
+
+    def test_pinned_serialization_gap_really_fails(self, dialect):
+        """Each gap row still fails, on the channels it names, for that reason.
+
+        Without this, a row could sit in the table for a class that now
+        round-trips perfectly well, and the artifact coverage it claims to
+        describe would be a stale statement rather than a measurement. The day
+        core's writer or reader fixes one of these, this test says so and the
+        row is deleted.
+        """
+        for fqn, (channels, witness) in SERIALIZATION_GAP.items():
+            instance, source = make_instance(REGISTERED[fqn], dialect)
+            assert instance is not None, (
+                f"{fqn} is pinned in SERIALIZATION_GAP but could not be "
+                f"constructed ({source})"
+            )
+            for channel in _CHANNELS:
+                outcome, detail = _run_channel(fqn, channel, instance, dialect)
+                if channel not in channels:
+                    assert outcome == "ok", (
+                        f"{fqn}: the {channel} channel is not named in the gap "
+                        f"row, so it must round-trip, but it "
+                        f"{'raised' if outcome == 'raises' else 'degraded'}: {detail}"
+                    )
+                    continue
+                assert outcome != "ok", (
+                    f"{fqn}: the gap row says the {channel} channel fails, but "
+                    f"it round-tripped. Core may have fixed it -- delete the row."
+                )
+                if isinstance(witness, tuple):
+                    expected_type, fragment = witness
+                    assert type(detail) is expected_type and fragment in str(detail), (
+                        f"{fqn}: the {channel} channel was pinned to raise "
+                        f"{expected_type.__name__} saying {fragment!r}, but it "
+                        f"raised {type(detail).__name__}: {detail}"
+                    )
+                else:
+                    assert outcome == "degrades" and witness in str(detail), (
+                        f"{fqn}: the {channel} channel was pinned to lose the "
+                        f"parameter type reported as {witness!r}, but it "
+                        f"{outcome}: {detail}"
+                    )
 
     def test_unmodelled_formatter_list_is_exact(self, dialect):
         """Pin the unmodelled-formatter table against what the dialect really lacks.
@@ -1481,7 +1969,6 @@ class TestMatrixIntegrity:
         the registry because the registry also holds whatever backends other test
         modules happened to import.
         """
-        ExpressionRegistry._auto_register_builtins()
         expected = set(_collect_matrix_classes())
         assert expected == set(REGISTERED), (
             "the set of classes these packages define changed after collection.\n"
@@ -1524,12 +2011,16 @@ class TestMatrixIntegrity:
     def test_every_covered_class_is_registered_for_deserialization(self):
         """A class in the matrix can be found again when deserializing.
 
-        Deserialisation looks the class up by name, so a class the matrix renders
-        but the registry cannot resolve would round-trip into the wrong thing or
-        nothing at all.
+        Deserialisation resolves a kind through the registry this file
+        assembled at import, so a class the matrix renders but that registry
+        cannot resolve would round-trip into nothing at all. Assembly would
+        already have raised on a kind two classes claim; this pins that every
+        collected class's own kind is in the registry at all.
         """
-        ExpressionRegistry._auto_register_builtins()
-        unresolved = sorted(set(REGISTERED) - set(ExpressionRegistry._registry))
+        kinds = set(default_registry().node_kinds())
+        unresolved = sorted(
+            fqn for fqn, cls in REGISTERED.items() if cls.kind() not in kinds
+        )
         assert not unresolved, (
             f"the matrix covers classes the registry cannot resolve: {unresolved}"
         )
@@ -1587,7 +2078,6 @@ class TestMatrixIntegrity:
 
     def test_coverage_report(self, dialect):
         """Surface the matrix's classification, so coverage stays transparent."""
-        ExpressionRegistry._auto_register_builtins()
         tally = {}
         constructible = 0
         for fqn in sorted(REGISTERED):
@@ -1611,3 +2101,5 @@ class TestMatrixIntegrity:
             print(f"  not modelled: {feature} ({len(methods)} formatters)")
         for fqn in sorted(LEGITIMATE_NON_RENDERS):
             print(f"  non-render: {fqn}")
+        for fqn, (channels, _witness) in sorted(SERIALIZATION_GAP.items()):
+            print(f"  artifact gap: {fqn} ({', '.join(channels)})")

@@ -18,10 +18,10 @@ from typing import Protocol, Tuple, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..expression.ddl.stage import (
-        SnowflakeAlterStageExpression,
-        SnowflakeCopyIntoExpression,
-        SnowflakeCreateStageExpression,
-        SnowflakeDropStageExpression,
+        SnowflakeAlterStageStatement,
+        SnowflakeCopyIntoStatement,
+        SnowflakeCreateStageStatement,
+        SnowflakeDropStageStatement,
     )
 
 
@@ -34,37 +34,37 @@ class SnowflakeStageSupport(Protocol):
         ...
 
     def format_copy_into_statement(
-        self, expr: "SnowflakeCopyIntoExpression"
+        self, expr: "SnowflakeCopyIntoStatement"
     ) -> Tuple[str, tuple]:
         """Format a full COPY INTO statement (load or unload)."""
         ...
 
     def format_create_stage_statement(
-        self, expr: "SnowflakeCreateStageExpression"
+        self, expr: "SnowflakeCreateStageStatement"
     ) -> Tuple[str, tuple]:
         """Format CREATE STAGE statement."""
         ...
 
     def format_alter_stage_statement(
-        self, expr: "SnowflakeAlterStageExpression"
+        self, expr: "SnowflakeAlterStageStatement"
     ) -> Tuple[str, tuple]:
         """Format ALTER STAGE ... SET statement."""
         ...
 
     def format_drop_stage_statement(
-        self, expr: "SnowflakeDropStageExpression"
+        self, expr: "SnowflakeDropStageStatement"
     ) -> Tuple[str, tuple]:
         """Format DROP STAGE statement."""
         ...
 
     def format_copy_into_load(
-        self, expr: "SnowflakeCopyIntoExpression"
+        self, expr: "SnowflakeCopyIntoStatement"
     ) -> Tuple[str, tuple]:
         """Format COPY INTO <table> FROM <stage> (load)."""
         ...
 
     def format_copy_into_unload(
-        self, expr: "SnowflakeCopyIntoExpression"
+        self, expr: "SnowflakeCopyIntoStatement"
     ) -> Tuple[str, tuple]:
         """Format COPY INTO <stage> FROM <table> (unload)."""
         ...
