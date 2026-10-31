@@ -311,6 +311,30 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             )
         return warehouses
 
+    @staticmethod
+    def parse_storage_total(metrics: Optional["SnowflakeTableStorageMetrics"]) -> Optional[int]:
+        """The common minimum's total, summed from the four billed tiers.
+
+        ``active`` + ``time travel`` + ``failsafe`` + ``clone-retained`` is
+        the table's whole retained footprint, which is what
+        ``IntrospectionTableInfo.size_bytes`` carries. ``None`` metrics --
+        which for this view also means "this role may not see the metrics"
+        -- answer ``None``: not stored and not visible are different
+        answers, and the second is the one this slot reports.
+
+        The split slots have no such sum to carry: managed micro-partition
+        storage has no index side, so they stay ``None`` wherever the total
+        is filled.
+        """
+        if metrics is None:
+            return None
+        return (
+            metrics.active_bytes
+            + metrics.time_travel_bytes
+            + metrics.failsafe_bytes
+            + metrics.retained_for_clone_bytes
+        )
+
     def parse_table_storage_metrics(
         self,
         rows: List[Dict[str, Any]],
@@ -836,6 +860,13 @@ class SyncSnowflakeIntrospector(
         table.columns = self.list_columns(table_name, schema)
         table.indexes = self.list_indexes(table_name, schema)
         table.foreign_keys = self.list_foreign_keys(table_name, schema)
+        if self.dialect.supports_table_storage_introspection():
+            # The one-table read answers the common minimum's total from the
+            # billed tiers; the listing deliberately does not -- see
+            # supports_table_storage_introspection and the CLI README.
+            table.size_bytes = self.parse_storage_total(
+                self.get_table_storage_metrics(table_name, schema)
+            )
         self._cache.set(key, table)
         return table
 
@@ -1051,6 +1082,11 @@ class AsyncSnowflakeIntrospector(
         table.columns = await self.list_columns(table_name, schema)
         table.indexes = await self.list_indexes(table_name, schema)
         table.foreign_keys = await self.list_foreign_keys(table_name, schema)
+        if self.dialect.supports_table_storage_introspection():
+            # The async twin of the sync fill: same tiers, awaited.
+            table.size_bytes = self.parse_storage_total(
+                await self.get_table_storage_metrics(table_name, schema)
+            )
         self._cache.set(key, table)
         return table
 

@@ -108,6 +108,30 @@ class SnowflakeIntrospectionMixin:
         from an absent table."""
         return True
 
+    def supports_table_storage_introspection(self) -> bool:
+        """The same billed storage answers the common minimum's total slot.
+
+        The capability for the per-table storage family, which is what the
+        ``table-storage-metrics`` family above feeds: the four tiers
+        (active, time travel, failsafe, clone-retained) sum to a table's
+        total footprint, and that sum lands on ``IntrospectionTableInfo``
+        ``size_bytes`` for a single-table read -- see
+        :meth:`~...introspection.introspector.SyncSnowflakeIntrospector.get_table_info`.
+
+        The listing deliberately stays unjoined, and the CLI README records
+        why: the metrics statement joins two views, so folding it into
+        ``list_tables`` would charge every list for the join, and the view
+        answers only for ``ACCOUNTADMIN``, so a column there would read as
+        "no storage" where the truth is "this role may not see it".
+
+        The split slots stay ``None``: Snowflake's storage is managed
+        micro-partition bytes with no index side to separate, so there is
+        nothing to attribute ``data_size_bytes`` or ``index_size_bytes`` to
+        -- the engine's shape, not a gap
+        (``.claude/rules/introspection.md`` §5).
+        """
+        return True
+
     # ========== Capability Detection ==========
 
     def supports_introspection(self) -> bool:
