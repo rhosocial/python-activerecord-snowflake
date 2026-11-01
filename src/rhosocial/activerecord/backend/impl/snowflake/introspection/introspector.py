@@ -2,7 +2,7 @@
 """
 Snowflake concrete introspectors.
 
-Implements SyncAbstractIntrospector and AsyncAbstractIntrospector for Snowflake
+Implements AbstractIntrospector and AsyncAbstractIntrospector for Snowflake
 databases using the INFORMATION_SCHEMA system views for metadata queries.
 
 The introspectors are exposed via ``backend.introspector``.
@@ -21,7 +21,7 @@ Key behaviours:
   - Snowflake does not have traditional indexes; constraints are used instead
 
 Design principle: Sync and Async are separate and cannot coexist.
-- SyncSnowflakeIntrospector: for synchronous backends
+- SnowflakeIntrospector: for synchronous backends
 - AsyncSnowflakeIntrospector: for asynchronous backends
 """
 
@@ -32,14 +32,14 @@ from typing import Any, Dict, List, Optional
 
 from rhosocial.activerecord.backend.introspection.base import (
     IntrospectorMixin,
-    SyncAbstractIntrospector,
+    AbstractIntrospector,
     AsyncAbstractIntrospector,
 )
 from rhosocial.activerecord.backend.introspection.cache import (
     IntrospectionCache,
 )
 from rhosocial.activerecord.backend.introspection.executor import (
-    SyncIntrospectorExecutor,
+    IntrospectorExecutor,
 )
 from rhosocial.activerecord.backend.introspection.types import (
     IntrospectionDatabaseInfo,
@@ -74,7 +74,7 @@ from .types import (
 class SnowflakeIntrospectorMixin(IntrospectorMixin):
     """Mixin providing shared Snowflake-specific introspection logic.
 
-    Both SyncSnowflakeIntrospector and AsyncSnowflakeIntrospector inherit
+    Both SnowflakeIntrospector and AsyncSnowflakeIntrospector inherit
     from this mixin to share:
     - Default schema handling
     - Snowflake version detection
@@ -822,8 +822,8 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         return []
 
 
-class SyncSnowflakeIntrospector(
-    SnowflakeIntrospectorMixin, SyncAbstractIntrospector
+class SnowflakeIntrospector(
+    SnowflakeIntrospectorMixin, AbstractIntrospector
 ):
     """Synchronous introspector for Snowflake backends.
 
@@ -836,7 +836,7 @@ class SyncSnowflakeIntrospector(
     def __init__(
         self,
         backend: Any,
-        executor: SyncIntrospectorExecutor,
+        executor: IntrospectorExecutor,
         cache: Optional[IntrospectionCache] = None,
     ) -> None:
         super().__init__(backend, executor, cache)
@@ -1098,7 +1098,7 @@ class AsyncSnowflakeIntrospector(
     async def list_databases(self) -> List[SnowflakeDatabaseInfo]:
         """List every database the session's role can see.
 
-        Asynchronous twin of :meth:`SyncSnowflakeIntrospector.list_databases`;
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_databases`;
         the SQL, parsing and cache key are shared through the mixin, so only
         the ``await`` differs.
         """
@@ -1116,7 +1116,7 @@ class AsyncSnowflakeIntrospector(
     ) -> List[SnowflakeSchemaInfo]:
         """List the schemas of *database*, or of the session's current one.
 
-        Asynchronous twin of :meth:`SyncSnowflakeIntrospector.list_schemas`.
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_schemas`.
         """
         key = self._cache.key(
             IntrospectionScope.SCHEMA, database or "*", extra="schemas"
@@ -1134,7 +1134,7 @@ class AsyncSnowflakeIntrospector(
     async def list_warehouses(self) -> List[SnowflakeWarehouseInfo]:
         """List the virtual warehouses the session's role can see.
 
-        Asynchronous twin of :meth:`SyncSnowflakeIntrospector.list_warehouses`.
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_warehouses`.
         """
         key = self._cache.key(IntrospectionScope.DATABASE, extra="warehouses")
         cached = self._cache.get(key)
@@ -1151,7 +1151,7 @@ class AsyncSnowflakeIntrospector(
         """Billed storage, row count and clustering for one live table.
 
         Asynchronous twin of
-        :meth:`SyncSnowflakeIntrospector.get_table_storage_metrics`, including
+        :meth:`SnowflakeIntrospector.get_table_storage_metrics`, including
         the documented ``ACCOUNTADMIN`` caveat on the view and the decision
         not to cache ``None``.
         """

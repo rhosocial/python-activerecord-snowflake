@@ -4,7 +4,7 @@
 Tests cover:
 - SnowflakeIntrospectionMixin format_*_query methods
 - SnowflakeIntrospectorMixin parse_* methods
-- SyncSnowflakeIntrospector with mock backend
+- SnowflakeIntrospector with mock backend
 - AsyncSnowflakeIntrospector with mock backend
 """
 import pytest
@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.introspection import (
     SnowflakeIntrospectorMixin,
-    SyncSnowflakeIntrospector,
+    SnowflakeIntrospector,
     AsyncSnowflakeIntrospector,
 )
 from rhosocial.activerecord.backend.introspection.types import (
@@ -22,7 +22,7 @@ from rhosocial.activerecord.backend.introspection.types import (
     ColumnNullable,
     ReferentialAction,
 )
-from rhosocial.activerecord.backend.introspection.executor import SyncIntrospectorExecutor
+from rhosocial.activerecord.backend.introspection.executor import IntrospectorExecutor
 
 
 @pytest.fixture
@@ -713,11 +713,11 @@ class TestSnowflakeCatalogSizeReachesParseType:
 
 
 # ================================================================== #
-# Tests for SyncSnowflakeIntrospector with mock executor
+# Tests for SnowflakeIntrospector with mock executor
 # ================================================================== #
 
-class TestSyncSnowflakeIntrospector:
-    """Test SyncSnowflakeIntrospector end-to-end with mock executor."""
+class TestSnowflakeIntrospector:
+    """Test SnowflakeIntrospector end-to-end with mock executor."""
 
     @pytest.fixture
     def mock_backend(self):
@@ -731,11 +731,11 @@ class TestSyncSnowflakeIntrospector:
 
     @pytest.fixture
     def mock_executor(self):
-        return MagicMock(spec=SyncIntrospectorExecutor)
+        return MagicMock(spec=IntrospectorExecutor)
 
     @pytest.fixture
     def introspector(self, mock_backend, mock_executor):
-        return SyncSnowflakeIntrospector(mock_backend, mock_executor)
+        return SnowflakeIntrospector(mock_backend, mock_executor)
 
     def test_default_schema(self, introspector):
         assert introspector.default_schema == "PUBLIC"
@@ -925,12 +925,12 @@ class TestTableStorageNarrowSlot:
             failsafe_bytes=5,
             retained_for_clone_bytes=1,
         )
-        assert SyncSnowflakeIntrospector.parse_storage_total(metrics) == 126
+        assert SnowflakeIntrospector.parse_storage_total(metrics) == 126
 
     def test_a_role_that_may_not_see_the_metrics_answers_none(self):
         """Absent metrics and a role without visibility are the same None
         from this view, and the slot reports None rather than zero."""
-        assert SyncSnowflakeIntrospector.parse_storage_total(None) is None
+        assert SnowflakeIntrospector.parse_storage_total(None) is None
 
     def test_empty_tiers_are_zero_not_none(self):
         """A visible table with no billed bytes is zero; that is a fact,
@@ -940,7 +940,7 @@ class TestTableStorageNarrowSlot:
         )
 
         assert (
-            SyncSnowflakeIntrospector.parse_storage_total(
+            SnowflakeIntrospector.parse_storage_total(
                 SnowflakeTableStorageMetrics(table_name="T")
             )
             == 0

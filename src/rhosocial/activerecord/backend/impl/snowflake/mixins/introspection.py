@@ -116,7 +116,7 @@ class SnowflakeIntrospectionMixin:
         (active, time travel, failsafe, clone-retained) sum to a table's
         total footprint, and that sum lands on ``IntrospectionTableInfo``
         ``size_bytes`` for a single-table read -- see
-        :meth:`~...introspection.introspector.SyncSnowflakeIntrospector.get_table_info`.
+        :meth:`~...introspection.introspector.SnowflakeIntrospector.get_table_info`.
 
         The listing deliberately stays unjoined, and the CLI README records
         why: the metrics statement joins two views, so folding it into

@@ -189,12 +189,12 @@ def make_introspector(executor):
     """A real sync introspector wired to *executor*.
 
     Deliberately the production class: the example's cache claims are about
-    :class:`SyncSnowflakeIntrospector`, so mocking the introspector instead
+    :class:`SnowflakeIntrospector`, so mocking the introspector instead
     would test the mock.
     """
     from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
     from rhosocial.activerecord.backend.impl.snowflake.introspection import (
-        SyncSnowflakeIntrospector,
+        SnowflakeIntrospector,
     )
 
     backend = MagicMock()
@@ -203,7 +203,7 @@ def make_introspector(executor):
     backend.config.schema = "PUBLIC"
     backend.config.database = "ANALYTICS"
     backend.dialect = SnowflakeDialect(version=(8, 32, 0))
-    return SyncSnowflakeIntrospector(backend, executor)
+    return SnowflakeIntrospector(backend, executor)
 
 
 @pytest.fixture

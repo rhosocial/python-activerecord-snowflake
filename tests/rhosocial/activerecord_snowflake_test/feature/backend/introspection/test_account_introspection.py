@@ -35,7 +35,7 @@ from rhosocial.activerecord.backend.impl.snowflake.introspection import (
     SnowflakeSchemaInfo,
     SnowflakeTableStorageMetrics,
     SnowflakeWarehouseInfo,
-    SyncSnowflakeIntrospector,
+    SnowflakeIntrospector,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.introspection import (
     SnowflakeDatabaseListQueryStatement,
@@ -44,7 +44,7 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.introspection impo
     SnowflakeWarehouseListQueryStatement,
 )
 from rhosocial.activerecord.backend.introspection.executor import (
-    SyncIntrospectorExecutor,
+    IntrospectorExecutor,
 )
 
 DATABASES_SQL = (
@@ -101,12 +101,12 @@ def mock_backend(dialect):
 
 @pytest.fixture
 def sync_executor():
-    return MagicMock(spec=SyncIntrospectorExecutor)
+    return MagicMock(spec=IntrospectorExecutor)
 
 
 @pytest.fixture
 def sync_introspector(mock_backend, sync_executor):
-    return SyncSnowflakeIntrospector(mock_backend, sync_executor)
+    return SnowflakeIntrospector(mock_backend, sync_executor)
 
 
 @pytest.fixture
@@ -631,7 +631,7 @@ class TestAccountObjectValues:
             "get_table_storage_metrics",
         ):
             sync_signature = inspect.signature(
-                getattr(SyncSnowflakeIntrospector, name)
+                getattr(SnowflakeIntrospector, name)
             )
             async_signature = inspect.signature(
                 getattr(AsyncSnowflakeIntrospector, name)
