@@ -1231,6 +1231,39 @@ _NO_FORMAT_METHOD_NAME = "does not declare its dialect formatting method name"
 _NO_GENERIC_TYPE = "does not support the generic type"
 
 LEGITIMATE_NON_RENDERS = {
+    # ---- core data-profile families this dialect does not answer ----
+    #  Snowflake's profiling surface is `INFORMATION_SCHEMA` plus `ACCOUNT_USAGE` views with their own latency and retention, and no per-column statistics catalogue. The probes answer False.
+    "rhosocial.activerecord.backend.expression.introspection.ColumnDataProfileQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
+    "rhosocial.activerecord.backend.expression.introspection.ColumnValueSampleQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
+    "rhosocial.activerecord.backend.expression.introspection.JoinCoverageQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
+    "rhosocial.activerecord.backend.expression.introspection.UnusedIndexesQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
+    "rhosocial.activerecord.backend.expression.introspection.TableUsageStatsQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
+    # ---- core operational families this dialect does not answer ----
+    #  Snowflake's use statistics live in ACCOUNT_USAGE views with latency
+    #  and retention semantics of their own, not a catalogue a schema name
+    #  addresses. The probes answer False.
+    "rhosocial.activerecord.backend.expression.introspection.RuntimeMetricsQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
+    "rhosocial.activerecord.backend.expression.introspection.IndexUsageStatsQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
+    "rhosocial.activerecord.backend.expression.introspection.ObjectDependencyQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
+    "rhosocial.activerecord.backend.expression.introspection.DDLStatementQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
     # ---- roots that name an expression category, not a renderable thing ----
     # Each is a base class that deliberately declares no ``format_method``, so
     # ``to_sql()`` reports that there is nothing to dispatch. They are not
