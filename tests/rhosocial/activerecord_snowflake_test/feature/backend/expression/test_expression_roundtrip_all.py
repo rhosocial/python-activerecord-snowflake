@@ -1231,17 +1231,13 @@ _NO_FORMAT_METHOD_NAME = "does not declare its dialect formatting method name"
 _NO_GENERIC_TYPE = "does not support the generic type"
 
 LEGITIMATE_NON_RENDERS = {
-    # ---- core data-profile families this dialect does not answer ----
-    #  Snowflake's profiling surface is `INFORMATION_SCHEMA` plus `ACCOUNT_USAGE` views with their own latency and retention, and no per-column statistics catalogue. The probes answer False.
-    "rhosocial.activerecord.backend.expression.introspection.ColumnDataProfileQueryStatement": (
-        ProtocolNotImplementedError, 'does not implement ',
-    ),
-    "rhosocial.activerecord.backend.expression.introspection.ColumnValueSampleQueryStatement": (
-        ProtocolNotImplementedError, 'does not implement ',
-    ),
-    "rhosocial.activerecord.backend.expression.introspection.JoinCoverageQueryStatement": (
-        ProtocolNotImplementedError, 'does not implement ',
-    ),
+    # ---- core data-profile families this dialect answers by aggregating ----
+    #  ``ColumnDataProfileQueryStatement``, ``ColumnValueSampleQueryStatement``
+    #  and ``JoinCoverageQueryStatement`` used to be pinned here: Snowflake has
+    #  no per-column statistics catalogue, and the probes answered False. They
+    #  render now, because the rows themselves answer -- one ``UNION ALL`` arm
+    #  per column, each a full scan of the table -- so the entries are gone and
+    #  the matrix asserts the rendered statements instead.
     "rhosocial.activerecord.backend.expression.introspection.UnusedIndexesQueryStatement": (
         ProtocolNotImplementedError, 'does not implement ',
     ),
