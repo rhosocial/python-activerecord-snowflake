@@ -4,13 +4,20 @@ The `introspect` subcommand asks a live Snowflake account what it holds, and
 prints the answer. Every question runs through the backend's introspector, so
 what the CLI reports is what the library sees — the same objects, the same
 types, the same parsing — rather than a second implementation that can drift
-from it.
+from it. Nineteen types are advertised, derived from `_TYPE_CAPABILITIES` in
+the source rather than written out a second time, so a family cannot be
+answerable and unaskable at once.
 
 ```bash
 python -m rhosocial.activerecord.backend.impl.snowflake introspect <TYPE> [NAME] [OPTIONS]
 ```
 
 ## What it can ask about
+
+Nineteen types, in the order `--help` prints them. The catalogue families
+answer True for this dialect; the operational and one-object families are
+offered and gated on their switch, so a run is refused (exit 2) rather than
+answered with an empty list.
 
 | Type | `NAME` | Reads | Notes |
 | :--- | :--- | :--- | :--- |
@@ -19,16 +26,27 @@ python -m rhosocial.activerecord.backend.impl.snowflake introspect <TYPE> [NAME]
 | `columns` | table, required | `information_schema.columns` | One table's columns: name, type, nullability, ordinal position, default. |
 | `indexes` | table, required | `information_schema.table_constraints`, `key_column_usage` | Constraints and the columns each side names. |
 | `foreign-keys` | table, required | `information_schema.referential_constraints` | Referential constraints. |
-| `table-storage-metrics` | table, required | `information_schema.table_storage_metrics`, `information_schema.tables` | One table's billed storage: active, time travel, failsafe and clone-retained bytes, plus the row count, clustering key and kind `tables` reports. |
+| `database` | — | `CURRENT_DATABASE()`, `CURRENT_VERSION()` | The database this session is in and the account's version. |
 | `databases` | — | `information_schema.databases` | The databases in the account, with owner and transient flag. |
 | `schemas` | — | `information_schema.schemata` | The schemas in a database — Snowflake's namespace level above a table. `--database` names the database to enumerate. |
 | `warehouses` | — | `SHOW WAREHOUSES` | Warehouses with size, state and auto-resume. This is `SHOW`, not an `information_schema` view, because no such view exists. |
-| `database` | — | `CURRENT_DATABASE()`, `CURRENT_VERSION()` | The database this session is in and the account's version. |
+| `table-storage-metrics` | table, required | `information_schema.table_storage_metrics`, `information_schema.tables` | One table's billed storage: active, time travel, failsafe and clone-retained bytes, plus the row count, clustering key and kind `tables` reports. |
+| `unused-indexes` | — | refused here | Offered and gated: `supports_unused_indexes_detection` answers False here, so the run is refused rather than answered empty. |
+| `table-stats` | — | refused here | Offered and gated on `supports_table_stats`, which answers False here. |
+| `runtime` | — | refused here | Offered and gated on `supports_runtime_stats`, which answers False here. |
+| `index-stats` | — | refused here | Offered and gated on `supports_index_stats`, which answers False here. |
+| `dependencies` | object, optional | refused here | Offered and gated on `supports_object_dependencies` (False here); a name narrows the graph to that object's edges. |
+| `ddl` | table, required | refused here | Offered and gated on `supports_ddl_extraction` (False here). |
+| `column-profiles` | table, required | the rows themselves | Answers True here: the profile is aggregated from the rows, so every figure is exact and paid for in time. |
+| `value-samples` | table, required | the rows themselves | Answers True here, read from the rows; `--column` names the column and `--limit` caps the count (default 100). |
+| `join-coverage` | left table, required | the rows themselves | Answers True here: how much two columns' value domains overlap. `--column`, `--right-table` and `--right-column` are required. |
 
-`NAME` is required for `columns`, `indexes`, `foreign-keys` and
-`table-storage-metrics`. For `views` it is optional: a name asks for that one
-view, and a name the catalogue does not have exits 1. The list types —
-`tables`, `database`, `databases`, `schemas` and `warehouses` — take no name,
+`NAME` is required for `columns`, `indexes`, `foreign-keys`,
+`table-storage-metrics`, `ddl`, `column-profiles`, `value-samples` and
+`join-coverage`. For `views` and `dependencies` it is optional: a name asks for
+that one view, or narrows the graph to that object's edges. The list types —
+`tables`, `database`, `databases`, `schemas`, `warehouses`,
+`unused-indexes`, `table-stats`, `runtime` and `index-stats` — take no name,
 and a stray one is refused (exit 2) rather than ignored: this backend has no
 `get_*_info` method that could answer for a single database, schema or
 warehouse. `schemas --database analytics` is unaffected — `--database` says
@@ -54,6 +72,17 @@ for this role" — a `None` the command can state out loud, which a column on th
 listing could not. An exit of 1 on this type is therefore **not** "the table
 does not exist".
 
+The nine families beyond the catalogue are offered for a different reason than
+the ten above: they are questions the *protocol* asks every dialect, and
+Snowflake's answer is a real answer, not a gap. Six of them — `unused-indexes`,
+`table-stats`, `runtime`, `index-stats`, `dependencies` and `ddl` — are gated on
+a switch that answers `False` here, so asking them exits 2 with "not supported by
+this server"; the remaining three (`column-profiles`, `value-samples`,
+`join-coverage`) read the rows themselves and answer True. Offering a gated type
+at all is the point: the dialect's answer is "this engine cannot tell you",
+which is a fact worth letting a caller ask for and be told, and is not the same
+as an empty list that would read as "it has none".
+
 ## Options
 
 | Option | Default | Description |
@@ -68,6 +97,10 @@ does not exist".
 | `--user`, `--password` | env | Credentials. |
 | `--authenticator` | _None_ | How the user is authenticated. |
 | `--use-async` | off | Drive the asynchronous backend. |
+| `--column` | _None_ | The column a `value-samples` or `join-coverage` question is about. |
+| `--right-table`, `--right-column` | _None_ | The right-hand side of a `join-coverage` question. |
+| `--limit` | `100` | How many values `value-samples` lists when not given. |
+| `--include-system` | off | Include the objects the system itself owns. |
 
 ## Notes
 
@@ -102,4 +135,13 @@ python -m rhosocial.activerecord.backend.impl.snowflake introspect warehouses -o
 
 # One table's storage facts
 python -m rhosocial.activerecord.backend.impl.snowflake introspect table-storage-metrics orders --schema public --database analytics
+
+# What the rows hold, not what the columns declare -- read from the rows, so exact and paid for
+python -m rhosocial.activerecord.backend.impl.snowflake introspect column-profiles orders
+python -m rhosocial.activerecord.backend.impl.snowflake introspect value-samples orders --column status --limit 50
+python -m rhosocial.activerecord.backend.impl.snowflake introspect join-coverage orders --column buyer_id --right-table customers --right-column id
+
+# Questions this dialect declines -- exit 2, "not supported by this server", not an empty list
+python -m rhosocial.activerecord.backend.impl.snowflake introspect unused-indexes
+python -m rhosocial.activerecord.backend.impl.snowflake introspect dependencies
 ```
