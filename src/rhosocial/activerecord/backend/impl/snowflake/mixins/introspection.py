@@ -31,6 +31,7 @@ from rhosocial.activerecord.backend.expression.query_parts import JoinClause, Jo
 from rhosocial.activerecord.backend.expression.sources.derived import DerivedTableSource
 from rhosocial.activerecord.backend.expression.sources.relation import NamedRelationRef
 from rhosocial.activerecord.backend.expression.types.string import VarCharType
+from rhosocial.activerecord.backend.introspection.types import ProfileSource
 
 from ..expression.introspection import (
     SnowflakeDatabaseListQueryStatement,
@@ -852,7 +853,7 @@ class SnowflakeIntrospectionMixin:
                 FunctionCall(self, "MIN", Column(self, column_name)).as_("MIN_VALUE"),
                 FunctionCall(self, "MAX", Column(self, column_name)).as_("MAX_VALUE"),
                 CountFunction(self, RowCountWildcard(self)).as_("ROW_COUNT"),
-                self._profile_label("aggregate", "SOURCE"),
+                self._profile_label(ProfileSource.AGGREGATE.value, "SOURCE"),
             ],
             from_=self._user_relation(table_name, schema=schema),
         )

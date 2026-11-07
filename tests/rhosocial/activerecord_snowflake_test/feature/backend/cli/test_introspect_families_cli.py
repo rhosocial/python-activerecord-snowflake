@@ -435,7 +435,7 @@ class TestTheValueSamplesBranch:
             )
         ]
 
-    def test_the_limit_is_the_introspector_default_when_omitted(self, monkeypatch):
+    def test_no_limit_is_sent_when_the_flag_is_omitted(self, monkeypatch):
         introspector = _RecordingIntrospector({"sample_column_values": []})
 
         _run_sync(
@@ -444,8 +444,10 @@ class TestTheValueSamplesBranch:
             _name_required_argv("value-samples", ["--column", "status"]),
         )
 
-        asserted_limit = introspector.calls[0][2]["limit"]
-        assert asserted_limit == introspect_cli.DEFAULT_VALUE_SAMPLE_LIMIT
+        # Absent ``--limit`` means absent from the call: the introspector's own
+        # signature answers with its own default, and the CLI does not restate
+        # it. A number here would fail the day the signature's default moved.
+        assert "limit" not in introspector.calls[0][2]
 
     def test_the_value_null_is_not_silently_dropped(self, monkeypatch, capsys):
         """A NULL is a legal member of a value domain, often the most interesting."""
