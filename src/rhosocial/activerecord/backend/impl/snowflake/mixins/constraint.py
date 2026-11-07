@@ -13,14 +13,14 @@ happened to say -- and for three of them (the two enforcement probes and the
 deferral probe) core's default licensed a render this backend never measured.
 Every such answer is now a local declaration, stated here rather than inherited.
 
-Evidence level: not server-verified (文档（待云验）)
+Evidence level: not server-verified (文档（待云端验证）)
 --------------------------------------------------
 **Every value below is official-grammar-only.  Nothing here was measured.**
 There is no Snowflake instance reachable from this repository's test environment
 -- no account credentials exist, and the repository has no Snowflake emulator --
 so none of this could be checked against a server even in principle.  The two
 reference pages were transcribed on 2026-10-12 and are named at
-:data:`OFFICIAL_GRAMMAR_URL` and :data:`ALTER_TABLE_GRAMMAR_URL`; a ``待云验``
+:data:`OFFICIAL_GRAMMAR_URL` and :data:`ALTER_TABLE_GRAMMAR_URL`; a ``待云端验证``
 marker means "a real Snowflake run must confirm this before a caller relies on
 it".  The contract tests assert the *declaration*, never the server's agreement
 with it, and every test for this file is render-only -- a rendering assertion
@@ -407,7 +407,7 @@ class SnowflakeConstraintMixin:
         core's formatter actually consults.  Both are ``True`` and both are
         declared, so a change to one cannot silently change the other.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -421,7 +421,7 @@ class SnowflakeConstraintMixin:
         the ``UNIQUE`` branch in ``format_column_constraint``; both are declared
         and both are ``True``.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -448,7 +448,7 @@ class SnowflakeConstraintMixin:
         the odd one out with a single combined ``ENABLE { VALIDATE | NOVALIDATE }``
         property instead of the six the other two branches carry separately.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -478,7 +478,7 @@ class SnowflakeConstraintMixin:
         probe on this core.  Snowflake answers ``True`` at both levels, so the
         coupling costs nothing here.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -500,7 +500,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level or ``naming_*`` yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -513,7 +513,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level or ``naming_*`` yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -535,7 +535,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level or ``naming_*`` yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -548,7 +548,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level or ``naming_*`` yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -582,7 +582,7 @@ class SnowflakeConstraintMixin:
         page brackets it instead; see the module docstring for that conflict.
         Either way core always renders it, so the stricter reading holds.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -593,7 +593,7 @@ class SnowflakeConstraintMixin:
         , ... ] )`` inside ``outoflineUniquePK``, quoted in full at
         :meth:`supports_table_primary_key_constraint`.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -616,7 +616,7 @@ class SnowflakeConstraintMixin:
         specified only in ``CREATE HYBRID TABLE``, never in
         ``ALTER TABLE ... ADD CONSTRAINT``.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -637,7 +637,7 @@ class SnowflakeConstraintMixin:
         the flat probe ``format_column_fk_constraint`` reaches for at column
         level; Snowflake answers ``True`` at both, so the coupling is harmless.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -649,7 +649,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level or ``naming_*`` yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -661,7 +661,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level or ``naming_*`` yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -680,7 +680,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level or ``naming_*`` yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -692,7 +692,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level or ``naming_*`` yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -725,7 +725,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-kind or ``*_constraint_comment`` yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -770,7 +770,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level or per-kind for enforcement yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -783,7 +783,7 @@ class SnowflakeConstraintMixin:
         and inherits every caveat in its docstring, including the note that the
         flat render gate is ``False`` here (``UNIQUE`` is refused by it).
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -806,7 +806,7 @@ class SnowflakeConstraintMixin:
         the render path refuses the spelling; this ``True`` is the grammar record
         and nothing more.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -833,7 +833,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level or per-kind for enforcement yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return False
 
@@ -859,7 +859,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level or per-kind for enforcement yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -871,7 +871,7 @@ class SnowflakeConstraintMixin:
         production, so it covers both kinds.  Same inverted default, same
         standard-table caveat.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -896,7 +896,7 @@ class SnowflakeConstraintMixin:
         ``Default: NOT ENFORCED``; and on a standard table the property does not
         change what is enforced.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -914,7 +914,7 @@ class SnowflakeConstraintMixin:
         set is identical inline and out-of-line, which is what makes CHECK the
         clean case for a per-kind gate rather than a per-level one.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return False
 
@@ -944,7 +944,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level or per-kind for deferral yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -956,7 +956,7 @@ class SnowflakeConstraintMixin:
         ``{ UNIQUE | PRIMARY KEY }`` in the single production, so this is the same
         fact as :meth:`supports_column_deferrable_primary_key_constraint`.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -974,7 +974,7 @@ class SnowflakeConstraintMixin:
         types of constraints that are enforced by Snowflake"), so on a standard
         table the property is metadata there too.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1000,7 +1000,7 @@ class SnowflakeConstraintMixin:
         the grammar record.  Those two are different questions, which is why
         they are kept apart.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return False
 
@@ -1020,7 +1020,7 @@ class SnowflakeConstraintMixin:
         Same inverted ``INITIALLY DEFERRED`` default as the column level; see
         :meth:`supports_column_deferrable_primary_key_constraint`.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1030,7 +1030,7 @@ class SnowflakeConstraintMixin:
         Official grammar: the deferral pair follows
         ``{ UNIQUE | PRIMARY KEY } ( ... )`` in the single production.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1040,7 +1040,7 @@ class SnowflakeConstraintMixin:
         Official grammar: the property block of ``outoflineFK`` is the same six
         optional groups as ``inlineFK``'s.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1056,7 +1056,7 @@ class SnowflakeConstraintMixin:
         Same absence as :meth:`supports_column_deferrable_check_constraint`, at
         the other level.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return False
 
@@ -1095,7 +1095,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level for constraint properties yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1113,7 +1113,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level for constraint properties yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1143,7 +1143,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level for constraint properties yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1161,7 +1161,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level for constraint properties yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1190,7 +1190,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level for constraint properties yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1212,7 +1212,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level for constraint properties yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1242,7 +1242,7 @@ class SnowflakeConstraintMixin:
         Name note: no core probe is per-level for ``fk_match`` yet; the flat
         :meth:`supports_fk_match` is the gate with teeth.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1256,7 +1256,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level for ``fk_match`` yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1284,7 +1284,7 @@ class SnowflakeConstraintMixin:
         Name note: no core probe is per-level for referential actions yet; see
         :meth:`supports_fk_on_update`.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1297,7 +1297,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-level for referential actions yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1347,7 +1347,7 @@ class SnowflakeConstraintMixin:
         Declared locally even though core's default is ``True``: the value is the
         gate on a refusal, so it must be Snowflake's statement.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1366,7 +1366,7 @@ class SnowflakeConstraintMixin:
         Declared locally even though core already answers ``True``: this is the
         gate on the refusal, so the value is load-bearing and must not move.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1381,7 +1381,7 @@ class SnowflakeConstraintMixin:
         ``UnsupportedFeatureError(self.name, "UNIQUE column constraint")`` when it
         declines, so the ``True`` is the gate on that refusal.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1409,7 +1409,7 @@ class SnowflakeConstraintMixin:
           on a standard table, so this is the most load-bearing ``True`` on the
           backend and the one most worth getting right.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1437,7 +1437,7 @@ class SnowflakeConstraintMixin:
         * on a **hybrid** table, a CHECK may be created only in
           ``CREATE HYBRID TABLE``.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1459,7 +1459,7 @@ class SnowflakeConstraintMixin:
         Not enforced on standard tables: see
         :meth:`supports_primary_key_constraint` for the shared caveat.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1482,7 +1482,7 @@ class SnowflakeConstraintMixin:
         Declared ``False`` rather than omitted: Snowflake's clustering keys are
         not exclusion constraints, and nothing on this dialect can express one.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return False
 
@@ -1510,7 +1510,7 @@ class SnowflakeConstraintMixin:
         ``format_references_clause`` raises on.  All three are ``True`` and all
         three are declared.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1525,7 +1525,7 @@ class SnowflakeConstraintMixin:
         ``DDLColumnMixin`` probe that ``format_references_clause`` raises on.
         Both ``True``; both declared.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1563,7 +1563,7 @@ class SnowflakeConstraintMixin:
         Declared locally so the ``True`` is Snowflake's statement rather than a
         side effect of two mixins' base-list order.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1595,7 +1595,7 @@ class SnowflakeConstraintMixin:
         ``INITIALLY``'s inverted default (``INITIALLY DEFERRED``) is recorded at
         :meth:`supports_column_deferrable_primary_key_constraint`.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return False
 
@@ -1636,7 +1636,7 @@ class SnowflakeConstraintMixin:
         already gets ``NOT ENFORCED`` semantics, which is why refusing to spell it
         costs this backend nothing it actually relies on.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return False
 
@@ -1675,7 +1675,7 @@ class SnowflakeConstraintMixin:
         in
         :mod:`~rhosocial.activerecord.backend.impl.snowflake.mixins.ddl`.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return False
 
@@ -1733,7 +1733,7 @@ class SnowflakeConstraintMixin:
         (BigQuery is the mirror image: the operation exists but adds a foreign key
         and nothing else.  SQLite adds none at all -- live-measured 2026-10-11.)
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1755,7 +1755,7 @@ class SnowflakeConstraintMixin:
         Name note: no core probe of this name exists; the guard is a per-branch
         question and this is its record.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return False
 
@@ -1767,7 +1767,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-kind for ADD yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1779,7 +1779,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-kind for ADD yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1803,7 +1803,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-kind for ADD yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1819,7 +1819,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe is per-kind for ADD yet.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1846,7 +1846,7 @@ class SnowflakeConstraintMixin:
         The by-name branch is also what a CHECK constraint must use: *"For CHECK
         constraints, the constraint_name is required."*
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1885,7 +1885,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe of this name exists.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1911,7 +1911,7 @@ class SnowflakeConstraintMixin:
         Name note: no core probe of this name exists; ``format_*`` for a rename
         action is core S1 work.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1952,7 +1952,7 @@ class SnowflakeConstraintMixin:
 
         Name note: no core probe of this name exists.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -1979,7 +1979,7 @@ class SnowflakeConstraintMixin:
         spelling.  Collapsing the two would either license a token that is not in
         the grammar or drop a property that is.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return False
 
@@ -2016,7 +2016,7 @@ class SnowflakeConstraintMixin:
 
         Declared locally: core already answers ``False``; this is the pin.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return False
 
@@ -2046,7 +2046,7 @@ class SnowflakeConstraintMixin:
         separately-rendered clauses with ``" ON "`` twice will produce SQL
         Snowflake does not accept.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 
@@ -2064,7 +2064,7 @@ class SnowflakeConstraintMixin:
         syntax at all -- Snowflake is at the opposite extreme and this is the
         record of it.
 
-        文档（待云验）: grammar-only, not server-verified.
+        文档（待云端验证）: grammar-only, not server-verified.
         """
         return True
 

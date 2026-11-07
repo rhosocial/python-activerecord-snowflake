@@ -6,7 +6,7 @@ repository, so nothing asserted here is a measurement.  Every verdict is read
 off the two official grammar pages transcribed in
 ``impl/snowflake/mixins/constraint.py`` (``create-table-constraint`` for the
 inline/out-of-line productions and ``alter-table`` for ``constraintAction``),
-and each switch's docstring carries that record next to the ``待云验`` marker.
+and each switch's docstring carries that record next to the ``待云端验证`` marker.
 A rendering assertion below pins *what this dialect does with* a switch; it says
 nothing about what a server would do with the SQL.
 
