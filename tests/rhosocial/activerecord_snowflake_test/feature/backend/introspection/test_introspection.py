@@ -4,7 +4,7 @@
 Tests cover:
 - SnowflakeIntrospectionMixin format_*_query methods
 - SnowflakeIntrospectorMixin parse_* methods
-- SyncSnowflakeIntrospector with mock backend
+- SnowflakeIntrospector with mock backend
 - AsyncSnowflakeIntrospector with mock backend
 """
 import pytest
@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.introspection import (
     SnowflakeIntrospectorMixin,
-    SyncSnowflakeIntrospector,
+    SnowflakeIntrospector,
     AsyncSnowflakeIntrospector,
 )
 from rhosocial.activerecord.backend.introspection.types import (
@@ -22,7 +22,7 @@ from rhosocial.activerecord.backend.introspection.types import (
     ColumnNullable,
     ReferentialAction,
 )
-from rhosocial.activerecord.backend.introspection.executor import SyncIntrospectorExecutor
+from rhosocial.activerecord.backend.introspection.executor import IntrospectorExecutor
 
 
 @pytest.fixture
@@ -713,11 +713,11 @@ class TestSnowflakeCatalogSizeReachesParseType:
 
 
 # ================================================================== #
-# Tests for SyncSnowflakeIntrospector with mock executor
+# Tests for SnowflakeIntrospector with mock executor
 # ================================================================== #
 
-class TestSyncSnowflakeIntrospector:
-    """Test SyncSnowflakeIntrospector end-to-end with mock executor."""
+class TestSnowflakeIntrospector:
+    """Test SnowflakeIntrospector end-to-end with mock executor."""
 
     @pytest.fixture
     def mock_backend(self):
@@ -731,11 +731,11 @@ class TestSyncSnowflakeIntrospector:
 
     @pytest.fixture
     def mock_executor(self):
-        return MagicMock(spec=SyncIntrospectorExecutor)
+        return MagicMock(spec=IntrospectorExecutor)
 
     @pytest.fixture
     def introspector(self, mock_backend, mock_executor):
-        return SyncSnowflakeIntrospector(mock_backend, mock_executor)
+        return SnowflakeIntrospector(mock_backend, mock_executor)
 
     def test_default_schema(self, introspector):
         assert introspector.default_schema == "PUBLIC"
@@ -896,3 +896,63 @@ class TestSnowflakeAsyncExecutor:
 
         assert result == []
         mock_cursor.close.assert_called_once()
+
+class TestTableStorageNarrowSlot:
+    """The four billed tiers sum onto the common minimum's total slot.
+
+    The single-table read answers ``size_bytes`` from the tiers; the listing
+    deliberately stays unjoined (the metrics statement joins two views, and
+    the view answers only for ACCOUNTADMIN -- see the CLI README). The split
+    slots have no sum to carry: managed micro-partition storage has no index
+    side to separate.
+    """
+
+    def test_the_family_probe_is_declared(self, dialect):
+        assert dialect.supports_table_storage_introspection() is True
+
+    def test_the_own_metrics_family_stays_a_family_of_its_own(self, dialect):
+        assert dialect.supports_table_storage_metrics() is True
+
+    def test_the_four_tiers_sum_to_the_total(self):
+        from rhosocial.activerecord.backend.impl.snowflake.introspection.types import (
+            SnowflakeTableStorageMetrics,
+        )
+
+        metrics = SnowflakeTableStorageMetrics(
+            table_name="T",
+            active_bytes=100,
+            time_travel_bytes=20,
+            failsafe_bytes=5,
+            retained_for_clone_bytes=1,
+        )
+        assert SnowflakeIntrospector.parse_storage_total(metrics) == 126
+
+    def test_a_role_that_may_not_see_the_metrics_answers_none(self):
+        """Absent metrics and a role without visibility are the same None
+        from this view, and the slot reports None rather than zero."""
+        assert SnowflakeIntrospector.parse_storage_total(None) is None
+
+    def test_empty_tiers_are_zero_not_none(self):
+        """A visible table with no billed bytes is zero; that is a fact,
+        unlike the invisible case."""
+        from rhosocial.activerecord.backend.impl.snowflake.introspection.types import (
+            SnowflakeTableStorageMetrics,
+        )
+
+        assert (
+            SnowflakeIntrospector.parse_storage_total(
+                SnowflakeTableStorageMetrics(table_name="T")
+            )
+            == 0
+        )
+
+    def test_every_cli_type_names_a_switch_the_dialect_has(self, dialect):
+        """The mechanical check the core rules added: a type cannot be
+        offered without an answer behind it."""
+        from rhosocial.activerecord.backend.impl.snowflake.cli.introspect import (
+            _TYPE_CAPABILITIES,
+        )
+
+        for cli_type, switch in _TYPE_CAPABILITIES.items():
+            assert hasattr(dialect, switch), cli_type
+

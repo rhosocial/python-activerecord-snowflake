@@ -7,13 +7,13 @@ column class the type gets on Snowflake. There is no inherited table in core to
 override -- a table there would be a guess about a server core has never seen --
 so the whole answer lives here, and every entry is answered deliberately.
 
-Evidence level: 文档（待云验）
+Evidence level: 文档（待云端验证）
 ---------------------------
 **Every entry in this module is read from Snowflake's official documentation.
 No Snowflake instance was reachable while this table was written, so nothing
 here is 活验-backed.** Each entry group below carries the URL it was read from,
 and the ones whose answer is a *judgement* rather than a fact are marked
-provisional. A cloud probe is what turns any of these from 文档（待云验） into
+provisional. A cloud probe is what turns any of these from 文档（待云端验证） into
 实测; until then this table is the backend's stated position, not a verified
 one.
 
@@ -71,20 +71,20 @@ here as prose rather than as code:
   case-insensitive comparison to determine whether a string matches", with its
   own ``ESCAPE`` clause. Five of the ten backends have to synthesise it as
   ``LOWER(x) LIKE LOWER(y)`` and pay for it; this one does not.
-  文档（待云验）<https://docs.snowflake.com/en/sql-reference/functions/ilike>
+  文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/functions/ilike>
 * the JSON path operations ``json_path`` / ``json_value`` -- served by
   ``GET_PATH`` and its ``:`` shorthand, which the reference defines for "An
   expression that evaluates to a VARIANT, OBJECT, or ARRAY column" and which
   this dialect already renders
   (:attr:`~.capabilities.SnowflakeCapabilityMixin._JSON_FUNCTION_NAMES`).
-  文档（待云验）<https://docs.snowflake.com/en/sql-reference/functions/get_path>
+  文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/functions/get_path>
 
 **One probe was left open rather than answered, and stays open.** Core's
 ``ArrayColumn`` offers ``array_length`` and ``unnest``, which render
 ``ARRAY_LENGTH(col, dim)`` and ``UNNEST(col)``. Snowflake's documented
 spellings are ``ARRAY_SIZE`` and the ``FLATTEN`` *table* function, and neither
 core name appears in the reference's function index. Absence from an index is
-not proof of absence, so this is recorded as a **待云验** probe: render
+not proof of absence, so this is recorded as a **待云端验证** probe: render
 ``ARRAY_LENGTH`` against a live instance, and if it is rejected, the array
 surface is unavailable before 议题 B is settled and the explicit
 ``UseColumnType(ArrayColumn)`` escape hatch goes with it.
@@ -113,7 +113,7 @@ from rhosocial.activerecord.backend.expression.column_types import (
 
 #: The evidence level of this whole table, stated once so a reader (and a test)
 #: can find it without reading every entry. See the module docstring.
-SNOWFLAKE_COLUMN_TYPE_EVIDENCE = "文档（待云验）"
+SNOWFLAKE_COLUMN_TYPE_EVIDENCE = "文档（待云端验证）"
 
 #: The entries whose answer is a provisional decision rather than a settled
 #: one, because 议题 B (Snowflake's VARIANT / OBJECT / ARRAY concepts) has not
@@ -135,7 +135,7 @@ SNOWFLAKE_PROVISIONAL_COLUMN_TYPES: Tuple[Any, ...] = (
 #: carries bytes; ``STRING``/``TEXT`` are listed as "Synonymous with
 #: VARCHAR" and ``VARBINARY`` as "Synonymous with BINARY", which is a
 #: storage fact and changes no text or byte operation.
-#: 文档（待云验）<https://docs.snowflake.com/en/sql-reference/data-types-text>
+#: 文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/data-types-text>
 SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     str: StringColumn,
     bytes: BinaryColumn,
@@ -152,7 +152,7 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     # being one 64-bit storage type is likewise a DDL-side collapse (the
     # DataType layer renders the requested spelling) and does not make a
     # float behave differently here.
-    # 文档（待云验）<https://docs.snowflake.com/en/sql-reference/data-types-numeric>
+    # 文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/data-types-numeric>
     int: IntegerColumn,
     decimal.Decimal: NumericColumn,
     float: NumericColumn,
@@ -160,7 +160,7 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     # which "can have TRUE or FALSE values" plus NULL for UNKNOWN, and is
     # usable in both expressions and predicates -- so the boolean family
     # needs no substitute here.
-    # 文档（待云验）<https://docs.snowflake.com/en/sql-reference/data-types-logical>
+    # 文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/data-types-logical>
     bool: BooleanColumn,
     # **Group 4 -- date and time.** ``DATE``, ``TIME``, and the three
     # ``TIMESTAMP_*`` variants are distinct server types, and ``TIMESTAMP``
@@ -171,7 +171,7 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     # it too; the split is a core gap, not a Snowflake one. Which variant
     # a *value* gets -- ``TIMESTAMP_NTZ`` for a naive datetime,
     # ``TIMESTAMP_TZ`` for an aware one -- is the DataType layer's decision.
-    # 文档（待云验）<https://docs.snowflake.com/en/sql-reference/data-types-datetime>
+    # 文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/data-types-datetime>
     datetime.date: TimestampColumn,
     datetime.time: TimestampColumn,
     datetime.datetime: TimestampColumn,
@@ -186,7 +186,7 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     # values can't contain interval values", and clustered tables, dynamic
     # tables and Iceberg tables "can't have interval columns". If core ever
     # adds an interval column class, this cell is the one to revisit.
-    # 文档（待云验）<https://docs.snowflake.com/en/sql-reference/data-types-datetime>
+    # 文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/data-types-datetime>
     datetime.timedelta: NumericColumn,
     # **Group 6 -- UUID.** ``UUIDColumn`` at every version. Core's
     # ``UUIDColumn`` carries no UUID-specific operator (portable SQL has
@@ -194,7 +194,7 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     # changes the DDL spelling and nothing on the operation side -- the
     # version gate lives in ``SNOWFLAKE_UUID_TYPE_MIN_VERSION`` and has no
     # business branching this table.
-    # 文档（待云验）<https://docs.snowflake.com/en/sql-reference/data-types-uuid>
+    # 文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/data-types-uuid>
     uuid.UUID: UUIDColumn,
     # **Group 7 -- semi-structured documents. 🔶 PROVISIONAL, pending 议题 B.**
     # A ``dict`` is a document; the DDL layer spells it ``VARIANT`` and the
@@ -202,7 +202,7 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     # of which take "An expression that evaluates to a VARIANT, OBJECT, or
     # ARRAY column". ``OBJECT`` would serve the same operations, but
     # choosing between the two is 议题 B's question, not this table's.
-    # 文档（待云验）<https://docs.snowflake.com/en/sql-reference/functions/get_path>
+    # 文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/functions/get_path>
     dict: JSONColumn,
     # **Group 8 -- sequences. 🔶 PROVISIONAL, pending 议题 B.**
     # Snowflake's ``ARRAY`` is a real type and its function family
@@ -217,7 +217,7 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     # container, ``ARRAY(<element type>)``, is not modelled by this backend
     # either. Declaring ``UseColumnType(ArrayColumn)`` explicitly remains
     # the way to ask for the array surface before 议题 B is decided.
-    # 文档（待云验）<https://docs.snowflake.com/en/sql-reference/data-types-semistructured>
+    # 文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/data-types-semistructured>
     list: JSONColumn,
     tuple: JSONColumn,
     set: JSONColumn,
@@ -225,7 +225,7 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     # **Group 9 -- enumerations.** Snowflake has no ``ENUM`` type -- it is
     # absent from the summary-of-data-types table -- so an enum is carried
     # as text, which is what ``StringColumn`` means everywhere.
-    # 文档（待云验）<https://docs.snowflake.com/en/sql-reference/intro-summary-data-types>
+    # 文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/intro-summary-data-types>
     enum.Enum: StringColumn,
 }
 

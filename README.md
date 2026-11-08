@@ -191,9 +191,10 @@ PYTHONPATH=tests .venv3.14-ubuntu26.04/bin/pytest \
 
 ## Documentation
 
-This repository has no `docs/` tree. Backend notes live in
-[.claude/snowflake_backend.md](.claude/snowflake_backend.md) and
-[.claude/testing.md](.claude/testing.md); core library documentation is at
+Backend notes live in [.claude/snowflake_backend.md](.claude/snowflake_backend.md)
+and [.claude/testing.md](.claude/testing.md). The one page of backend
+documentation is [docs/introspection.md](docs/introspection.md), which states
+what this backend answers and what it declines. Core library documentation is at
 [python-activerecord/docs](https://github.com/rhosocial/python-activerecord/tree/main/docs).
 
 ## Contributing

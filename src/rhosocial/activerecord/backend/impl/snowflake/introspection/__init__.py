@@ -1,13 +1,13 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/introspection/__init__.py
 """Snowflake introspection package.
 
-Provides SyncSnowflakeIntrospector and AsyncSnowflakeIntrospector
+Provides SnowflakeIntrospector and AsyncSnowflakeIntrospector
 for querying Snowflake metadata via INFORMATION_SCHEMA.
 """
 
 from .introspector import (
     SnowflakeIntrospectorMixin,
-    SyncSnowflakeIntrospector,
+    SnowflakeIntrospector,
     AsyncSnowflakeIntrospector,
 )
 from .types import (
@@ -19,7 +19,7 @@ from .types import (
 
 __all__ = [
     "SnowflakeIntrospectorMixin",
-    "SyncSnowflakeIntrospector",
+    "SnowflakeIntrospector",
     "AsyncSnowflakeIntrospector",
     "SnowflakeDatabaseInfo",
     "SnowflakeSchemaInfo",

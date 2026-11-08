@@ -188,7 +188,10 @@ from rhosocial.activerecord.backend.expression.statements.dml import (
     MergeAction,
     MergeActionType,
 )
-from rhosocial.activerecord.backend.expression.statements.dql import QueryStatement
+from rhosocial.activerecord.backend.expression.statements.dql import (
+    QueryStatement,
+    SetOperationStatement,
+)
 from rhosocial.activerecord.backend.expression.types import (
     ArrayType,
     IntegerType,
@@ -733,6 +736,22 @@ def register_specials():
             right=QueryStatement(d, select=[Column(d, "id")]),
         ),
     )
+    # The statement half of the same pair: the word-form enum refuses the
+    # guess's bare string at construction, and Snowflake spells a compound
+    # SELECT, so a factory turns it into an instance the matrix can assert.
+    register_special_constructor(
+        "statements.dql.SetOperationStatement",
+        lambda d: SetOperationStatement(
+            d,
+            op="union_all",
+            parts=[
+                QueryStatement(d, select=[Column(d, "id")], from_=_table_obj(d)),
+                QueryStatement(
+                    d, select=[Column(d, "id")], from_=_table_obj(d, "other")
+                ),
+            ],
+        ),
+    )
 
 # -- expressions that need at least one member --------------------------
     register_special_constructor(
@@ -1231,6 +1250,35 @@ _NO_FORMAT_METHOD_NAME = "does not declare its dialect formatting method name"
 _NO_GENERIC_TYPE = "does not support the generic type"
 
 LEGITIMATE_NON_RENDERS = {
+    # ---- core data-profile families this dialect answers by aggregating ----
+    #  ``ColumnDataProfileQueryStatement``, ``ColumnValueSampleQueryStatement``
+    #  and ``JoinCoverageQueryStatement`` used to be pinned here: Snowflake has
+    #  no per-column statistics catalogue, and the probes answered False. They
+    #  render now, because the rows themselves answer -- one ``UNION ALL`` arm
+    #  per column, each a full scan of the table -- so the entries are gone and
+    #  the matrix asserts the rendered statements instead.
+    "rhosocial.activerecord.backend.expression.introspection.UnusedIndexesQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
+    "rhosocial.activerecord.backend.expression.introspection.TableUsageStatsQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
+    # ---- core operational families this dialect does not answer ----
+    #  Snowflake's use statistics live in ACCOUNT_USAGE views with latency
+    #  and retention semantics of their own, not a catalogue a schema name
+    #  addresses. The probes answer False.
+    "rhosocial.activerecord.backend.expression.introspection.RuntimeMetricsQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
+    "rhosocial.activerecord.backend.expression.introspection.IndexUsageStatsQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
+    "rhosocial.activerecord.backend.expression.introspection.ObjectDependencyQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
+    "rhosocial.activerecord.backend.expression.introspection.DDLStatementQueryStatement": (
+        ProtocolNotImplementedError, 'does not implement ',
+    ),
     # ---- roots that name an expression category, not a renderable thing ----
     # Each is a base class that deliberately declares no ``format_method``, so
     # ``to_sql()`` reports that there is nothing to dispatch. They are not
@@ -1755,6 +1803,95 @@ def _assert_pinned_non_render(fqn, exc):
 def dialect():
     """A Snowflake dialect. Needs no connection and no warehouse."""
     return SnowflakeDialect(version=DIALECT_VERSION)
+
+
+# ---------------------------------------------------------------------------
+# The set-operation statement, rendered
+# ---------------------------------------------------------------------------
+#
+# The matrix says ``SetOperationStatement`` renders, which is a verdict about
+# the dialect rather than a claim about the bytes, so the bytes are pinned here.
+# Snowflake double-quotes its identifiers and its set operators include
+# ``INTERSECT`` and ``EXCEPT``, neither of them version-gated in this dialect.
+# The ``all`` word is a second axis: the plain ``UNION`` over the same arms must
+# render, and must spell something different.
+
+
+def _compound_arms(d):
+    """Two single-column SELECTs over two tables, no bind parameters."""
+    return [
+        QueryStatement(d, select=[Column(d, "id")], from_=_table_obj(d)),
+        QueryStatement(d, select=[Column(d, "id")], from_=_table_obj(d, "other")),
+    ]
+
+
+class TestSetOperationStatementRenders:
+    """Pin the SQL the compound SELECT actually renders on Snowflake."""
+
+    def test_union_all_renders_the_pinned_sql(self, dialect):
+        node = SetOperationStatement(
+            dialect, op="union_all", parts=_compound_arms(dialect)
+        )
+
+        rendered, params = node.to_sql()
+
+        assert rendered == 'SELECT "id" FROM "t" UNION ALL SELECT "id" FROM "other"'
+        assert params == ()
+
+    def test_union_renders_a_different_keyword(self, dialect):
+        """Same arms, different word, different SQL -- otherwise nothing is
+        proven by the second test."""
+        node = SetOperationStatement(
+            dialect, op="union", parts=_compound_arms(dialect)
+        )
+
+        rendered, params = node.to_sql()
+
+        assert rendered == 'SELECT "id" FROM "t" UNION SELECT "id" FROM "other"'
+        assert params == ()
+
+    def test_parameters_concatenate_in_part_order(self, dialect):
+        """Each arm's parameters arrive in the order the operator joins them."""
+        parts = [
+            QueryStatement(
+                dialect,
+                select=[Column(dialect, "id"), Literal(dialect, 1)],
+                from_=_table_obj(dialect),
+                where=ComparisonPredicate(
+                    dialect, "=", Column(dialect, "id"), Literal(dialect, 5)
+                ),
+            ),
+            QueryStatement(
+                dialect,
+                select=[Column(dialect, "id"), Literal(dialect, 2)],
+                from_=_table_obj(dialect, "u"),
+            ),
+        ]
+        node = SetOperationStatement(dialect, op="union_all", parts=parts)
+
+        rendered, params = node.to_sql()
+
+        assert rendered == (
+            'SELECT "id", %s FROM "t" WHERE "id" = %s '
+            "UNION ALL "
+            'SELECT "id", %s FROM "u"'
+        )
+        assert params == (1, 5, 2)
+
+    @pytest.mark.parametrize("op, keyword", [
+        ("intersect", "INTERSECT"),
+        ("except", "EXCEPT"),
+    ])
+    def test_the_other_two_operators_render(self, dialect, op, keyword):
+        """Both spell the keyword directly, with no version gate on Snowflake."""
+        node = SetOperationStatement(dialect, op=op, parts=_compound_arms(dialect))
+
+        rendered, params = node.to_sql()
+
+        assert rendered == (
+            f'SELECT "id" FROM "t" {keyword} SELECT "id" FROM "other"'
+        )
+        assert params == ()
 
 
 #: Node ids for the parameterised fixture. The last two dotted segments of the

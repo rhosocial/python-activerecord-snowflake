@@ -2,7 +2,7 @@
 """
 Snowflake concrete introspectors.
 
-Implements SyncAbstractIntrospector and AsyncAbstractIntrospector for Snowflake
+Implements AbstractIntrospector and AsyncAbstractIntrospector for Snowflake
 databases using the INFORMATION_SCHEMA system views for metadata queries.
 
 The introspectors are exposed via ``backend.introspector``.
@@ -21,7 +21,7 @@ Key behaviours:
   - Snowflake does not have traditional indexes; constraints are used instead
 
 Design principle: Sync and Async are separate and cannot coexist.
-- SyncSnowflakeIntrospector: for synchronous backends
+- SnowflakeIntrospector: for synchronous backends
 - AsyncSnowflakeIntrospector: for asynchronous backends
 """
 
@@ -31,29 +31,30 @@ import warnings
 from typing import Any, Dict, List, Optional
 
 from rhosocial.activerecord.backend.introspection.base import (
-    IntrospectorMixin,
-    SyncAbstractIntrospector,
+    AbstractIntrospector,
     AsyncAbstractIntrospector,
+    IntrospectorBase,
+    IntrospectorMixin,
 )
 from rhosocial.activerecord.backend.introspection.cache import (
     IntrospectionCache,
 )
 from rhosocial.activerecord.backend.introspection.executor import (
-    SyncIntrospectorExecutor,
+    IntrospectorExecutor,
 )
 from rhosocial.activerecord.backend.introspection.types import (
-    IntrospectionDatabaseInfo,
-    IntrospectionTableInfo,
-    IntrospectionColumnInfo,
     ColumnNullable,
-    IndexInfo,
     IndexColumnInfo,
+    IndexInfo,
     IndexType,
+    IntrospectionColumnInfo,
+    IntrospectionDatabaseInfo,
     IntrospectionForeignKeyInfo,
-    ReferentialAction,
-    IntrospectionViewInfo,
-    IntrospectionTriggerInfo,
     IntrospectionScope,
+    IntrospectionTableInfo,
+    IntrospectionTriggerInfo,
+    IntrospectionViewInfo,
+    ReferentialAction,
 )
 
 from ..expression.introspection import (
@@ -74,7 +75,7 @@ from .types import (
 class SnowflakeIntrospectorMixin(IntrospectorMixin):
     """Mixin providing shared Snowflake-specific introspection logic.
 
-    Both SyncSnowflakeIntrospector and AsyncSnowflakeIntrospector inherit
+    Both SnowflakeIntrospector and AsyncSnowflakeIntrospector inherit
     from this mixin to share:
     - Default schema handling
     - Snowflake version detection
@@ -91,10 +92,9 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         Snowflake uses a three-level namespace: database.schema.table.
         The schema is configured in the connection config.
         """
-        if hasattr(self._backend, 'config') and self._backend.config:
-            schema = (
-                getattr(self._backend.config, 'schema', None)
-                or getattr(self._backend.config, 'schema_name', None)
+        if hasattr(self._backend, "config") and self._backend.config:
+            schema = getattr(self._backend.config, "schema", None) or getattr(
+                self._backend.config, "schema_name", None
             )
             return schema or ""
         return ""
@@ -113,9 +113,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         """
         version = self.server_version
         version_tuple = version if version is not None else (0, 0, 0)
-        version_str = (
-            "unknown" if version is None else ".".join(str(v) for v in version)
-        )
+        version_str = "unknown" if version is None else ".".join(str(v) for v in version)
         db_name = self.default_schema
 
         db_row = rows[0] if rows else {}
@@ -311,6 +309,30 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             )
         return warehouses
 
+    @staticmethod
+    def parse_storage_total(metrics: Optional["SnowflakeTableStorageMetrics"]) -> Optional[int]:
+        """The common minimum's total, summed from the four billed tiers.
+
+        ``active`` + ``time travel`` + ``failsafe`` + ``clone-retained`` is
+        the table's whole retained footprint, which is what
+        ``IntrospectionTableInfo.size_bytes`` carries. ``None`` metrics --
+        which for this view also means "this role may not see the metrics"
+        -- answer ``None``: not stored and not visible are different
+        answers, and the second is the one this slot reports.
+
+        The split slots have no such sum to carry: managed micro-partition
+        storage has no index side, so they stay ``None`` wherever the total
+        is filled.
+        """
+        if metrics is None:
+            return None
+        return (
+            metrics.active_bytes
+            + metrics.time_travel_bytes
+            + metrics.failsafe_bytes
+            + metrics.retained_for_clone_bytes
+        )
+
     def parse_table_storage_metrics(
         self,
         rows: List[Dict[str, Any]],
@@ -361,10 +383,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             active_bytes=self._as_int(row.get("ACTIVE_BYTES")) or 0,
             time_travel_bytes=self._as_int(row.get("TIME_TRAVEL_BYTES")) or 0,
             failsafe_bytes=self._as_int(row.get("FAILSAFE_BYTES")) or 0,
-            retained_for_clone_bytes=self._as_int(
-                row.get("RETAINED_FOR_CLONE_BYTES")
-            )
-            or 0,
+            retained_for_clone_bytes=self._as_int(row.get("RETAINED_FOR_CLONE_BYTES")) or 0,
             row_count=self._as_int(row.get("ROW_COUNT")),
             clustering_key=row.get("CLUSTERING_KEY"),
             auto_clustering_on=self._as_flag(row.get("AUTO_CLUSTERING_ON")),
@@ -581,9 +600,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         # on, and :meth:`parse_data_type` is where the unreadable type is
         # reported and degraded to ``None`` for that one column.
         try:
-            concept = getattr(
-                DataType.parse_data_type_str(dialect, word), "name", None
-            )
+            concept = getattr(DataType.parse_data_type_str(dialect, word), "name", None)
         except Exception:  # noqa: BLE001 -- see the docstring
             concept = None
         width_column = self._SNOW_WIDTH_COLUMN.get(concept)
@@ -605,9 +622,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         return word
 
     @staticmethod
-    def parse_data_type(
-        composed: str, row: Dict[str, Any], dialect: Any
-    ) -> Optional[Any]:
+    def parse_data_type(composed: str, row: Dict[str, Any], dialect: Any) -> Optional[Any]:
         """Read one composed catalog type string into a ``DataType``, or ``None``.
 
         ``IntrospectionColumnInfo.parsed_data_type`` is ``None`` for exactly one reason --
@@ -661,9 +676,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             # are for: the string core's differ falls back to when a type cannot
             # be parsed is the word, and the composed spelling is the one that
             # says how wide the column is.
-            composed = (
-                self._catalog_type_string(row, dialect) if dialect else data_type
-            )
+            composed = self._catalog_type_string(row, dialect) if dialect else data_type
             columns.append(
                 IntrospectionColumnInfo(
                     name=row["COLUMN_NAME"],
@@ -673,9 +686,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
                     data_type=data_type.lower(),
                     data_type_full=composed,
                     parsed_data_type=(
-                        self.parse_data_type(composed, row, dialect)
-                        if dialect
-                        else None
+                        self.parse_data_type(composed, row, dialect) if dialect else None
                     ),
                     nullable=nullable,
                     default_value=row.get("COLUMN_DEFAULT"),
@@ -755,14 +766,10 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
                     referenced_columns=[],
                 )
             fk_map[fk_name].columns.append(row.get("COLUMN_NAME", ""))
-            fk_map[fk_name].referenced_columns.append(
-                row.get("REFERENCED_COLUMN_NAME", "")
-            )
+            fk_map[fk_name].referenced_columns.append(row.get("REFERENCED_COLUMN_NAME", ""))
         return list(fk_map.values())
 
-    def parse_views(
-        self, rows: List[Dict[str, Any]], schema: str
-    ) -> List[IntrospectionViewInfo]:
+    def parse_views(self, rows: List[Dict[str, Any]], schema: str) -> List[IntrospectionViewInfo]:
         return [
             IntrospectionViewInfo(
                 name=row.get("TABLE_NAME", ""),
@@ -797,10 +804,86 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         """Snowflake does not support triggers; always returns empty list."""
         return []
 
+    def parse_column_data_profiles(
+        self,
+        rows: List[Dict[str, Any]],
+        schema: str,
+        table_name: str,
+    ) -> List[Any]:
+        """Project the profile rows, whatever case their names arrive in.
 
-class SyncSnowflakeIntrospector(
-    SnowflakeIntrospectorMixin, SyncAbstractIntrospector
-):
+        This override exists because of one Snowflake rule and one testing
+        fact. The rule: an unquoted identifier is folded to upper case by the
+        service, and the aggregate profile's aliases are written the way the
+        rest of this mixin writes result names -- ``COLUMN_NAME``,
+        ``NULL_COUNT`` -- so the columns come back upper-cased. The testing
+        fact: the local emulator this repository can run without an account
+        preserves the alias exactly as written, so the very same statement can
+        arrive lower-cased there. Lower-casing the keys makes one shape out of
+        two, which is what :meth:`_upper_row` does in the opposite direction for
+        ``SHOW`` output, and the core parser then reads the names it documents.
+
+        Values are untouched: only the keys are casing.
+
+        The base implementation is named rather than reached through
+        ``super()``: this mixin is instantiated on its own by this
+        repository's parser tests, and there ``super()`` would find nothing
+        that answers.
+        """
+        normalized = [{str(key).lower(): value for key, value in row.items()} for row in rows or []]
+        return IntrospectorBase.parse_column_data_profiles(self, normalized, schema, table_name)
+
+    def parse_column_value_samples(self, rows: List[Dict[str, Any]]) -> List[Any]:
+        """Project a value listing whose column names may be upper-cased.
+
+        The same normalisation as :meth:`parse_column_data_profiles`, for the
+        same reason: the listing's aliases are written in the upper case the
+        service stores them in, and the emulator preserves whatever case the
+        statement used. The listing's *values* are not touched -- and a NULL
+        value is kept, because NULL is a legitimate and often the most
+        frequent member of a column's domain.
+
+        The base implementation is named rather than reached through
+        ``super()``: this mixin is instantiated on its own by this
+        repository's parser tests, and there ``super()`` would find nothing
+        that answers.
+        """
+        normalized = [{str(key).lower(): value for key, value in row.items()} for row in rows or []]
+        return IntrospectorBase.parse_column_value_samples(self, normalized)
+
+    def parse_join_coverage(
+        self,
+        rows: List[Dict[str, Any]],
+        *,
+        left_table: str,
+        left_column: str,
+        right_table: str,
+        right_column: str,
+        schema: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Project the single overlap row, normalising its column names.
+
+        Both fractions are read from one row, so the two ``NULLIF``-guarded
+        denominators and the two intersections have already been resolved by
+        the server; what is left is naming the four columns the caller asked
+        about, which the core parser does. The key normalisation is the same
+        one the two parsers above perform, and it matters more here: a missing
+        key reads as "no measurement", which is an answer a caller must be able
+        to tell apart from zero overlap.
+        """
+        normalized = [{str(key).lower(): value for key, value in row.items()} for row in rows or []]
+        return IntrospectorBase.parse_join_coverage(
+            self,
+            normalized,
+            left_table=left_table,
+            left_column=left_column,
+            right_table=right_table,
+            right_column=right_column,
+            schema=schema,
+        )
+
+
+class SnowflakeIntrospector(SnowflakeIntrospectorMixin, AbstractIntrospector):
     """Synchronous introspector for Snowflake backends.
 
     Access via ``backend.introspector``::
@@ -812,7 +895,7 @@ class SyncSnowflakeIntrospector(
     def __init__(
         self,
         backend: Any,
-        executor: SyncIntrospectorExecutor,
+        executor: IntrospectorExecutor,
         cache: Optional[IntrospectionCache] = None,
     ) -> None:
         super().__init__(backend, executor, cache)
@@ -820,9 +903,7 @@ class SyncSnowflakeIntrospector(
     def get_table_info(
         self, table_name: str, schema: Optional[str] = None
     ) -> Optional[IntrospectionTableInfo]:
-        key = self._cache.key(
-            IntrospectionScope.TABLE, table_name, schema=schema
-        )
+        key = self._cache.key(IntrospectionScope.TABLE, table_name, schema=schema)
         cached = self._cache.get(key)
         if cached is not None:
             return cached
@@ -836,6 +917,13 @@ class SyncSnowflakeIntrospector(
         table.columns = self.list_columns(table_name, schema)
         table.indexes = self.list_indexes(table_name, schema)
         table.foreign_keys = self.list_foreign_keys(table_name, schema)
+        if self.dialect.supports_table_storage_introspection():
+            # The one-table read answers the common minimum's total from the
+            # billed tiers; the listing deliberately does not -- see
+            # supports_table_storage_introspection and the CLI README.
+            table.size_bytes = self.parse_storage_total(
+                self.get_table_storage_metrics(table_name, schema)
+            )
         self._cache.set(key, table)
         return table
 
@@ -886,15 +974,11 @@ class SyncSnowflakeIntrospector(
         it, because that parameter names the schema of the *requested*
         objects, and here the database is the container being enumerated.
         """
-        key = self._cache.key(
-            IntrospectionScope.SCHEMA, database or "*", extra="schemas"
-        )
+        key = self._cache.key(IntrospectionScope.SCHEMA, database or "*", extra="schemas")
         cached = self._cache.get(key)
         if cached is not None:
             return cached
-        sql, params = SnowflakeSchemaListQueryStatement(
-            self.dialect, database=database
-        ).to_sql()
+        sql, params = SnowflakeSchemaListQueryStatement(self.dialect, database=database).to_sql()
         result = self.parse_schemas(self._executor.execute(sql, params))
         self._cache.set(key, result)
         return result
@@ -987,11 +1071,9 @@ class _SnowflakeAsyncIntrospectorExecutor:
 
     def __init__(self, backend: Any) -> None:
         self._backend = backend
-        self._executor = getattr(backend, '_executor', None)
+        self._executor = getattr(backend, "_executor", None)
 
-    async def execute(
-        self, sql: str, params: tuple = ()
-    ) -> List[Dict[str, Any]]:
+    async def execute(self, sql: str, params: tuple = ()) -> List[Dict[str, Any]]:
         """Execute SQL in a thread pool and return rows as dicts."""
         loop = asyncio.get_event_loop()
         conn = self._backend._connection
@@ -1002,9 +1084,7 @@ class _SnowflakeAsyncIntrospectorExecutor:
                 cursor.execute(sql, params)
                 if cursor.description:
                     columns = [desc[0] for desc in cursor.description]
-                    return [
-                        dict(zip(columns, row)) for row in cursor.fetchall()
-                    ]
+                    return [dict(zip(columns, row)) for row in cursor.fetchall()]
                 return []
             finally:
                 cursor.close()
@@ -1012,9 +1092,7 @@ class _SnowflakeAsyncIntrospectorExecutor:
         return await loop.run_in_executor(self._executor, _run)
 
 
-class AsyncSnowflakeIntrospector(
-    SnowflakeIntrospectorMixin, AsyncAbstractIntrospector
-):
+class AsyncSnowflakeIntrospector(SnowflakeIntrospectorMixin, AsyncAbstractIntrospector):
     """Asynchronous introspector for Snowflake backends.
 
     Uses a thread-pool-based executor since snowflake-connector-python
@@ -1035,9 +1113,7 @@ class AsyncSnowflakeIntrospector(
     async def get_table_info(
         self, table_name: str, schema: Optional[str] = None
     ) -> Optional[IntrospectionTableInfo]:
-        key = self._cache.key(
-            IntrospectionScope.TABLE, table_name, schema=schema
-        )
+        key = self._cache.key(IntrospectionScope.TABLE, table_name, schema=schema)
         cached = self._cache.get(key)
         if cached is not None:
             return cached
@@ -1051,6 +1127,11 @@ class AsyncSnowflakeIntrospector(
         table.columns = await self.list_columns(table_name, schema)
         table.indexes = await self.list_indexes(table_name, schema)
         table.foreign_keys = await self.list_foreign_keys(table_name, schema)
+        if self.dialect.supports_table_storage_introspection():
+            # The async twin of the sync fill: same tiers, awaited.
+            table.size_bytes = self.parse_storage_total(
+                await self.get_table_storage_metrics(table_name, schema)
+            )
         self._cache.set(key, table)
         return table
 
@@ -1062,7 +1143,7 @@ class AsyncSnowflakeIntrospector(
     async def list_databases(self) -> List[SnowflakeDatabaseInfo]:
         """List every database the session's role can see.
 
-        Asynchronous twin of :meth:`SyncSnowflakeIntrospector.list_databases`;
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_databases`;
         the SQL, parsing and cache key are shared through the mixin, so only
         the ``await`` differs.
         """
@@ -1075,22 +1156,16 @@ class AsyncSnowflakeIntrospector(
         self._cache.set(key, result)
         return result
 
-    async def list_schemas(
-        self, database: Optional[str] = None
-    ) -> List[SnowflakeSchemaInfo]:
+    async def list_schemas(self, database: Optional[str] = None) -> List[SnowflakeSchemaInfo]:
         """List the schemas of *database*, or of the session's current one.
 
-        Asynchronous twin of :meth:`SyncSnowflakeIntrospector.list_schemas`.
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_schemas`.
         """
-        key = self._cache.key(
-            IntrospectionScope.SCHEMA, database or "*", extra="schemas"
-        )
+        key = self._cache.key(IntrospectionScope.SCHEMA, database or "*", extra="schemas")
         cached = self._cache.get(key)
         if cached is not None:
             return cached
-        sql, params = SnowflakeSchemaListQueryStatement(
-            self.dialect, database=database
-        ).to_sql()
+        sql, params = SnowflakeSchemaListQueryStatement(self.dialect, database=database).to_sql()
         result = self.parse_schemas(await self._executor.execute(sql, params))
         self._cache.set(key, result)
         return result
@@ -1098,7 +1173,7 @@ class AsyncSnowflakeIntrospector(
     async def list_warehouses(self) -> List[SnowflakeWarehouseInfo]:
         """List the virtual warehouses the session's role can see.
 
-        Asynchronous twin of :meth:`SyncSnowflakeIntrospector.list_warehouses`.
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_warehouses`.
         """
         key = self._cache.key(IntrospectionScope.DATABASE, extra="warehouses")
         cached = self._cache.get(key)
@@ -1115,7 +1190,7 @@ class AsyncSnowflakeIntrospector(
         """Billed storage, row count and clustering for one live table.
 
         Asynchronous twin of
-        :meth:`SyncSnowflakeIntrospector.get_table_storage_metrics`, including
+        :meth:`SnowflakeIntrospector.get_table_storage_metrics`, including
         the documented ``ACCOUNTADMIN`` caveat on the view and the decision
         not to cache ``None``.
         """
@@ -1138,4 +1213,3 @@ class AsyncSnowflakeIntrospector(
         if result is not None:
             self._cache.set(key, result)
         return result
-

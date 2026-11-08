@@ -4,22 +4,34 @@
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from rhosocial.activerecord.backend.expression import (
+    CaseExpression,
     Column,
     ComparisonPredicate,
+    CountFunction,
     FunctionCall,
+    GroupByHavingClause,
     InPredicate,
     IsNullPredicate,
     LikeOperator,
     LikePredicate,
+    LimitOffsetClause,
     Literal,
     LogicalPredicate,
     OrderByClause,
     QueryStatement,
+    RowCountWildcard,
+    SelectModifier,
+    Subquery,
+    SumFunction,
     WhereClause,
 )
+from rhosocial.activerecord.backend.expression.core import CastExpression
 from rhosocial.activerecord.backend.expression.objects import Table
 from rhosocial.activerecord.backend.expression.query_parts import JoinClause, JoinType
+from rhosocial.activerecord.backend.expression.sources.derived import DerivedTableSource
 from rhosocial.activerecord.backend.expression.sources.relation import NamedRelationRef
+from rhosocial.activerecord.backend.expression.types.string import VarCharType
+from rhosocial.activerecord.backend.introspection.types import ProfileSource
 
 from ..expression.introspection import (
     SnowflakeDatabaseListQueryStatement,
@@ -31,10 +43,13 @@ from ..expression.show import SnowflakeShowObjectType, SnowflakeShowStatement
 
 if TYPE_CHECKING:
     from rhosocial.activerecord.backend.expression.introspection import (
+        ColumnDataProfileQueryStatement,
         ColumnInfoQueryStatement,
+        ColumnValueSampleQueryStatement,
         DatabaseInfoQueryStatement,
         ForeignKeyQueryStatement,
         IndexInfoQueryStatement,
+        JoinCoverageQueryStatement,
         TableListQueryStatement,
         TriggerListQueryStatement,
         ViewInfoQueryStatement,
@@ -106,6 +121,30 @@ class SnowflakeIntrospectionMixin:
         :meth:`format_table_storage_metrics_query_statement` for the columns
         and the ``ACCOUNTADMIN`` caveat that makes an absent row distinct
         from an absent table."""
+        return True
+
+    def supports_table_storage_introspection(self) -> bool:
+        """The same billed storage answers the common minimum's total slot.
+
+        The capability for the per-table storage family, which is what the
+        ``table-storage-metrics`` family above feeds: the four tiers
+        (active, time travel, failsafe, clone-retained) sum to a table's
+        total footprint, and that sum lands on ``IntrospectionTableInfo``
+        ``size_bytes`` for a single-table read -- see
+        :meth:`~...introspection.introspector.SnowflakeIntrospector.get_table_info`.
+
+        The listing deliberately stays unjoined, and the CLI README records
+        why: the metrics statement joins two views, so folding it into
+        ``list_tables`` would charge every list for the join, and the view
+        answers only for ``ACCOUNTADMIN``, so a column there would read as
+        "no storage" where the truth is "this role may not see it".
+
+        The split slots stay ``None``: Snowflake's storage is managed
+        micro-partition bytes with no index side to separate, so there is
+        nothing to attribute ``data_size_bytes`` or ``index_size_bytes`` to
+        -- the engine's shape, not a gap
+        (``.claude/rules/introspection.md`` §5).
+        """
         return True
 
     # ========== Capability Detection ==========
@@ -685,6 +724,364 @@ class SnowflakeIntrospectionMixin:
     def format_trigger_info_query_statement(self, expr) -> Tuple[str, tuple]:
         """Snowflake does not support triggers; return empty result."""
         return self.format_trigger_list_query_statement(expr)
+
+    # ========== Data profiles: the rows, because no catalogue holds them ==========
+
+    def supports_column_data_profile(self) -> bool:
+        """Snowflake answers a column profile by aggregating the rows.
+
+        Nothing in the account keeps a per-column distribution to read.
+        ``INFORMATION_SCHEMA.COLUMNS`` describes what a column *declares* --
+        type, nullability, default, comment -- and ``ACCOUNT_USAGE`` describes
+        objects and how often they were used, not what they hold. There is no
+        ``pg_stats`` here and no equivalent: Snowflake's micro-partition
+        metadata records value ranges for pruning, and those ranges are
+        published nowhere a session can query. So the answer is computed from
+        the rows, exact, and paid for in time -- one arm per column, each a scan
+        of the table.
+
+        ``COUNT(DISTINCT ...)`` rather than ``APPROX_COUNT_DISTINCT``, and the
+        reason is provenance rather than speed. The approximation is cheaper and
+        is the right tool for a cardinality *estimate*, but this family has no
+        word for what it produces: an ``aggregate`` says every row was counted
+        and the answer is exact, a ``sample`` says a subset of rows was read and
+        ``row_count`` says how many, and a HyperLogLog estimate over the whole
+        table is neither. Labelling it ``aggregate`` would be a false claim
+        about precision, and labelling it ``sample`` would be a false claim
+        about which rows were read. The exactness also carries a signal an
+        estimate would destroy: ``distinct_count == row_count`` is how a caller
+        recognises a unique column, and that comparison has no tolerance. A
+        table big enough for the exact count to hurt is one whose owner should
+        decide to pay for it, which is why this is a probe and not a pass.
+        """
+        return True
+
+    def supports_column_value_sample(self) -> bool:
+        """Snowflake answers a value listing with a grouped scan and a limit.
+
+        Nothing is precomputed, so this costs a ``GROUP BY`` over the column
+        plus a sort of the groups. Kept a separate probe from the profile for
+        the reason the protocol gives: the listing is priced differently on
+        every engine, and one probe for both would charge the cheap question at
+        the expensive answer's rate.
+        """
+        return True
+
+    def supports_join_coverage(self) -> bool:
+        """Snowflake answers overlap by counting distinct values on both sides.
+
+        Exact, and paid for with a scan of each column twice: once for the
+        intersection, once for the denominator. Answering ``True`` says the
+        engine *can* answer, not that it answers cheaply -- the cost belongs in
+        this docstring, not in a ``False`` that would claim Snowflake cannot
+        read its own rows. Nulls are excluded on both sides; collations are the
+        columns' own, so two columns comparing differently make the fractions a
+        lower bound.
+        """
+        return True
+
+    def _user_relation(
+        self, table_name: str, alias: Optional[str] = None, schema: Optional[str] = None
+    ) -> NamedRelationRef:
+        """A user table as a ``FROM`` source, quoted by the dialect.
+
+        The opposite of :meth:`_information_schema_view`: a user table is
+        whatever its owner declared, so name and schema are left to the
+        dialect's identifier renderer. Quoting is case-sensitive in Snowflake,
+        which is why the name must arrive in the catalogue's own spelling --
+        the column list a profile is built from comes from
+        ``INFORMATION_SCHEMA``, so it does.
+        """
+        return NamedRelationRef(
+            self,
+            Table(self, table_name, schema_name=schema or None),
+            alias=alias,
+        )
+
+    def _profile_label(self, text: Optional[str], alias: str) -> CastExpression:
+        """A constant label as a named select-list entry.
+
+        ``Literal`` is deliberately unaliasable -- a value has nothing to name
+        -- so the constant is cast to text, which is the smallest node that
+        produces a named result. The cast is not there for its type: it is
+        there so the label can be called ``COLUMN_NAME`` or ``SOURCE``, which
+        is what the parser reads. ``None`` is the same node carrying SQL NULL,
+        which is how the empty profile says "the column name is absent" without
+        inventing one.
+
+        The cast target is ``VARCHAR`` at the dialect's own maximum width
+        (16,777,216) because a label has no width to declare, and any narrower
+        choice would silently truncate the name it carries.
+        """
+        return CastExpression(
+            self, Literal(self, text, inline=True), VarCharType(self), alias=alias
+        )
+
+    def _profile_arm(self, table_name: str, schema: Optional[str], column_name: str):
+        """One column's arm of the profile, as a node.
+
+        The seven entries are the family's contract: the column's own name, the
+        null count, the distinct count, the two endpoints, the row count the
+        parser divides by, and the provenance. The null count is a ``SUM`` over
+        a ``CASE`` so an empty table answers NULL rather than a fabricated zero
+        (``SUM`` over no rows is NULL in Snowflake, which is what this relies
+        on); the distinct count is the exact ``COUNT(DISTINCT ...)``, for the
+        reason the probe records; the endpoints are the engine's own
+        ``MIN``/``MAX``; and ``COUNT(*)`` rides the same scan as the divisor.
+
+        Empty is answered by the caller, not here: an arm over no columns does
+        not exist.
+        """
+        return QueryStatement(
+            self,
+            select=[
+                self._profile_label(column_name, "COLUMN_NAME"),
+                SumFunction(
+                    self,
+                    CaseExpression(
+                        self,
+                        cases=[
+                            (
+                                IsNullPredicate(self, Column(self, column_name)),
+                                Literal(self, 1, inline=True),
+                            )
+                        ],
+                        else_result=Literal(self, 0, inline=True),
+                    ),
+                ).as_("NULL_COUNT"),
+                CountFunction(self, Column(self, column_name), distinct=True).as_("DISTINCT_COUNT"),
+                FunctionCall(self, "MIN", Column(self, column_name)).as_("MIN_VALUE"),
+                FunctionCall(self, "MAX", Column(self, column_name)).as_("MAX_VALUE"),
+                CountFunction(self, RowCountWildcard(self)).as_("ROW_COUNT"),
+                self._profile_label(ProfileSource.AGGREGATE.value, "SOURCE"),
+            ],
+            from_=self._user_relation(table_name, schema=schema),
+        )
+
+    def format_column_data_profile_query_statement(
+        self, expr: "ColumnDataProfileQueryStatement"
+    ) -> Tuple[str, tuple]:
+        """Format a per-column profile by aggregating the rows themselves.
+
+        One arm per column, over the column list the expression carries: SQL
+        cannot pivot ``SUM(CASE WHEN col IS NULL ...)`` across columns it was
+        never told about, so an aggregating backend genuinely needs that list
+        where a catalogue-based one does not.
+
+        The one place in this module where a set operator is written as text.
+        Every arm is a real :class:`~...statements.dql.QueryStatement` -- it
+        owns its projection, its identifiers and its relation -- because a
+        ``UNION ALL`` over a column list known only at run time has no node to
+        represent it: the list is a tuple on the expression, not an operand in
+        the tree. So each arm renders on its own, its parameters are
+        concatenated in arm order, and the rendered arms are joined by the set
+        operator's word.
+
+        An empty column list answers with no rows. That cannot arise from a real
+        table -- Snowflake requires at least one column -- but the branch has to
+        render, so it is a statement selecting no rows rather than a
+        special-case string.
+
+        Two consequences of the union are worth reading before the figures are.
+        Snowflake resolves one result type per column position across every arm,
+        so ``MIN_VALUE`` -- which carries ``code``'s text in one arm and
+        ``amount``'s number in another -- may arrive coerced to text, and the
+        test reads the numeric endpoints through ``Decimal`` for that reason.
+        And a column type ``MIN``/``MAX``/``COUNT(DISTINCT ...)`` refuse --
+        ``VARIANT``, ``OBJECT``, ``ARRAY`` -- fails the whole statement rather
+        than dropping that column's arm: a silently missing column would be a
+        profile that claims a table has fewer columns than it does.
+        """
+        params = expr.get_params()
+        schema = params.get("schema")
+
+        arms = []
+        parameters: list = []
+        for name in expr.columns:
+            sql, arm_parameters = self._profile_arm(params.get("table_name"), schema, name).to_sql()
+            arms.append(sql)
+            parameters.extend(arm_parameters)
+
+        if not arms:
+            return QueryStatement(
+                self,
+                select=[self._profile_label(None, "COLUMN_NAME")],
+                where=WhereClause(
+                    self,
+                    ComparisonPredicate(
+                        self,
+                        "eq",
+                        Literal(self, 0, inline=True),
+                        Literal(self, 1, inline=True),
+                    ),
+                ),
+            ).to_sql()
+
+        return " UNION ALL ".join(arms), tuple(parameters)
+
+    def format_column_value_sample_query_statement(
+        self, expr: "ColumnValueSampleQueryStatement"
+    ) -> Tuple[str, tuple]:
+        """Format a most-frequent-values listing with a grouped scan.
+
+        Nothing is precomputed, so this costs a ``GROUP BY`` over the column
+        plus a sort of the groups -- the same order as the profile, which is why
+        the two are separate probes rather than one call that would make the
+        cheap half pay for the dear one.
+
+        ``ORDER BY COUNT(*) DESC`` is what makes the answer "the most frequent
+        values" rather than "the first values"; ties break by the value so two
+        runs of the same query agree. Snowflake groups NULLs into a real row, so
+        a column holding NULLs has a NULL entry in its listing -- usually the
+        most frequent one -- which is a shape the parser accepts and the test
+        pins, rather than a value this formatter filters out.
+
+        The ``LIMIT`` is a bind parameter, as it is everywhere else in this
+        dialect: the caller's integer is never spliced into statement text.
+        """
+        column = Column(self, expr.column_name)
+        rows = CountFunction(self, RowCountWildcard(self))
+
+        return QueryStatement(
+            self,
+            select=[column.as_("VALUE"), rows.as_("COUNT")],
+            from_=self._user_relation(expr.table_name, schema=expr.schema),
+            group_by_having=GroupByHavingClause(self, group_by=[column]),
+            order_by=OrderByClause(
+                self,
+                expressions=[
+                    (CountFunction(self, RowCountWildcard(self)), "DESC"),
+                    (Column(self, expr.column_name), "ASC"),
+                ],
+            ),
+            limit_offset=LimitOffsetClause(self, limit=int(expr.limit)),
+        ).to_sql()
+
+    def _coverage_fraction(self, column, source, other_column, other_source):
+        """One side of the overlap: the share of *column* the other side holds.
+
+        The numerator counts the *distinct* values of *column* that also occur
+        in *other_column*, as a ``COUNT(*)`` over a derived table of those
+        distinct values; the denominator counts *column*'s distinct non-NULL
+        values. Distinct on both sides is what makes the figure a coverage of
+        values rather than of rows -- a key repeated a thousand times that
+        matches once would otherwise read as well covered.
+
+        ``IS NOT NULL`` is written on both halves rather than relied upon. In
+        the numerator it is load-bearing: a DISTINCT treats a NULL as one
+        value, so counting it would credit the tested side with a match it does
+        not have. In the divisor ``COUNT(DISTINCT ...)`` skips NULLs on its
+        own, but the statement says so explicitly, because the share is of the
+        values that could join and that is the fact being measured.
+        ``NULLIF(..., 0)`` then makes a column with no value at all answer NULL
+        rather than 0, which the parser reads as "no fraction": the difference
+        between "nothing matched" and "nothing to match" survives to the caller.
+
+        No ``* 1.0`` here: Snowflake's ``/`` over two integers already answers a
+        fractional ``NUMBER``, so multiplying first would only add noise.
+        """
+        overlap = QueryStatement(
+            self,
+            select=[column],
+            from_=source,
+            where=WhereClause(
+                self,
+                LogicalPredicate(
+                    self,
+                    "AND",
+                    column.is_not_null(),
+                    InPredicate(
+                        self,
+                        column,
+                        Subquery(
+                            self,
+                            QueryStatement(
+                                self,
+                                select=[other_column],
+                                from_=other_source,
+                                where=WhereClause(self, other_column.is_not_null()),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            select_modifier=SelectModifier.DISTINCT,
+        )
+        covered = Subquery(
+            self,
+            QueryStatement(
+                self,
+                select=[CountFunction(self, RowCountWildcard(self))],
+                from_=DerivedTableSource(self, overlap, alias="covered"),
+            ),
+        )
+        total = Subquery(
+            self,
+            QueryStatement(
+                self,
+                select=[
+                    FunctionCall(
+                        self,
+                        "NULLIF",
+                        CountFunction(self, column, distinct=True),
+                        Literal(self, 0, inline=True),
+                    )
+                ],
+                from_=source,
+                where=WhereClause(self, column.is_not_null()),
+            ),
+        )
+        return covered / total
+
+    def format_join_coverage_query_statement(
+        self, expr: "JoinCoverageQueryStatement"
+    ) -> Tuple[str, tuple]:
+        """Format a two-sided measurement of two columns' value domains.
+
+        Unlike every other statement in this module, this one names two user
+        tables rather than one catalogue relation: the question is a relation
+        between two objects, so both sides are carried explicitly and their
+        identifiers are the dialect's to quote (see :meth:`_user_relation`).
+        The aliases ``l`` and ``r`` are what keep the two columns apart.
+
+        The row carries both fractions because neither is meaningful alone: a
+        left share of 1.0 beside a right share of 0.2 says every tested value
+        exists on the other side while most of that other domain is
+        unaccounted for, and a single similarity score would average the two
+        and describe neither.
+
+        Both figures are counted over distinct values with NULLs excluded from
+        the numerators and denominators alike -- a NULL is not a value that
+        could ever join -- and the denominators are ``NULLIF``-guarded so a
+        column with nothing to match answers NULL, which the parser reports as
+        "no measurement" instead of a zero overlap that would read as a real
+        answer.
+
+        The cost is each side read for its distinct domain plus the
+        intersection of the two, which is why the probe is an explicit call and
+        belongs in no automatic pass. Collations are not reconciled: the two
+        columns compare under their own, so the fractions are a lower bound
+        across mismatched ones.
+        """
+        params = expr.get_params()
+        schema = params.get("schema")
+
+        left_source = self._user_relation(params.get("left_table"), "l", schema)
+        right_source = self._user_relation(params.get("right_table"), "r", schema)
+        left_column = Column(self, params.get("left_column"), table="l")
+        right_column = Column(self, params.get("right_column"), table="r")
+
+        return QueryStatement(
+            self,
+            select=[
+                self._coverage_fraction(left_column, left_source, right_column, right_source).as_(
+                    "LEFT_COVERAGE"
+                ),
+                self._coverage_fraction(right_column, right_source, left_column, left_source).as_(
+                    "RIGHT_COVERAGE"
+                ),
+            ],
+        ).to_sql()
 
     # ------------------------------------------------------------------ #
     # Account-level objects: databases, schemas, warehouses, storage

@@ -1,7 +1,7 @@
 # tests/rhosocial/activerecord_snowflake_test/feature/backend/types/test_column_types.py
 """Snowflake's column-type table, asserted against the rebuilt core protocol.
 
-Everything asserted here is **文档（待云验）**: the table was built from
+Everything asserted here is **文档（待云端验证）**: the table was built from
 Snowflake's official documentation, and no Snowflake instance was reachable
 while it was written. These tests therefore check that the backend *says* what
 it means, and that the provisional cells stay visibly provisional -- they
@@ -304,11 +304,11 @@ def test_the_evidence_level_is_stated_once_and_is_docs_pending_cloud():
     Exported as a constant so this test can assert it, and so that a later
     cloud-verified pass has one place to change.
     """
-    assert SNOWFLAKE_COLUMN_TYPE_EVIDENCE == "文档（待云验）"
+    assert SNOWFLAKE_COLUMN_TYPE_EVIDENCE == "文档（待云端验证）"
 
 
 def test_every_entry_group_carries_the_marker_and_a_doc_url():
-    """Each group in the table names the page it was read from, and marks 待云验.
+    """Each group in the table names the page it was read from, and marks 待云端验证.
 
     A citation that is present in the module docstring but absent from a group
     would let a reader believe a whole cell on the strength of an unrelated
@@ -316,7 +316,7 @@ def test_every_entry_group_carries_the_marker_and_a_doc_url():
     required *inside* the table body.
     """
     table_body = _table_source()
-    assert table_body.count("文档（待云验）") == 9, "one marker per entry group"
+    assert table_body.count("文档（待云端验证）") == 9, "one marker per entry group"
     assert table_body.count("https://docs.snowflake.com/") == 9
 
 
