@@ -4,7 +4,7 @@ The `introspect` subcommand asks a live Snowflake account what it holds, and
 prints the answer. Every question runs through the backend's introspector, so
 what the CLI reports is what the library sees — the same objects, the same
 types, the same parsing — rather than a second implementation that can drift
-from it. Twenty-six types are advertised, derived from `_TYPE_CAPABILITIES` in
+from it. Twenty-five types are advertised, derived from `_TYPE_CAPABILITIES` in
 the source rather than written out a second time, so a family cannot be
 answerable and unaskable at once.
 
@@ -14,10 +14,10 @@ python -m rhosocial.activerecord.backend.impl.snowflake introspect <TYPE> [NAME]
 
 ## What it can ask about
 
-Twenty-six types, in the order `--help` prints them. The catalogue families
-answer True for this dialect; the operational and one-object families are
-offered and gated on their switch, so a run is refused (exit 2) rather than
-answered with an empty list.
+Twenty-five types, in the order `--help` prints them. The catalogue families
+answer True for this dialect; the operational families are offered and gated on
+their switch, so a run is refused (exit 2) rather than answered with an empty
+list.
 
 | Type | `NAME` | Reads | Notes |
 | :--- | :--- | :--- | :--- |
@@ -43,13 +43,12 @@ answered with an empty list.
 | `runtime` | — | refused here | Offered and gated on `supports_runtime_stats`, which answers False here. |
 | `index-stats` | — | refused here | Offered and gated on `supports_index_stats`, which answers False here. |
 | `dependencies` | object, optional | refused here | Offered and gated on `supports_object_dependencies` (False here); a name narrows the graph to that object's edges. |
-| `ddl` | table, required | refused here | Offered and gated on `supports_ddl_extraction` (False here). |
 | `column-profiles` | table, required | the rows themselves | Answers True here: the profile is aggregated from the rows, so every figure is exact and paid for in time. |
 | `value-samples` | table, required | the rows themselves | Answers True here, read from the rows; `--column` names the column and `--limit` caps the count (default 100). |
 | `join-coverage` | left table, required | the rows themselves | Answers True here: how much two columns' value domains overlap. `--column`, `--right-table` and `--right-column` are required. |
 
 `NAME` is required for `columns`, `indexes`, `foreign-keys`,
-`table-storage-metrics`, `ddl`, `column-profiles`, `value-samples` and
+`table-storage-metrics`, `column-profiles`, `value-samples` and
 `join-coverage`. For `views` and `dependencies` it is optional: a name asks for
 that one view, or narrows the graph to that object's edges. The list types —
 `tables`, `database`, `databases`, `schemas`, `warehouses`, `routines`,
@@ -66,12 +65,15 @@ unexpected) and also "the named view or table is not there"; **2** is a request
 this backend cannot serve — a type whose capability switch is off, or a `NAME`
 on a list type.
 
-Two absences worth naming:
+Three absences worth naming:
 
 *   **No `triggers` type.** Snowflake has no triggers, so there is no object to
     ask about. That is an engine fact, not a gap in the CLI.
 *   **No `partition-metadata` type.** The dialect carries a formatter for it,
     but no introspector method reads it, so there is no answer behind the type.
+*   **No `ddl` type.** DDL extraction is not offered by this backend:
+    `supports_ddl_extraction()` answers False, and the dialect refuses to
+    assemble text that would read as the engine's own.
 
 `table-storage-metrics` is a type of its own rather than a column of `tables`
 for two reasons. Its statement joins two views, so folding it into the listing
@@ -81,16 +83,16 @@ for this role" — a `None` the command can state out loud, which a column on th
 listing could not. An exit of 1 on this type is therefore **not** "the table
 does not exist".
 
-The nine families beyond the catalogue are offered for a different reason than
-the ten above: they are questions the *protocol* asks every dialect, and
-Snowflake's answer is a real answer, not a gap. Six of them — `unused-indexes`,
-`table-stats`, `runtime`, `index-stats`, `dependencies` and `ddl` — are gated on
-a switch that answers `False` here, so asking them exits 2 with "not supported by
-this server"; the remaining three (`column-profiles`, `value-samples`,
-`join-coverage`) read the rows themselves and answer True. Offering a gated type
-at all is the point: the dialect's answer is "this engine cannot tell you",
-which is a fact worth letting a caller ask for and be told, and is not the same
-as an empty list that would read as "it has none".
+The eight families beyond the catalogue are offered for a different reason than
+the catalogue questions above: they are questions the *protocol* asks every
+dialect, and Snowflake's answer is a real answer, not a gap. Five of them —
+`unused-indexes`, `table-stats`, `runtime`, `index-stats` and `dependencies` —
+are gated on a switch that answers `False` here, so asking them exits 2 with
+"not supported by this server"; the remaining three (`column-profiles`,
+`value-samples`, `join-coverage`) read the rows themselves and answer True.
+Offering a gated type at all is the point: the dialect's answer is "this engine
+cannot tell you", which is a fact worth letting a caller ask for and be told, and
+is not the same as an empty list that would read as "it has none".
 
 ## Options
 

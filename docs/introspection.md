@@ -66,7 +66,7 @@ The answers most easily mistaken for a gap in this backend, rather than a proper
 
 `supports_trigger_introspection()` is `False` because Snowflake has no trigger object to ask about. The dialect still has a trigger formatter -- it renders a statement that cannot match a row (`SELECT 1 WHERE 1 = 0`) -- so a caller that ignores the probe receives an empty listing from a real statement rather than an error. The probe is the answer, though: the question has no answer because the object does not exist. The CLI does not offer a `triggers` type at all.
 
-The operational families -- `unused-indexes`, `table-stats`, `runtime` and `index-stats` -- read counters of a shape this engine does not publish to a session: per-index access counts and per-table I/O counters. `dependencies` needs a declared edge catalogue, and Snowflake's catalogue does not record which view, task or stage mentions which table. `ddl` needs the engine's own retained text for an object; this backend reads no such text and refuses to assemble one, because an assembled `CREATE` would read as authoritative while being this library's guess. `ddl_extraction_native` is `False` for the same reason. All six switches are constants on this dialect: unlike a feature that appears in a later release, these answers do not vary by server version.
+The operational families -- `unused-indexes`, `table-stats`, `runtime` and `index-stats` -- read counters of a shape this engine does not publish to a session: per-index access counts and per-table I/O counters. `dependencies` needs a declared edge catalogue, and Snowflake's catalogue does not record which view, task or stage mentions which table. `ddl` needs the engine's own retained text for an object; this backend reads no such text and refuses to assemble one, because an assembled `CREATE` would read as authoritative while being this library's guess. `ddl_extraction_native` is `False` for the same reason. All six switches are constants on this dialect: unlike a feature that appears in a later release, these answers do not vary by server version. Because `supports_ddl_extraction()` is permanently `False`, the CLI does not offer a `ddl` type; the capability and the DDL formatter stay on the dialect for a future real implementation.
 
 `supports_partition_info()` stays `False` by inheritance. Snowflake's own partition questions live under their own switches, and `supports_partition_metadata_introspection()` answers `False` because the dialect has a formatter for the family but no introspector method reads it. The CLI excludes `partition-metadata` for that reason, rather than offering a type with no answer behind it.
 
@@ -213,7 +213,7 @@ The four billed tiers are `ACTIVE_BYTES`, `TIME_TRAVEL_BYTES`, `FAILSAFE_BYTES` 
 
 ## Operational Families
 
-None of the six answers here. Each probe is `False`, each is a constant on the dialect, and the CLI refuses the type (exit 2) instead of printing an empty listing.
+None of the six answers here. Each probe is `False` and each is a constant on the dialect. Five are CLI types, refused (exit 2) instead of printing an empty listing; `ddl` is not offered as a type at all, because its capability is permanently `False`.
 
 | Family | Probe | Why this backend declines |
 |--------|-------|---------------------------|
@@ -351,7 +351,7 @@ The invocation requires `--account` and/or `--database`; connection parameters c
 
 ### Introspection Types
 
-Twenty-six types. Seventeen are catalogue questions, six are families this backend declines, and three are the data families.
+Twenty-five types. Seventeen are catalogue questions, five are families this backend declines, and three are the data families.
 
 | Type | Description | Name |
 |------|-------------|------|
@@ -377,12 +377,11 @@ Twenty-six types. Seventeen are catalogue questions, six are families this backe
 | `runtime` | Declined: `False` | refused |
 | `index-stats` | Declined: `False` | refused |
 | `dependencies` | Declined: `False` | optional (object) |
-| `ddl` | Declined: `False` | required (table) |
 | `column-profiles` | What each column of a table holds, `source='aggregate'` | required (table) |
 | `value-samples` | Most frequent values of one column | required (table) |
 | `join-coverage` | Overlap of two columns' value domains | required (left table) |
 
-The six declined types are advertised rather than omitted, and refused at runtime by the switch behind them (exit 2) before the introspector is reached. The advertised list is derived from the same capability map the handler consults, so a family cannot be answerable and unaskable at once.
+The five declined types are advertised rather than omitted, and refused at runtime by the switch behind them (exit 2) before the introspector is reached. `ddl` is not among them: its capability is permanently `False`, so the CLI does not advertise it. The advertised list is derived from the same capability map the handler consults, so a family cannot be answerable and unaskable at once.
 
 A `NAME` a type cannot use is refused (exit 2) rather than ignored, and a required one that is missing exits 1 -- a typo and a misfiled question are different failures. `value-samples` also requires `--column`; `join-coverage` requires `--column`, `--right-table` and `--right-column`, with the left table given as `NAME`. `--limit` is forwarded to `sample_column_values()` only when it is given; without it the introspector's own default answers, so the number is not written in two places. A flag the type does not read is refused (exit 2).
 
@@ -396,7 +395,7 @@ python -m rhosocial.activerecord.backend.impl.snowflake introspect table-storage
   --account myaccount --database mydb
 
 # Declined families: exit 2, no query run
-python -m rhosocial.activerecord.backend.impl.snowflake introspect ddl orders \
+python -m rhosocial.activerecord.backend.impl.snowflake introspect unused-indexes \
   --account myaccount --database mydb
 
 # The data families

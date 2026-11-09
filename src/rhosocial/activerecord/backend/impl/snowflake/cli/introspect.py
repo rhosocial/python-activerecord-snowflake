@@ -6,9 +6,10 @@ advertised list is derived from :data:`_TYPE_CAPABILITIES` rather than written
 a second time -- so a family cannot be answerable and unaskable at once. The
 three families that read the rows themselves (data profiles, value samples,
 join coverage) are offered because the dialect answers them by aggregating; the
-six that a catalogue or a statistics collector answers elsewhere are offered
+five that a catalogue or a statistics collector answers elsewhere are offered
 too, and the switch that names them is what decides at runtime, because the
-*server* in front of us may not have what the switch describes.
+*server* in front of us may not have what the switch describes. DDL extraction
+is not offered: its capability is permanently false here.
 
 A NAME or a flag the type has no question for is refused (exit 2) rather than
 dropped, and a required one that is missing exits 1. A probe that answers
@@ -79,10 +80,9 @@ _TYPE_CAPABILITIES = {
     "index-stats": "supports_index_stats",
     "dependencies": "supports_object_dependencies",
     # ---- the one-object families ----
-    # The DDL that recreates a named table, the profiles of one table and the
-    # samples of one of its columns. The dialect answers these by aggregating
-    # the rows themselves, so every figure is exact and paid for in time.
-    "ddl": "supports_ddl_extraction",
+    # The profiles of one table and the samples of one of its columns. The
+    # dialect answers these by aggregating the rows themselves, so every figure
+    # is exact and paid for in time.
     "column-profiles": "supports_column_data_profile",
     "value-samples": "supports_column_value_sample",
     "join-coverage": "supports_join_coverage",
@@ -137,9 +137,8 @@ _TABLE_NAME_TYPES = (
     "indexes",
     "foreign-keys",
     "table-storage-metrics",
-    # The one-object families: the DDL that recreates one table, the profiles
-    # of its columns, and the samples of one of them.
-    "ddl",
+    # The one-object families: the profiles of one table's columns and the
+    # samples of one of them.
     "column-profiles",
     "value-samples",
     # ``join-coverage`` asks about two tables: the left one is NAME, the
@@ -328,9 +327,8 @@ def create_parser(subparsers):
   %(prog)s dependencies --account myaccount
   %(prog)s dependencies orders --account myaccount
 
-  # The DDL that recreates one table, the exact per-column profiles, and the
-  # values one column holds. The profile reads every row, so it is paid for.
-  %(prog)s ddl orders --account myaccount
+  # The exact per-column profiles, and the values one column holds. The
+  # profile reads every row, so it is paid for.
   %(prog)s column-profiles orders --account myaccount
   %(prog)s value-samples orders --column status --account myaccount
 
@@ -380,7 +378,7 @@ both exit 1 with the same message.
         default=None,
         help=(
             "Object name: a table for columns, indexes, foreign-keys, "
-            "table-storage-metrics, ddl, column-profiles, value-samples and "
+            "table-storage-metrics, column-profiles, value-samples and "
             "join-coverage (required); the object itself for views and "
             "dependencies (optional); refused for tables, database, "
             "databases, schemas, warehouses, routines, sequences, stages, "
@@ -481,22 +479,6 @@ def _serialize_for_output(obj: Any) -> Any:
     if isinstance(obj, (str, int, float, bool)):
         return obj
     return str(obj)
-
-
-def _display_ddl(provider, statement, args) -> None:
-    """Show a DDL statement in the form that stays readable.
-
-    A ``CREATE TABLE`` is text: a one-row table folds it into a cell that
-    wraps at the terminal width and interleaves with the other columns. Table
-    output therefore prints the statement itself, while the structured
-    formats keep the whole row so JSON and CSV still carry ``object_type``
-    and ``native`` beside the text.
-    """
-    if args.output == "table":
-        print(statement.ddl or "")
-        return
-    data = _serialize_for_output([statement])
-    provider.display_results(data, title=f"DDL of {statement.object_name}")
 
 
 #: Said before a data-profile listing. It goes to stderr so the machine
@@ -691,20 +673,8 @@ def _handle_introspect_sync(args, backend: SnowflakeBackend, provider):
             provider.display_results(data, title=title)
 
         # ---- the one-object families --------------------------------------
-        # The DDL that recreates a table, and the profiles of one table or one
-        # column of it: the name is the table and the column is named on its
-        # own flag.
-
-        elif args.type == "ddl":
-            statement = introspector.get_ddl_statement(args.name, object_type=None, schema=None)
-            if statement is None:
-                # Not "no such table": the object exists, and Snowflake
-                # answers with no text rather than an assembled fragment that
-                # would read as authoritative. The two are worth telling
-                # apart, so this exits without printing an empty row.
-                print(f"Error: no DDL available for '{args.name}'", file=sys.stderr)
-                sys.exit(1)
-            _display_ddl(provider, statement, args)
+        # The profiles of one table or one column of it: the name is the table
+        # and the column is named on its own flag.
 
         elif args.type == "column-profiles":
             # The note goes to stderr so the machine formats stay parseable,
@@ -924,15 +894,6 @@ async def _handle_introspect_async(args, backend: AsyncSnowflakeBackend, provide
             data = _serialize_for_output(dependencies)
             title = f"Dependencies of {args.name}" if args.name else "Object Dependencies"
             provider.display_results(data, title=title)
-
-        elif args.type == "ddl":
-            statement = await introspector.get_ddl_statement(
-                args.name, object_type=None, schema=None
-            )
-            if statement is None:
-                print(f"Error: no DDL available for '{args.name}'", file=sys.stderr)
-                sys.exit(1)
-            _display_ddl(provider, statement, args)
 
         elif args.type == "column-profiles":
             print(

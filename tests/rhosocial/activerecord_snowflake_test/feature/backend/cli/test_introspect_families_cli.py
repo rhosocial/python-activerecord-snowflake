@@ -1,5 +1,5 @@
 # tests/rhosocial/activerecord_snowflake_test/feature/backend/cli/test_introspect_families_cli.py
-"""The nine families the dialect answers, as the CLI asks for them.
+"""The eight families the dialect declares, as the CLI asks for them.
 
 No server is needed here. What is checked is the wiring the CLI owns: that
 each type reaches its introspector method, that NAME and the type-specific
@@ -11,10 +11,10 @@ The stub introspector records one call per run, so a branch that calls two
 methods, or calls the right one with a dropped argument, fails here rather
 than showing up as a plausible-looking listing.
 
-Six of the nine are families this dialect cannot answer -- the switch is
+Five of the eight are families this dialect cannot answer -- the switch is
 inherited as ``False`` -- so the gate is what the run meets, and the tests
 hold both sides of it: the refusal before anything connects, and the branch
-that does run once a stub dialect answers ``True``. Six families answering
+that does run once a stub dialect answers ``True``. Five families answering
 ``False`` is the honest state of this backend, and a CLI that runs them anyway
 would render a statement on a catalogue Snowflake does not have.
 
@@ -34,13 +34,12 @@ from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDiale
 from rhosocial.activerecord.backend.introspection.types import (
     ColumnDataProfile,
     ColumnValueFrequency,
-    DDLStatement,
     JoinCoverage,
 )
 
-#: The nine families this change wires, and the switch that gates each. The
-#: dialect declares the three data families and inherits the other six as
-#: ``False``, so the three are asked and the six are refused -- both of which
+#: The eight families this change wires, and the switch that gates each. The
+#: dialect declares the three data families and inherits the other five as
+#: ``False``, so the three are asked and the five are refused -- both of which
 #: the CLI must be able to do.
 NEW_FAMILIES = {
     "unused-indexes": "supports_unused_indexes_detection",
@@ -48,7 +47,6 @@ NEW_FAMILIES = {
     "runtime": "supports_runtime_stats",
     "index-stats": "supports_index_stats",
     "dependencies": "supports_object_dependencies",
-    "ddl": "supports_ddl_extraction",
     "column-profiles": "supports_column_data_profile",
     "value-samples": "supports_column_value_sample",
     "join-coverage": "supports_join_coverage",
@@ -71,7 +69,6 @@ GATED_FAMILIES = (
     "runtime",
     "index-stats",
     "dependencies",
-    "ddl",
 )
 
 #: The families a real dialect answers, so their branch is reachable live.
@@ -305,49 +302,6 @@ class TestTheDependenciesBranch:
         ]
 
 
-class TestTheDdlBranch:
-    """The schema object, not a name, is what a caller parses."""
-
-    def _statement(self) -> DDLStatement:
-        return DDLStatement(
-            schema=None,
-            object_type="TABLE",
-            object_name="orders",
-            ddl="CREATE TABLE ORDERS (ID NUMBER)",
-            native=True,
-        )
-
-    def test_the_table_is_asked_for_by_name(self, monkeypatch):
-        introspector = _RecordingIntrospector({"get_ddl_statement": self._statement()})
-
-        _run_sync(monkeypatch, introspector, _name_required_argv("ddl"))
-
-        assert introspector.calls == [
-            ("get_ddl_statement", ("orders",), {"object_type": None, "schema": None})
-        ]
-
-    def test_the_engine_text_reaches_json_with_its_native_flag(self, monkeypatch, capsys):
-        introspector = _RecordingIntrospector({"get_ddl_statement": self._statement()})
-
-        _run_with_real_provider(
-            monkeypatch, introspector, _name_required_argv("ddl", ["-o", "json"])
-        )
-
-        payload = json.loads(capsys.readouterr().out)
-        assert payload[0]["object_name"] == "orders"
-        assert payload[0]["ddl"] == "CREATE TABLE ORDERS (ID NUMBER)"
-        assert payload[0]["native"] is True
-
-    def test_no_ddl_is_an_error_not_an_empty_listing(self, monkeypatch, capsys):
-        introspector = _RecordingIntrospector({"get_ddl_statement": None})
-
-        with pytest.raises(SystemExit) as excinfo:
-            _run_sync(monkeypatch, introspector, _name_required_argv("ddl"))
-
-        assert excinfo.value.code == 1
-        assert "no DDL available" in capsys.readouterr().err
-
-
 class TestTheColumnProfilesBranch:
     """The aggregate label must reach the reader; the numbers are not a catalogue."""
 
@@ -544,7 +498,7 @@ class TestTheArgumentRules:
     """The rules the CLI owns: a NAME and a flag are read, refused or required."""
 
     @pytest.mark.parametrize(
-        "type_", ["ddl", "column-profiles", "value-samples", "join-coverage"]
+        "type_", ["column-profiles", "value-samples", "join-coverage"]
     )
     def test_a_missing_table_name_exits_one(self, type_, capsys, monkeypatch):
         with pytest.raises(SystemExit) as excinfo:
@@ -611,7 +565,7 @@ class TestTheArgumentRules:
 class TestTheCapabilityGate:
     """The switch is what the run consults, and it is consulted before the work.
 
-    Six of the nine families are ones this dialect cannot answer, and the
+    Five of the eight families are ones this dialect cannot answer, and the
     earlier behaviour was to run the branch anyway -- which produced an empty
     listing that read as "this database has none". Refusing first is what makes
     the two answers distinguishable, so the gate is asserted against the live
@@ -670,7 +624,7 @@ class TestTheCapabilityGate:
         introspector = _RecordingIntrospector()
 
         argv = ["introspect", type_] + CONNECTION
-        if type_ in ("ddl", "column-profiles", "value-samples", "join-coverage"):
+        if type_ in ("column-profiles", "value-samples", "join-coverage"):
             argv += ["orders"]
         if type_ in ("value-samples", "join-coverage"):
             argv += ["--column", "BUYER_ID"]
@@ -736,12 +690,6 @@ class TestTheAsyncPath:
                 ((), {"object_name": "posts", "schema": None}),
             ),
             (
-                "ddl",
-                "get_ddl_statement",
-                ["orders"],
-                (("orders",), {"object_type": None, "schema": None}),
-            ),
-            (
                 "column-profiles",
                 "list_column_data_profiles",
                 ["orders"],
@@ -773,16 +721,8 @@ class TestTheAsyncPath:
         self, type_, method, extra, expected, monkeypatch
     ):
         # The one family whose answer is a single row rather than a listing
-        # needs an actual statement, because the branch reads a field off it.
+        # needs an actual row, because the branch reads a field off it.
         results = {method: []}
-        if method == "get_ddl_statement":
-            results[method] = DDLStatement(
-                schema=None,
-                object_type="TABLE",
-                object_name="orders",
-                ddl="CREATE TABLE ORDERS (ID NUMBER)",
-                native=True,
-            )
         if method == "estimate_join_coverage":
             results[method] = JoinCoverage(
                 left_table="orders",
