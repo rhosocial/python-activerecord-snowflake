@@ -287,6 +287,13 @@ class TestIntrospectParserContract:
         with pytest.raises(SystemExit):
             build_parser().parse_args(["introspect", "table", "customers", "--account", "acct"])
 
+    def test_ddl_is_not_a_type(self, capsys):
+        """The backend declines DDL extraction, so the CLI does not advertise it."""
+        with pytest.raises(SystemExit) as excinfo:
+            build_parser().parse_args(["introspect", "ddl", "orders", "--account", "acct"])
+        assert excinfo.value.code == 2
+        assert "invalid choice" in capsys.readouterr().err
+
     def test_help_lists_every_type_and_no_removed_aggregate(self, capsys):
         with pytest.raises(SystemExit):
             build_parser().parse_args(["introspect", "--help"])
@@ -294,6 +301,7 @@ class TestIntrospectParserContract:
         for itype in cli_introspect.INTROSPECT_TYPES:
             assert itype in out
         assert "table users" not in out
+        assert "ddl" not in out
 
     def test_connection_arguments_flow_through(self):
         args = build_parser().parse_args(

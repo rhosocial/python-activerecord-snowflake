@@ -55,17 +55,28 @@ from rhosocial.activerecord.backend.introspection.types import (
     IntrospectionTriggerInfo,
     IntrospectionViewInfo,
     ReferentialAction,
+    SequenceInfo,
 )
 
 from ..expression.introspection import (
     SnowflakeDatabaseListQueryStatement,
+    SnowflakeFileFormatListQueryStatement,
+    SnowflakeFunctionListQueryStatement,
+    SnowflakePipeListQueryStatement,
+    SnowflakeProcedureListQueryStatement,
     SnowflakeSchemaListQueryStatement,
+    SnowflakeSequenceListQueryStatement,
+    SnowflakeStageListQueryStatement,
+    SnowflakeStreamListQueryStatement,
     SnowflakeTableStorageMetricsQueryStatement,
+    SnowflakeTaskListQueryStatement,
     SnowflakeWarehouseListQueryStatement,
 )
 from .table_types import core_table_type, read_table_type
 from .types import (
+    SnowflakeCatalogObjectInfo,
     SnowflakeDatabaseInfo,
+    SnowflakeRoutineInfo,
     SnowflakeSchemaInfo,
     SnowflakeTableStorageMetrics,
     SnowflakeWarehouseInfo,
@@ -178,6 +189,41 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         return cls._as_flag(value)
 
     @staticmethod
+    def _as_tristate_flag(value: Any) -> Optional[bool]:
+        """A flag where an unreadable spelling is "not reported", not "false".
+
+        :meth:`_as_optional_flag` maps any non-empty text to a boolean, which
+        is right for ``SHOW`` properties that are documented booleans: an
+        unreadable ``auto_resume`` is not "true". It is wrong for the catalog
+        columns below, where a non-flag is a spelling this backend has not
+        learned, and reporting it as ``False`` would invent an answer:
+
+        * ``SEQUENCES.CYCLE_OPTION`` is documented "Not applicable for
+          Snowflake", so the only honest reading of an unexpected value is
+          "this backend does not know".
+        * ``SEQUENCES.ORDERED`` and ``COLUMNS.IDENTITY_ORDERED`` are
+          documented ``YES``/``NO``; anything else is an unlearned spelling.
+        * the file-format, pipe, task and stream booleans are documented as
+          their views/``SHOW`` pages state, and the same rule applies.
+
+        Values that *are* recognisable (``Y``/``YES``/``TRUE``/``1`` and the
+        four negative spellings) answer ``True``/``False``; everything else
+        answers ``None``.
+        """
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return value != 0
+        text = str(value).strip().upper()
+        if text in ("Y", "YES", "TRUE", "1"):
+            return True
+        if text in ("N", "NO", "FALSE", "0"):
+            return False
+        return None
+
+    @staticmethod
     def _as_int(value: Any) -> Optional[int]:
         """One catalog number as an ``int``, or ``None`` when unreadable.
 
@@ -191,6 +237,368 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
             return int(value)
         except (TypeError, ValueError):
             return None
+
+    # ------------------------------------------------------------------ #
+    # Routines, sequences and the Snowflake catalog objects
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _is_sequence_backed(default_value: Any) -> bool:
+        """Whether a column default calls a sequence's ``NEXTVAL``.
+
+        Snowflake has two ways a column can get a database-generated number.
+        ``IDENTITY`` / ``AUTOINCREMENT`` is one; a ``DEFAULT`` of the form
+        ``some_sequence.NEXTVAL`` is the other. The catalog reports the first
+        as ``IS_IDENTITY = 'YES'`` and the second only as default text, so
+        the question "is this column auto-generated?" needs both signals.
+        The test is deliberately narrow -- the literal word ``NEXTVAL`` in
+        the documented default expression -- rather than a guess at a
+        function name this backend has not learned.
+        """
+        if default_value is None:
+            return False
+        return "NEXTVAL" in str(default_value).upper()
+
+    def parse_routines(
+        self,
+        rows: List[Dict[str, Any]],
+        kind: str,
+        schema: str,
+    ) -> List[SnowflakeRoutineInfo]:
+        """Parse ``FUNCTIONS`` or ``PROCEDURES`` rows into one family shape.
+
+        *kind* is ``"FUNCTION"`` or ``"PROCEDURE"`` and is also the prefix both
+        catalog views put on their columns (``FUNCTION_NAME`` /
+        ``PROCEDURE_NAME``). Reading the prefix off the kind is why one parser
+        serves both views: the documented shape is the same, the spelling is
+        not, and duplicate parsers would be two places for the prefix rule to
+        drift.
+
+        ``additional columns`` that only one view documents are read with
+        ``.get`` and kept in ``extra``: the function-only volatility and
+        aggregate flags stay ``None`` on a procedure, and the procedure-only
+        ``SECRETS``/``EXTERNAL_ACCESS_INTEGRATIONS`` stay ``None`` on a
+        function. The extras therefore have the same keys for both kinds,
+        which is the stable shape a caller filters on.
+        """
+        routines = []
+        for raw_row in rows:
+            row = self._upper_row(raw_row)
+            prefix = kind.upper()
+            routines.append(
+                SnowflakeRoutineInfo(
+                    name=row.get(f"{prefix}_NAME", ""),
+                    kind=prefix,
+                    schema=row.get(f"{prefix}_SCHEMA") or schema,
+                    catalog=row.get(f"{prefix}_CATALOG"),
+                    language=row.get(f"{prefix}_LANGUAGE"),
+                    argument_signature=row.get("ARGUMENT_SIGNATURE"),
+                    return_type=row.get("DATA_TYPE"),
+                    owner=row.get(f"{prefix}_OWNER"),
+                    comment=row.get("COMMENT"),
+                    created=row.get("CREATED"),
+                    last_altered=row.get("LAST_ALTERED"),
+                    definition=row.get(f"{prefix}_DEFINITION"),
+                    extra={
+                        "character_maximum_length": self._as_int(
+                            row.get("CHARACTER_MAXIMUM_LENGTH")
+                        ),
+                        "character_octet_length": self._as_int(
+                            row.get("CHARACTER_OCTET_LENGTH")
+                        ),
+                        "numeric_precision": self._as_int(row.get("NUMERIC_PRECISION")),
+                        "numeric_precision_radix": self._as_int(
+                            row.get("NUMERIC_PRECISION_RADIX")
+                        ),
+                        "numeric_scale": self._as_int(row.get("NUMERIC_SCALE")),
+                        "volatility": row.get("VOLATILITY"),
+                        "is_null_call": self._as_tristate_flag(row.get("IS_NULL_CALL")),
+                        "is_secure": self._as_tristate_flag(row.get("IS_SECURE")),
+                        "is_memoizable": self._as_tristate_flag(row.get("IS_MEMOIZABLE")),
+                        "is_external": self._as_tristate_flag(row.get("IS_EXTERNAL")),
+                        "is_data_metric": self._as_tristate_flag(
+                            row.get("IS_DATA_METRIC")
+                        ),
+                        "is_aggregate": self._as_tristate_flag(row.get("IS_AGGREGATE")),
+                        "runtime_version": row.get("RUNTIME_VERSION"),
+                        "handler": row.get("HANDLER"),
+                        "packages": row.get("PACKAGES"),
+                        "installed_packages": row.get("INSTALLED_PACKAGES"),
+                        "artifact_repository": row.get("ARTIFACT_REPOSITORY"),
+                        "external_access_integrations": row.get(
+                            "EXTERNAL_ACCESS_INTEGRATIONS"
+                        ),
+                        "secrets": row.get("SECRETS"),
+                        "owner_role_type": row.get("OWNER_ROLE_TYPE"),
+                    },
+                )
+            )
+        return routines
+
+    def parse_sequences(
+        self,
+        rows: List[Dict[str, Any]],
+        schema: str,
+    ) -> List[SequenceInfo]:
+        """Parse ``INFORMATION_SCHEMA.SEQUENCES`` rows onto core's ``SequenceInfo``.
+
+        The common shape is core's, because a sequence is one of the object
+        kinds core already models. Snowflake's differences live in ``extra``:
+        the catalog's own three-part name, the owner, ``NEXT_VALUE`` (which is
+        *not* a last-produced value and is therefore not put in
+        ``last_value``), and the ``ORDERED`` property.
+
+        ``MINIMUM_VALUE``, ``MAXIMUM_VALUE`` and ``CYCLE_OPTION`` are
+        documented "Not applicable for Snowflake"; they parse as ``None``
+        rather than as an invented default. ``START_VALUE`` and ``INCREMENT``
+        are documented ``VARCHAR`` and are converted by ``_as_int``. A value
+        that cannot be read costs that field its value, not the row.
+        """
+        sequences = []
+        for raw_row in rows:
+            row = self._upper_row(raw_row)
+            sequences.append(
+                SequenceInfo(
+                    name=row.get("SEQUENCE_NAME", ""),
+                    schema=row.get("SEQUENCE_SCHEMA") or schema,
+                    data_type=row.get("DATA_TYPE"),
+                    start_value=self._as_int(row.get("START_VALUE")),
+                    minimum_value=self._as_int(row.get("MINIMUM_VALUE")),
+                    maximum_value=self._as_int(row.get("MAXIMUM_VALUE")),
+                    increment=self._as_int(row.get("INCREMENT")),
+                    cycle=self._as_tristate_flag(row.get("CYCLE_OPTION")),
+                    cache_size=None,
+                    last_value=None,
+                    extra={
+                        "snowflake_catalog": row.get("SEQUENCE_CATALOG"),
+                        "snowflake_owner": row.get("SEQUENCE_OWNER"),
+                        "snowflake_next_value": self._as_int(row.get("NEXT_VALUE")),
+                        "snowflake_ordered": self._as_tristate_flag(
+                            row.get("ORDERED")
+                        ),
+                        "snowflake_numeric_precision": self._as_int(
+                            row.get("NUMERIC_PRECISION")
+                        ),
+                        "snowflake_numeric_precision_radix": self._as_int(
+                            row.get("NUMERIC_PRECISION_RADIX")
+                        ),
+                        "snowflake_numeric_scale": self._as_int(
+                            row.get("NUMERIC_SCALE")
+                        ),
+                        "snowflake_created": row.get("CREATED"),
+                        "snowflake_last_altered": row.get("LAST_ALTERED"),
+                        "snowflake_comment": row.get("COMMENT"),
+                    },
+                )
+            )
+        return sequences
+
+    def parse_stages(
+        self,
+        rows: List[Dict[str, Any]],
+        schema: str,
+    ) -> List[SnowflakeCatalogObjectInfo]:
+        """Parse ``INFORMATION_SCHEMA.STAGES`` rows into the catalog shape."""
+        stages = []
+        for raw_row in rows:
+            row = self._upper_row(raw_row)
+            stages.append(
+                SnowflakeCatalogObjectInfo(
+                    name=row.get("STAGE_NAME", ""),
+                    kind="STAGE",
+                    catalog=row.get("STAGE_CATALOG"),
+                    schema=row.get("STAGE_SCHEMA") or schema,
+                    owner=row.get("STAGE_OWNER"),
+                    comment=row.get("COMMENT"),
+                    created=row.get("CREATED"),
+                    last_altered=row.get("LAST_ALTERED"),
+                    extra={
+                        "stage_url": row.get("STAGE_URL"),
+                        "stage_region": row.get("STAGE_REGION"),
+                        "stage_type": row.get("STAGE_TYPE"),
+                    },
+                )
+            )
+        return stages
+
+    def parse_file_formats(
+        self,
+        rows: List[Dict[str, Any]],
+        schema: str,
+    ) -> List[SnowflakeCatalogObjectInfo]:
+        """Parse ``INFORMATION_SCHEMA.FILE_FORMATS`` rows into the catalog shape.
+
+        ``SKIP_HEADER`` is a ``NUMBER``, so it is converted; the boolean
+        options are documented as text and read through the shared flag
+        reader so ``TRUE``/``FALSE`` and ``YES``/``NO`` both work.
+        """
+        formats = []
+        for raw_row in rows:
+            row = self._upper_row(raw_row)
+            formats.append(
+                SnowflakeCatalogObjectInfo(
+                    name=row.get("FILE_FORMAT_NAME", ""),
+                    kind="FILE FORMAT",
+                    catalog=row.get("FILE_FORMAT_CATALOG"),
+                    schema=row.get("FILE_FORMAT_SCHEMA") or schema,
+                    owner=row.get("FILE_FORMAT_OWNER"),
+                    comment=row.get("COMMENT"),
+                    created=row.get("CREATED"),
+                    last_altered=row.get("LAST_ALTERED"),
+                    extra={
+                        "file_format_type": row.get("FILE_FORMAT_TYPE"),
+                        "record_delimiter": row.get("RECORD_DELIMITER"),
+                        "field_delimiter": row.get("FIELD_DELIMITER"),
+                        "skip_header": self._as_int(row.get("SKIP_HEADER")),
+                        "date_format": row.get("DATE_FORMAT"),
+                        "time_format": row.get("TIME_FORMAT"),
+                        "timestamp_format": row.get("TIMESTAMP_FORMAT"),
+                        "binary_format": row.get("BINARY_FORMAT"),
+                        "escape": row.get("ESCAPE"),
+                        "escape_unenclosed_field": row.get(
+                            "ESCAPE_UNENCLOSED_FIELD"
+                        ),
+                        "trim_space": self._as_tristate_flag(row.get("TRIM_SPACE")),
+                        "field_optionally_enclosed_by": row.get(
+                            "FIELD_OPTIONALLY_ENCLOSED_BY"
+                        ),
+                        "null_if": row.get("NULL_IF"),
+                        "compression": row.get("COMPRESSION"),
+                        "error_on_column_count_mismatch": self._as_tristate_flag(
+                            row.get("ERROR_ON_COLUMN_COUNT_MISMATCH")
+                        ),
+                    },
+                )
+            )
+        return formats
+
+    def parse_pipes(
+        self,
+        rows: List[Dict[str, Any]],
+        schema: str,
+    ) -> List[SnowflakeCatalogObjectInfo]:
+        """Parse ``INFORMATION_SCHEMA.PIPES`` rows into the catalog shape."""
+        pipes = []
+        for raw_row in rows:
+            row = self._upper_row(raw_row)
+            pipes.append(
+                SnowflakeCatalogObjectInfo(
+                    name=row.get("PIPE_NAME", ""),
+                    kind="PIPE",
+                    catalog=row.get("PIPE_CATALOG"),
+                    schema=row.get("PIPE_SCHEMA") or schema,
+                    owner=row.get("PIPE_OWNER"),
+                    comment=row.get("COMMENT"),
+                    created=row.get("CREATED"),
+                    last_altered=row.get("LAST_ALTERED"),
+                    extra={
+                        "definition": row.get("DEFINITION"),
+                        "is_autoingest_enabled": self._as_tristate_flag(
+                            row.get("IS_AUTOINGEST_ENABLED")
+                        ),
+                        "notification_channel_name": row.get(
+                            "NOTIFICATION_CHANNEL_NAME"
+                        ),
+                        "pattern": row.get("PATTERN"),
+                    },
+                )
+            )
+        return pipes
+
+    def parse_tasks(self, rows: List[Dict[str, Any]]) -> List[SnowflakeCatalogObjectInfo]:
+        """Parse ``SHOW TASKS`` rows, whose column names are lowercase.
+
+        The page documents two places where the shape is not an Information
+        Schema row: the keys are lowercase, and the timestamps are ``created_on``
+        only -- there is no ``last_altered`` column in this output. Values are
+        stored as the catalog spelled them; ``ALLOW_OVERLAPPING_EXECUTION`` is
+        the one documented boolean and is read through the shared flag reader.
+
+        ``PREDECESSORS`` and ``TASK_RELATIONS`` are JSON-bearing ``VARCHAR``
+        fields. They are kept as text rather than parsed here: this backend
+        does not know whether a given account serializes them with the standard
+        JSON rules, and a failed parse should cost no row its identity.
+        """
+        tasks = []
+        for raw_row in rows:
+            row = self._upper_row(raw_row)
+            tasks.append(
+                SnowflakeCatalogObjectInfo(
+                    name=row.get("NAME", ""),
+                    kind="TASK",
+                    catalog=row.get("DATABASE_NAME"),
+                    schema=row.get("SCHEMA_NAME"),
+                    owner=row.get("OWNER"),
+                    comment=row.get("COMMENT"),
+                    created=row.get("CREATED_ON"),
+                    last_altered=None,
+                    extra={
+                        "id": row.get("ID"),
+                        "warehouse": row.get("WAREHOUSE"),
+                        "schedule": row.get("SCHEDULE"),
+                        "scheduling_mode": row.get("SCHEDULING_MODE"),
+                        "target_completion_interval": row.get(
+                            "TARGET_COMPLETION_INTERVAL"
+                        ),
+                        "predecessors": row.get("PREDECESSORS"),
+                        "state": row.get("STATE"),
+                        "definition": row.get("DEFINITION"),
+                        "condition": row.get("CONDITION"),
+                        "allow_overlapping_execution": self._as_tristate_flag(
+                            row.get("ALLOW_OVERLAPPING_EXECUTION")
+                        ),
+                        "error_integration": row.get("ERROR_INTEGRATION"),
+                        "success_integration": row.get("SUCCESS_INTEGRATION"),
+                        "last_committed_on": row.get("LAST_COMMITTED_ON"),
+                        "last_suspended_on": row.get("LAST_SUSPENDED_ON"),
+                        "last_suspended_reason": row.get("LAST_SUSPENDED_REASON"),
+                        "task_relations": row.get("TASK_RELATIONS"),
+                        "execute_as_user": row.get("EXECUTE_AS_USER"),
+                        "overlap_policy": row.get("OVERLAP_POLICY"),
+                        "owner_role_type": row.get("OWNER_ROLE_TYPE"),
+                        "config": row.get("CONFIG"),
+                    },
+                )
+            )
+        return tasks
+
+    def parse_streams(
+        self, rows: List[Dict[str, Any]]
+    ) -> List[SnowflakeCatalogObjectInfo]:
+        """Parse ``SHOW STREAMS`` rows, whose column names are lowercase.
+
+        ``STALE`` is the documented boolean ("If this is TRUE, the stream may
+        be stale"); it and ``STALE_AFTER`` are the two columns a consumer acts
+        on. ``BASE_TABLES`` applies only to streams on views and is kept as the
+        catalog text. There is no ``last_altered`` in this output.
+        """
+        streams = []
+        for raw_row in rows:
+            row = self._upper_row(raw_row)
+            streams.append(
+                SnowflakeCatalogObjectInfo(
+                    name=row.get("NAME", ""),
+                    kind="STREAM",
+                    catalog=row.get("DATABASE_NAME"),
+                    schema=row.get("SCHEMA_NAME"),
+                    owner=row.get("OWNER"),
+                    comment=row.get("COMMENT"),
+                    created=row.get("CREATED_ON"),
+                    last_altered=None,
+                    extra={
+                        "table_name": row.get("TABLE_NAME"),
+                        "source_type": row.get("SOURCE_TYPE"),
+                        "base_tables": row.get("BASE_TABLES"),
+                        "stream_type": row.get("TYPE"),
+                        "stale": self._as_tristate_flag(row.get("STALE")),
+                        "mode": row.get("MODE"),
+                        "stale_after": row.get("STALE_AFTER"),
+                        "invalid_reason": row.get("INVALID_REASON"),
+                        "owner_role_type": row.get("OWNER_ROLE_TYPE"),
+                    },
+                )
+            )
+        return streams
 
     def parse_databases(self, rows: List[Dict[str, Any]]) -> List[SnowflakeDatabaseInfo]:
         """Parse ``INFORMATION_SCHEMA.DATABASES`` rows.
@@ -671,6 +1079,17 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
                 else ColumnNullable.NOT_NULL
             )
             data_type = row.get("DATA_TYPE") or "VARCHAR"
+            # Identity and sequence-backed defaults are different spellings of
+            # the same first-order fact: the database supplies the value. Both
+            # set ``is_auto_increment``; ``extra`` keeps which one it was, so
+            # a model builder can tell an AUTOINCREMENT column from one that
+            # merely defaults to ``sequence.NEXTVAL``.
+            identity = str(row.get("IS_IDENTITY") or "").strip().upper() == "YES"
+            sequence_backed = self._is_sequence_backed(row.get("COLUMN_DEFAULT"))
+            kind = str(row.get("KIND") or "").strip().upper()
+            generated_expression = (
+                row.get("EXPRESSION") if kind == "VIRTUAL_COLUMN" else None
+            )
             # ``data_type`` stays the bare word the catalog reported and
             # ``data_type_full`` carries the size, which is what the two fields
             # are for: the string core's differ falls back to when a type cannot
@@ -695,6 +1114,33 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
                     numeric_precision=row.get("NUMERIC_PRECISION"),
                     numeric_scale=row.get("NUMERIC_SCALE"),
                     collation=row.get("COLLATION_NAME"),
+                    is_auto_increment=identity or sequence_backed,
+                    is_generated=kind == "VIRTUAL_COLUMN",
+                    generated_expression=generated_expression,
+                    extra={
+                        "snowflake_auto_increment_source": (
+                            "identity"
+                            if identity
+                            else ("sequence_default" if sequence_backed else None)
+                        ),
+                        "snowflake_identity": identity,
+                        "snowflake_identity_generation": row.get(
+                            "IDENTITY_GENERATION"
+                        ),
+                        "snowflake_identity_start": self._as_int(
+                            row.get("IDENTITY_START")
+                        ),
+                        "snowflake_identity_increment": self._as_int(
+                            row.get("IDENTITY_INCREMENT")
+                        ),
+                        "snowflake_identity_ordered": self._as_tristate_flag(
+                            row.get("IDENTITY_ORDERED")
+                        ),
+                        "snowflake_sequence_backed": sequence_backed,
+                        "snowflake_column_kind": row.get("KIND"),
+                        "snowflake_data_type_alias": row.get("DATA_TYPE_ALIAS"),
+                        "snowflake_expression": row.get("EXPRESSION"),
+                    },
                 )
             )
         return columns
@@ -1059,6 +1505,199 @@ class SnowflakeIntrospector(SnowflakeIntrospectorMixin, AbstractIntrospector):
             self._cache.set(key, result)
         return result
 
+    # ------------------------------------------------------------------ #
+    # Routines, sequences and the Snowflake catalog objects
+    #
+    # Method names and signatures match the async class exactly; see the
+    # async twins below. Each answer is cached under ``IntrospectionScope.SCHEMA``
+    # with the family in ``extra``, because core has no scope for a routine,
+    # a stage or a stream -- and the ``extra`` is what keeps five families
+    # that share the scope from answering each other's questions.
+    # ------------------------------------------------------------------ #
+
+    def list_routines(self, schema: Optional[str] = None) -> List[SnowflakeRoutineInfo]:
+        """List stored procedures and user-defined functions of one schema.
+
+        Two statements are read -- ``INFORMATION_SCHEMA.FUNCTIONS`` and
+        ``INFORMATION_SCHEMA.PROCEDURES`` -- because the engine keeps them
+        in two views with different columns. The two answers are merged and
+        sorted by ``(kind, name, argument_signature)`` so overloads have a
+        deterministic order. The function and procedure columns are
+        documented on the pages linked in
+        :meth:`~..mixins.introspection.SnowflakeIntrospectionMixin.format_function_list_query_statement`
+        and
+        :meth:`~..mixins.introspection.SnowflakeIntrospectionMixin.format_procedure_list_query_statement`.
+
+        ``schema=None`` means the configured schema, as everywhere else. A
+        result is cached per schema; the cache key carries the family because
+        core has no routine scope.
+
+        The view is privilege-filtered: a role that cannot see a routine does
+        not get a row for it, which is not the same as the routine not existing.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(IntrospectionScope.SCHEMA, schema=target_schema, extra="routines")
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        functions_sql, functions_params = SnowflakeFunctionListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        functions = self.parse_routines(
+            self._executor.execute(functions_sql, functions_params),
+            "FUNCTION",
+            target_schema,
+        )
+        procedures_sql, procedures_params = SnowflakeProcedureListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        procedures = self.parse_routines(
+            self._executor.execute(procedures_sql, procedures_params),
+            "PROCEDURE",
+            target_schema,
+        )
+        result = sorted(
+            functions + procedures,
+            key=lambda routine: (
+                routine.kind,
+                routine.name,
+                routine.argument_signature or "",
+            ),
+        )
+        self._cache.set(key, result)
+        return result
+
+    def list_sequences(self, schema: Optional[str] = None) -> List[SequenceInfo]:
+        """List standalone sequences of one schema.
+
+        Reads ``INFORMATION_SCHEMA.SEQUENCES``; the columns and the meaning
+        of each mapped field are in
+        :meth:`~..mixins.introspection.SnowflakeIntrospectorMixin.parse_sequences`.
+
+        This family is not the identity answer. A column declared
+        ``AUTOINCREMENT`` has no independent sequence object in
+        ``SEQUENCES`` (Snowflake manages its backing sequence internally), and
+        ``COLUMNS.IS_IDENTITY`` is where that fact is read; see
+        :meth:`~..mixins.introspection.SnowflakeIntrospectorMixin.parse_columns`.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SEQUENCE, schema=target_schema, extra="sequences"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeSequenceListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_sequences(
+            self._executor.execute(sql, params), target_schema
+        )
+        self._cache.set(key, result)
+        return result
+
+    def list_stages(self, schema: Optional[str] = None) -> List[SnowflakeCatalogObjectInfo]:
+        """List named stages of one schema, from ``INFORMATION_SCHEMA.STAGES``."""
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SCHEMA, schema=target_schema, extra="stages"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeStageListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_stages(self._executor.execute(sql, params), target_schema)
+        self._cache.set(key, result)
+        return result
+
+    def list_file_formats(
+        self, schema: Optional[str] = None
+    ) -> List[SnowflakeCatalogObjectInfo]:
+        """List named file formats of one schema, from ``INFORMATION_SCHEMA.FILE_FORMATS``."""
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SCHEMA, schema=target_schema, extra="file_formats"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeFileFormatListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_file_formats(
+            self._executor.execute(sql, params), target_schema
+        )
+        self._cache.set(key, result)
+        return result
+
+    def list_pipes(self, schema: Optional[str] = None) -> List[SnowflakeCatalogObjectInfo]:
+        """List pipes of one schema, from ``INFORMATION_SCHEMA.PIPES``."""
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SCHEMA, schema=target_schema, extra="pipes"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakePipeListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_pipes(self._executor.execute(sql, params), target_schema)
+        self._cache.set(key, result)
+        return result
+
+    def list_tasks(self, schema: Optional[str] = None) -> List[SnowflakeCatalogObjectInfo]:
+        """List tasks of one schema, from ``SHOW TASKS``.
+
+        There is no Information Schema view for tasks; the statement is scoped
+        with ``IN SCHEMA`` when a schema is known and is the bare command when
+        it is not. The rows are documented lowercase and are normalized before
+        parsing.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SCHEMA, schema=target_schema, extra="tasks"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeTaskListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_tasks(self._executor.execute(sql, params))
+        self._cache.set(key, result)
+        return result
+
+    def list_streams(self, schema: Optional[str] = None) -> List[SnowflakeCatalogObjectInfo]:
+        """List streams of one schema, from ``SHOW STREAMS``.
+
+        The same absence of a view as for tasks, and the same schema scope rule
+        and lowercase row shape. ``STALE``/``STALE_AFTER`` say whether the
+        stream can still be read.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SCHEMA, schema=target_schema, extra="streams"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeStreamListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_streams(self._executor.execute(sql, params))
+        self._cache.set(key, result)
+        return result
+
 
 class _SnowflakeAsyncIntrospectorExecutor:
     """Async executor wrapping synchronous Snowflake cursor operations.
@@ -1212,4 +1851,185 @@ class AsyncSnowflakeIntrospector(SnowflakeIntrospectorMixin, AsyncAbstractIntros
         )
         if result is not None:
             self._cache.set(key, result)
+        return result
+
+    # ------------------------------------------------------------------ #
+    # Routines, sequences and the Snowflake catalog objects
+    # Async twins of the sync methods above: same method names, same
+    # signatures, same cache keys, awaited execution.
+    # ------------------------------------------------------------------ #
+
+    async def list_routines(
+        self, schema: Optional[str] = None
+    ) -> List[SnowflakeRoutineInfo]:
+        """List stored procedures and user-defined functions asynchronously.
+
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_routines`; both
+        catalog views are read, merged and sorted the same way.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(IntrospectionScope.SCHEMA, schema=target_schema, extra="routines")
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        functions_sql, functions_params = SnowflakeFunctionListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        functions = self.parse_routines(
+            await self._executor.execute(functions_sql, functions_params),
+            "FUNCTION",
+            target_schema,
+        )
+        procedures_sql, procedures_params = SnowflakeProcedureListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        procedures = self.parse_routines(
+            await self._executor.execute(procedures_sql, procedures_params),
+            "PROCEDURE",
+            target_schema,
+        )
+        result = sorted(
+            functions + procedures,
+            key=lambda routine: (
+                routine.kind,
+                routine.name,
+                routine.argument_signature or "",
+            ),
+        )
+        self._cache.set(key, result)
+        return result
+
+    async def list_sequences(self, schema: Optional[str] = None) -> List[SequenceInfo]:
+        """List standalone sequences asynchronously.
+
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_sequences`.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SEQUENCE, schema=target_schema, extra="sequences"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeSequenceListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_sequences(
+            await self._executor.execute(sql, params), target_schema
+        )
+        self._cache.set(key, result)
+        return result
+
+    async def list_stages(
+        self, schema: Optional[str] = None
+    ) -> List[SnowflakeCatalogObjectInfo]:
+        """List named stages asynchronously.
+
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_stages`.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SCHEMA, schema=target_schema, extra="stages"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeStageListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_stages(await self._executor.execute(sql, params), target_schema)
+        self._cache.set(key, result)
+        return result
+
+    async def list_file_formats(
+        self, schema: Optional[str] = None
+    ) -> List[SnowflakeCatalogObjectInfo]:
+        """List named file formats asynchronously.
+
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_file_formats`.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SCHEMA, schema=target_schema, extra="file_formats"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeFileFormatListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_file_formats(
+            await self._executor.execute(sql, params), target_schema
+        )
+        self._cache.set(key, result)
+        return result
+
+    async def list_pipes(
+        self, schema: Optional[str] = None
+    ) -> List[SnowflakeCatalogObjectInfo]:
+        """List pipes asynchronously.
+
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_pipes`.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SCHEMA, schema=target_schema, extra="pipes"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakePipeListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_pipes(await self._executor.execute(sql, params), target_schema)
+        self._cache.set(key, result)
+        return result
+
+    async def list_tasks(
+        self, schema: Optional[str] = None
+    ) -> List[SnowflakeCatalogObjectInfo]:
+        """List tasks asynchronously.
+
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_tasks`.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SCHEMA, schema=target_schema, extra="tasks"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeTaskListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_tasks(await self._executor.execute(sql, params))
+        self._cache.set(key, result)
+        return result
+
+    async def list_streams(
+        self, schema: Optional[str] = None
+    ) -> List[SnowflakeCatalogObjectInfo]:
+        """List streams asynchronously.
+
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_streams`.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SCHEMA, schema=target_schema, extra="streams"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeStreamListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_streams(await self._executor.execute(sql, params))
+        self._cache.set(key, result)
         return result

@@ -19,9 +19,9 @@ suite asserts the row -> value mapping against fabricated rows, which pins
 the parser and the SQL text but cannot pin the account's answer.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 
 
 @dataclass(frozen=True)
@@ -226,3 +226,78 @@ class SnowflakeTableStorageMetrics:
     def is_clustered(self) -> bool:
         """Whether ``TABLES.CLUSTERING_KEY`` names a clustering key."""
         return bool(self.clustering_key)
+
+
+@dataclass(frozen=True)
+class SnowflakeRoutineInfo:
+    """One stored procedure or user-defined function, as Snowflake reports it.
+
+    ``kind`` is ``"FUNCTION"`` or ``"PROCEDURE"``. Both catalog views carry
+    their own prefix on every column (``FUNCTION_NAME`` / ``PROCEDURE_NAME``);
+    the parser reads the prefix off *kind* rather than keeping two nearly
+    identical classes, which is the same split the engine itself makes.
+
+    The stable slots are the ones a model inference needs: what the routine is
+    called, what language it is written in, the argument signature it accepts,
+    the type it returns, who owns it and the comment left for a reader. Each
+    remaining catalog fact -- volatility, security, handler, runtime, packages,
+    external integrations, secrets -- is engine-specific and lives in
+    ``extra``. The views are documented on
+    https://docs.snowflake.com/en/sql-reference/info-schema/functions and
+    https://docs.snowflake.com/en/sql-reference/info-schema/procedures.
+
+    ``argument_signature`` is the view's own spelling (for example
+    ``(VARCHAR, NUMBER)``), not a re-rendered Python signature: it is the text
+    Snowflake uses to distinguish overloads, and rewriting it would lose that
+    identity.
+
+    ``return_type`` is ``DATA_TYPE`` as the catalog reports it. The procedure
+    view documents it as the return value's type; a procedure can return a
+    single value or a table, so the field is the view's answer rather than a
+    shape this backend infers.
+    """
+
+    name: str
+    kind: str
+    schema: Optional[str] = None
+    catalog: Optional[str] = None
+    language: Optional[str] = None
+    argument_signature: Optional[str] = None
+    return_type: Optional[str] = None
+    owner: Optional[str] = None
+    comment: Optional[str] = None
+    created: Optional[datetime] = None
+    last_altered: Optional[datetime] = None
+    definition: Optional[str] = None
+    extra: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SnowflakeCatalogObjectInfo:
+    """One schema object Snowflake names, as one stable shape.
+
+    Stages, file formats and pipes are database-level views; tasks and streams
+    are ``SHOW`` result sets. Their column names differ in every family, but
+    every row answers the same first-order questions -- its name, its kind,
+    where it lives, who owns it, when it was created and altered, and the
+    comment left for a reader -- so this is the one shape those five families
+    project onto. ``kind`` is the engine's vocabulary (``STAGE``,
+    ``FILE FORMAT``, ``PIPE``, ``TASK``, ``STREAM``), not a Python type.
+
+    Each family's remaining catalog columns are in ``extra``: a stage's URL
+    and region, a file format's delimiters and compression, a pipe's COPY
+    definition and pattern, a task's schedule and state, a stream's source
+    table and staleness. Keeping those fields out of the common shape is what
+    lets the five families share one class without pretending a stage and a
+    stream declare the same things.
+    """
+
+    name: str
+    kind: str
+    catalog: Optional[str] = None
+    schema: Optional[str] = None
+    owner: Optional[str] = None
+    comment: Optional[str] = None
+    created: Optional[datetime] = None
+    last_altered: Optional[datetime] = None
+    extra: Dict[str, Any] = field(default_factory=dict)

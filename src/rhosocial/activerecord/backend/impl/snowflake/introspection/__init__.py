@@ -11,7 +11,9 @@ from .introspector import (
     AsyncSnowflakeIntrospector,
 )
 from .types import (
+    SnowflakeCatalogObjectInfo,
     SnowflakeDatabaseInfo,
+    SnowflakeRoutineInfo,
     SnowflakeSchemaInfo,
     SnowflakeTableStorageMetrics,
     SnowflakeWarehouseInfo,
@@ -21,7 +23,9 @@ __all__ = [
     "SnowflakeIntrospectorMixin",
     "SnowflakeIntrospector",
     "AsyncSnowflakeIntrospector",
+    "SnowflakeCatalogObjectInfo",
     "SnowflakeDatabaseInfo",
+    "SnowflakeRoutineInfo",
     "SnowflakeSchemaInfo",
     "SnowflakeTableStorageMetrics",
     "SnowflakeWarehouseInfo",
