@@ -47,9 +47,17 @@ from rhosocial.activerecord.backend.expression.introspection import (
 
 __all__ = [
     "SnowflakeDatabaseListQueryStatement",
+    "SnowflakeFileFormatListQueryStatement",
+    "SnowflakeFunctionListQueryStatement",
+    "SnowflakePipeListQueryStatement",
+    "SnowflakeProcedureListQueryStatement",
     "SnowflakeSchemaListQueryStatement",
-    "SnowflakeWarehouseListQueryStatement",
+    "SnowflakeSequenceListQueryStatement",
+    "SnowflakeStageListQueryStatement",
+    "SnowflakeStreamListQueryStatement",
     "SnowflakeTableStorageMetricsQueryStatement",
+    "SnowflakeTaskListQueryStatement",
+    "SnowflakeWarehouseListQueryStatement",
 ]
 
 
@@ -211,3 +219,133 @@ class SnowflakeTableStorageMetricsQueryStatement(IntrospectionExpression):
     def format_method(self) -> str:
         """The dialect formatting method that renders this expression."""
         return "format_table_storage_metrics_query_statement"
+
+
+class SnowflakeFunctionListQueryStatement(IntrospectionExpression):
+    """``SELECT`` over ``INFORMATION_SCHEMA.FUNCTIONS``.
+
+    Documentation: https://docs.snowflake.com/en/sql-reference/info-schema/functions
+
+    The view lists user-defined functions, external functions and data metric
+    functions in the current (or specified) database. It does not list the
+    built-in system functions; those are served by ``SHOW FUNCTIONS`` and are
+    not schema objects with an owner or a comment.
+    """
+
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_function_list_query_statement"
+
+
+class SnowflakeProcedureListQueryStatement(IntrospectionExpression):
+    """``SELECT`` over ``INFORMATION_SCHEMA.PROCEDURES``.
+
+    Documentation: https://docs.snowflake.com/en/sql-reference/info-schema/procedures
+
+    Procedures are a separate catalog view from functions: the columns are
+    prefixed ``PROCEDURE_`` and the return-value columns differ. Keeping a
+    separate statement is what lets each formatter select the documented
+    columns instead of projecting a union of two views.
+    """
+
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_procedure_list_query_statement"
+
+
+class SnowflakeSequenceListQueryStatement(IntrospectionExpression):
+    """``SELECT`` over ``INFORMATION_SCHEMA.SEQUENCES``.
+
+    Documentation: https://docs.snowflake.com/en/sql-reference/info-schema/sequences
+
+    Snowflake sequences are standalone schema objects, like PostgreSQL's and
+    MariaDB's; they are not a synonym for a table's identity column, which is
+    answered by ``COLUMNS.IS_IDENTITY`` instead.
+    """
+
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_sequence_list_query_statement"
+
+
+class SnowflakeStageListQueryStatement(IntrospectionExpression):
+    """``SELECT`` over ``INFORMATION_SCHEMA.STAGES``.
+
+    Documentation: https://docs.snowflake.com/en/sql-reference/info-schema/stages
+
+    The view lists named stages; the user and table stages are not named
+    objects and do not appear here.
+    """
+
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_stage_list_query_statement"
+
+
+class SnowflakeFileFormatListQueryStatement(IntrospectionExpression):
+    """``SELECT`` over ``INFORMATION_SCHEMA.FILE_FORMATS``.
+
+    Documentation: https://docs.snowflake.com/en/sql-reference/info-schema/file_formats
+
+    The view lists named file formats, with the delimiter, encoding and
+    compression options each declares.
+    """
+
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_file_format_list_query_statement"
+
+
+class SnowflakePipeListQueryStatement(IntrospectionExpression):
+    """``SELECT`` over ``INFORMATION_SCHEMA.PIPES``.
+
+    Documentation: https://docs.snowflake.com/en/sql-reference/info-schema/pipes
+
+    The view lists pipes, with the COPY statement each runs and the pattern it
+    accepts. Current pipe status is not a catalog column; it is answered by
+    ``SYSTEM$PIPE_STATUS``, which is left to the caller.
+    """
+
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_pipe_list_query_statement"
+
+
+class SnowflakeTaskListQueryStatement(IntrospectionExpression):
+    """``SHOW TASKS`` -- there is no ``INFORMATION_SCHEMA.TASKS`` view.
+
+    Documentation: https://docs.snowflake.com/en/sql-reference/sql/show-tasks
+
+    The Information Schema view index lists no ``TASKS`` view, so the
+    documented route is the ``SHOW`` command, rendered by
+    :class:`~...expression.show.SnowflakeShowStatement`. When a schema is
+    given the statement is scoped to it with ``IN SCHEMA``; without one it
+    keeps Snowflake's own default (the current database).
+    """
+
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_task_list_query_statement"
+
+
+class SnowflakeStreamListQueryStatement(IntrospectionExpression):
+    """``SHOW STREAMS`` -- there is no ``INFORMATION_SCHEMA.STREAMS`` view.
+
+    Documentation: https://docs.snowflake.com/en/sql-reference/sql/show-streams
+
+    As with tasks, the documented access path is ``SHOW``. Stream rows are
+    documented in lowercase, and the introspector normalizes their keys before
+    reading them.
+    """
+
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_stream_list_query_statement"

@@ -4,7 +4,7 @@ The `introspect` subcommand asks a live Snowflake account what it holds, and
 prints the answer. Every question runs through the backend's introspector, so
 what the CLI reports is what the library sees — the same objects, the same
 types, the same parsing — rather than a second implementation that can drift
-from it. Nineteen types are advertised, derived from `_TYPE_CAPABILITIES` in
+from it. Twenty-six types are advertised, derived from `_TYPE_CAPABILITIES` in
 the source rather than written out a second time, so a family cannot be
 answerable and unaskable at once.
 
@@ -14,7 +14,7 @@ python -m rhosocial.activerecord.backend.impl.snowflake introspect <TYPE> [NAME]
 
 ## What it can ask about
 
-Nineteen types, in the order `--help` prints them. The catalogue families
+Twenty-six types, in the order `--help` prints them. The catalogue families
 answer True for this dialect; the operational and one-object families are
 offered and gated on their switch, so a run is refused (exit 2) rather than
 answered with an empty list.
@@ -23,7 +23,7 @@ answered with an empty list.
 | :--- | :--- | :--- | :--- |
 | `tables` | — | `information_schema.tables` | Tables, with the kind the catalogue reports and their comment. |
 | `views` | view, optional | `information_schema.views` | Views, with their definitions; one view when named. |
-| `columns` | table, required | `information_schema.columns` | One table's columns: name, type, nullability, ordinal position, default. |
+| `columns` | table, required | `information_schema.columns` | One table's columns: name, type, nullability, ordinal position, default, and whether the value is identity- or sequence-generated. |
 | `indexes` | table, required | `information_schema.table_constraints`, `key_column_usage` | Constraints and the columns each side names. |
 | `foreign-keys` | table, required | `information_schema.referential_constraints` | Referential constraints. |
 | `database` | — | `CURRENT_DATABASE()`, `CURRENT_VERSION()` | The database this session is in and the account's version. |
@@ -31,6 +31,13 @@ answered with an empty list.
 | `schemas` | — | `information_schema.schemata` | The schemas in a database — Snowflake's namespace level above a table. `--database` names the database to enumerate. |
 | `warehouses` | — | `SHOW WAREHOUSES` | Warehouses with size, state and auto-resume. This is `SHOW`, not an `information_schema` view, because no such view exists. |
 | `table-storage-metrics` | table, required | `information_schema.table_storage_metrics`, `information_schema.tables` | One table's billed storage: active, time travel, failsafe and clone-retained bytes, plus the row count, clustering key and kind `tables` reports. |
+| `routines` | — | `information_schema.functions`, `information_schema.procedures` | Functions and stored procedures as one family: language, argument signature, return type, owner and comment. |
+| `sequences` | — | `information_schema.sequences` | Standalone sequences: type, start, increment, next value, ordered property and owner. This is not the identity answer; that is on `columns`. |
+| `stages` | — | `information_schema.stages` | Named stages with their URL, region and type. |
+| `file-formats` | — | `information_schema.file_formats` | Named file formats with their delimiters, formats and compression. |
+| `pipes` | — | `information_schema.pipes` | Pipes with the COPY definition, auto-ingest flag and pattern. |
+| `tasks` | — | `SHOW TASKS` | Tasks with schedule, state, definition, predecessors and overlap policy. Scoped with `IN SCHEMA` when a schema is set. |
+| `streams` | — | `SHOW STREAMS` | Streams with source table, type, mode, staleness and `stale_after`. |
 | `unused-indexes` | — | refused here | Offered and gated: `supports_unused_indexes_detection` answers False here, so the run is refused rather than answered empty. |
 | `table-stats` | — | refused here | Offered and gated on `supports_table_stats`, which answers False here. |
 | `runtime` | — | refused here | Offered and gated on `supports_runtime_stats`, which answers False here. |
@@ -45,12 +52,14 @@ answered with an empty list.
 `table-storage-metrics`, `ddl`, `column-profiles`, `value-samples` and
 `join-coverage`. For `views` and `dependencies` it is optional: a name asks for
 that one view, or narrows the graph to that object's edges. The list types —
-`tables`, `database`, `databases`, `schemas`, `warehouses`,
+`tables`, `database`, `databases`, `schemas`, `warehouses`, `routines`,
+`sequences`, `stages`, `file-formats`, `pipes`, `tasks`, `streams`,
 `unused-indexes`, `table-stats`, `runtime` and `index-stats` — take no name,
 and a stray one is refused (exit 2) rather than ignored: this backend has no
-`get_*_info` method that could answer for a single database, schema or
-warehouse. `schemas --database analytics` is unaffected — `--database` says
-which database's schemas to enumerate, not which schema to fetch.
+`get_*_info` method that could answer for a single database, schema, routine,
+sequence, stage, file format, pipe, task or stream. `schemas --database
+analytics` is unaffected — `--database` says which database's schemas to
+enumerate, not which schema to fetch.
 
 Exit codes follow that split: **1** is a runtime failure (connection, query,
 unexpected) and also "the named view or table is not there"; **2** is a request
@@ -135,6 +144,15 @@ python -m rhosocial.activerecord.backend.impl.snowflake introspect warehouses -o
 
 # One table's storage facts
 python -m rhosocial.activerecord.backend.impl.snowflake introspect table-storage-metrics orders --schema public --database analytics
+
+# The schema objects beyond tables and views
+python -m rhosocial.activerecord.backend.impl.snowflake introspect routines --schema public --database analytics
+python -m rhosocial.activerecord.backend.impl.snowflake introspect sequences --schema public --database analytics
+python -m rhosocial.activerecord.backend.impl.snowflake introspect stages --schema public --database analytics
+python -m rhosocial.activerecord.backend.impl.snowflake introspect file-formats --schema public --database analytics
+python -m rhosocial.activerecord.backend.impl.snowflake introspect pipes --schema public --database analytics
+python -m rhosocial.activerecord.backend.impl.snowflake introspect tasks --schema public --database analytics
+python -m rhosocial.activerecord.backend.impl.snowflake introspect streams --schema public --database analytics
 
 # What the rows hold, not what the columns declare -- read from the rows, so exact and paid for
 python -m rhosocial.activerecord.backend.impl.snowflake introspect column-profiles orders

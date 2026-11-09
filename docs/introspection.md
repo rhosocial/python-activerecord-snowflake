@@ -13,6 +13,9 @@ The introspection system is available via `backend.introspector` and answers:
 - **Index information**: primary-key and unique constraints, which are as close to an index as this engine has
 - **Foreign-key information**: referenced table, column mapping, and the update/delete rules the catalogue declares
 - **View information**: definition, check option, updatability
+- **Routine information**: stored procedures and user-defined functions, with language, argument signature, return type, owner and comment
+- **Sequence information**: standalone sequences, with start, increment, next value and ordered property
+- **Catalog objects**: named stages, file formats, pipes, tasks and streams, each with its owning role and engine-specific facts
 - **Storage information**: the four billed storage tiers of one table, and the total that fills a table record's `size_bytes`
 - **Data answers**: per-column profiles, value listings, and two columns' domain overlap
 
@@ -22,7 +25,7 @@ Snowflake has no trigger object, so the trigger family answers `False` rather th
 
 Every question in the introspection contract has a probe on the dialect, and a probe is a question about the server in front of you rather than about the product. This table is Snowflake's answer to every probe the families use. Read the `False` rows first: a probe that answers `False` says the question cannot be asked of this server, never that the answer was empty or zero.
 
-Ten catalogue families answer `True` -- the ten catalogue types the CLI offers -- and so do the three data families. Two further switches answer `True`: `supports_introspection()`, the umbrella every scope is gated on, and `supports_table_storage_introspection()`, which fills one table record's `size_bytes` rather than backing a CLI type of its own.
+Ten catalogue families answer `True` among the original set -- the ten catalogue types the CLI offered before the catalog-object work -- and so do the three data families. Seven more answer `True` as of this change: `routines`, `sequences`, `stages`, `file-formats`, `pipes`, `tasks` and `streams`. Two further switches answer `True`: `supports_introspection()`, the umbrella every scope is gated on, and `supports_table_storage_introspection()`, which fills one table record's `size_bytes` rather than backing a CLI type of its own.
 
 | Probe | Snowflake answers | The question it gates |
 |-------|-------------------|-----------------------|
@@ -36,6 +39,13 @@ Ten catalogue families answer `True` -- the ten catalogue types the CLI offers -
 | `supports_index_introspection()` | `True` | Primary-key and unique constraints |
 | `supports_foreign_key_introspection()` | `True` | Foreign keys and their rules |
 | `supports_view_introspection()` | `True` | Views and their definitions |
+| `supports_routine_introspection()` | `True` | Stored procedures and user-defined functions |
+| `supports_sequence_introspection()` | `True` | Standalone sequences |
+| `supports_stage_introspection()` | `True` | Named stages |
+| `supports_file_format_introspection()` | `True` | Named file formats |
+| `supports_pipe_introspection()` | `True` | Pipes |
+| `supports_task_introspection()` | `True` | Tasks, from `SHOW TASKS` |
+| `supports_stream_introspection()` | `True` | Streams, from `SHOW STREAMS` |
 | `supports_table_storage_introspection()` | `True` | One table's `size_bytes` slot |
 | `supports_table_storage_metrics()` | `True` | Billed storage, row count and clustering of one table |
 | `supports_column_data_profile()` | `True` | What each column of a table holds |
@@ -131,6 +141,13 @@ Each of these is one catalogue read, or one `SHOW` for warehouses. None scans th
 | Schemas | `list_schemas()` | `INFORMATION_SCHEMA.SCHEMATA` |
 | Warehouses | `list_warehouses()` | `SHOW WAREHOUSES` |
 | Storage metrics | `get_table_storage_metrics()` | `TABLE_STORAGE_METRICS` joined to `TABLES` |
+| Routines | `list_routines()` | `INFORMATION_SCHEMA.FUNCTIONS` + `PROCEDURES` |
+| Sequences | `list_sequences()` | `INFORMATION_SCHEMA.SEQUENCES` |
+| Stages | `list_stages()` | `INFORMATION_SCHEMA.STAGES` |
+| File formats | `list_file_formats()` | `INFORMATION_SCHEMA.FILE_FORMATS` |
+| Pipes | `list_pipes()` | `INFORMATION_SCHEMA.PIPES` |
+| Tasks | `list_tasks()` | `SHOW TASKS` |
+| Streams | `list_streams()` | `SHOW STREAMS` |
 
 ### Tables and views
 
@@ -151,6 +168,20 @@ A view's definition comes from `VIEW_DEFINITION`, with `CHECK_OPTION` and `IS_UP
 The composition is per concept, not per family. `CHARACTER_MAXIMUM_LENGTH` is documented in characters of string columns, so it is fed to `VARCHAR`, `CHAR` and sized `TEXT` only, and a bare word with no usable width stays bare. `NUMERIC_PRECISION` and `NUMERIC_SCALE` are fed to `NUMBER` only: the integer names are documented as `NUMBER` synonyms that cannot carry a precision or scale, so composing their reported 38 would turn every `INT` column into `NUMBER(38, 0)`, and `FLOAT`'s reported precision is left alone because neither its unit nor its radix is selected by the query. `BINARY` is deliberately excluded: the manual measures binary lengths in bytes and the selected columns are documented for string columns, so this backend composes no width for it rather than feeding a byte count to a character column.
 
 The other fields are the catalogue's own: `ORDINAL_POSITION`, `IS_NULLABLE` (read as `YES`, everything else is `NOT_NULL`), `COLUMN_DEFAULT`, `COMMENT`, `COLLATION_NAME`, and the raw precision/scale/length columns.
+
+`IS_IDENTITY` answers the auto-increment question. Snowflake documents it as "Whether this column is an identity column", and the identity columns (`IDENTITY_GENERATION`, `IDENTITY_START`, `IDENTITY_INCREMENT`, `IDENTITY_ORDERED`) carry the declared numbers and ordering property. A column whose default is `some_sequence.NEXTVAL` is the second way the database can generate a value; the default text is the only place that fact appears. Both set `is_auto_increment` on the column record, and `extra["snowflake_auto_increment_source"]` says which one it was (`"identity"` or `"sequence_default"`). A column with neither is false. The identity fields are always present in `extra`, so a caller can tell "not an identity" from "identity details not read".
+
+`KIND = 'VIRTUAL_COLUMN'` marks a generated column, and `EXPRESSION` carries the expression that computes it. `is_generated` and `generated_expression` are filled from those two columns; a regular `COLUMN` keeps both unset, whatever text the expression slot happens to contain.
+
+### Routines, sequences and catalog objects
+
+`list_routines()` reads two views because Snowflake stores functions and procedures separately: `INFORMATION_SCHEMA.FUNCTIONS` and `INFORMATION_SCHEMA.PROCEDURES`. The columns are prefixed per view, so the parser reads the prefix off the `kind` it was given, and the two listings are merged and sorted by `(kind, name, argument_signature)`. `argument_signature` is the view's own signature text, which is how overloads are distinguished; `return_type` is `DATA_TYPE`; `language` is the view's `FUNCTION_LANGUAGE` / `PROCEDURE_LANGUAGE`. The engine-specific remainder -- volatility, security, handler, runtime, packages, integrations, secrets -- is in `extra` under the documented uppercase name.
+
+`list_sequences()` projects `INFORMATION_SCHEMA.SEQUENCES` onto core's `SequenceInfo`, with Snowflake's facts in `extra`. `MINIMUM_VALUE`, `MAXIMUM_VALUE` and `CYCLE_OPTION` are documented "Not applicable for Snowflake" and stay `None`; `START_VALUE` and `INCREMENT` are documented `VARCHAR` and are converted to integers. `NEXT_VALUE` is the value the sequence will produce next, not a last-produced value, so it is stored as `extra["snowflake_next_value"]` and `last_value` stays `None`.
+
+Stages, file formats, pipes, tasks and streams share one stable record shape (`SnowflakeCatalogObjectInfo`): name, kind, catalog, schema, owner, comment, created and last altered, with each family's engine-specific columns in `extra`. The first three are database-level Information Schema views; tasks and streams have no such view, so they are read through `SHOW TASKS` / `SHOW STREAMS`, scoped with `IN SCHEMA` when a schema is configured. `SHOW` rows are documented lowercase and are normalized before parsing.
+
+Snowflake identity columns are backed by an internal sequence, but that sequence is not a row in `SEQUENCES` and must not be inferred as one. Conversely, a standalone sequence used as a column default does not make the column an identity column. The two facts are deliberately separate: `list_sequences()` answers "which sequence objects exist", while `list_columns()` answers "is this column's value generated", with `extra` naming the mechanism.
 
 ### Indexes and foreign keys
 
@@ -320,7 +351,7 @@ The invocation requires `--account` and/or `--database`; connection parameters c
 
 ### Introspection Types
 
-Nineteen types. Ten are catalogue questions, six are families this backend declines, and three are the data families.
+Twenty-six types. Seventeen are catalogue questions, six are families this backend declines, and three are the data families.
 
 | Type | Description | Name |
 |------|-------------|------|
@@ -334,6 +365,13 @@ Nineteen types. Ten are catalogue questions, six are families this backend decli
 | `schemas` | The schemas of `--database`, or the current one | refused |
 | `warehouses` | Virtual warehouses | refused |
 | `table-storage-metrics` | Billed storage tiers, row count and clustering | required (table) |
+| `routines` | Functions and procedures: language, signature, return type, owner | refused |
+| `sequences` | Standalone sequences: start, increment, next value | refused |
+| `stages` | Named stages: URL, region, type | refused |
+| `file-formats` | Named file formats: delimiter, format, compression | refused |
+| `pipes` | Pipes: COPY definition, auto-ingest, pattern | refused |
+| `tasks` | Tasks: schedule, state, definition, predecessors | refused |
+| `streams` | Streams: source table, type, staleness | refused |
 | `unused-indexes` | Declined: `False` | refused |
 | `table-stats` | Declined: `False` | refused |
 | `runtime` | Declined: `False` | refused |
@@ -409,6 +447,13 @@ python -m rhosocial.activerecord.backend.impl.snowflake introspect tables \
 | `list_views(schema=None, include_system=False)` | Views |
 | `get_view_info(name, schema=None)` | One view's definition |
 | `get_table_storage_metrics(table_name, schema=None)` | Billed storage, row count, clustering |
+| `list_routines(schema=None)` | Functions and procedures as one family |
+| `list_sequences(schema=None)` | Standalone sequences |
+| `list_stages(schema=None)` | Named stages |
+| `list_file_formats(schema=None)` | Named file formats |
+| `list_pipes(schema=None)` | Pipes |
+| `list_tasks(schema=None)` | Tasks, from `SHOW TASKS` |
+| `list_streams(schema=None)` | Streams, from `SHOW STREAMS` |
 | `list_column_data_profiles(table_name, schema=None)` | What each column holds |
 | `sample_column_values(table_name, column_name, limit=100, schema=None)` | Most frequent values |
 | `estimate_join_coverage(left_table, left_column, right_table, right_column, schema=None)` | Both coverage fractions |

@@ -54,6 +54,18 @@ _TYPE_CAPABILITIES = {
     "schemas": "supports_schema_introspection",
     "warehouses": "supports_warehouse_introspection",
     "table-storage-metrics": "supports_table_storage_metrics",
+    # ---- the schema objects Snowflake names ----
+    # Core has no family for routines, sequences, stages, file formats, pipes,
+    # tasks or streams; each switch is declared on this dialect beside the
+    # formatter that answers it. `sequences` is a core `IntrospectionScope`, but
+    # core has no listing method, so the family is wired here like the rest.
+    "routines": "supports_routine_introspection",
+    "sequences": "supports_sequence_introspection",
+    "stages": "supports_stage_introspection",
+    "file-formats": "supports_file_format_introspection",
+    "pipes": "supports_pipe_introspection",
+    "tasks": "supports_task_introspection",
+    "streams": "supports_stream_introspection",
     # ---- the operational families ----
     # Index usage, table counters, runtime facts and the dependency graph are
     # each a listing over the connection's scope, so none takes a NAME --
@@ -94,6 +106,16 @@ _NO_NAME_TYPES = (
     "databases",
     "schemas",
     "warehouses",
+    # The schema-object listings answer for the whole configured schema; no
+    # introspector method takes a single routine/sequence/stage name, so a
+    # NAME on one of them is refused rather than ignored.
+    "routines",
+    "sequences",
+    "stages",
+    "file-formats",
+    "pipes",
+    "tasks",
+    "streams",
     # The operational families describe the connection's scope rather than
     # one object, so a NAME is refused for the same reason as ``tables``:
     # ``introspect unused-indexes orders`` would read as a narrowing the
@@ -285,6 +307,17 @@ def create_parser(subparsers):
   %(prog)s schemas --account myaccount --database mydb
   %(prog)s warehouses --account myaccount
 
+  # The schema objects beyond tables and views: routines (functions plus
+  # procedures), standalone sequences, stages, file formats, pipes, tasks
+  # and streams
+  %(prog)s routines --account myaccount --database mydb
+  %(prog)s sequences --account myaccount --database mydb
+  %(prog)s stages --account myaccount --database mydb
+  %(prog)s file-formats --account myaccount --database mydb
+  %(prog)s pipes --account myaccount --database mydb
+  %(prog)s tasks --account myaccount --database mydb
+  %(prog)s streams --account myaccount --database mydb
+
   # Operational readings over the connection's scope: indexes no query has
   # used, per-table and per-index counters, live runtime facts, and the
   # dependency graph (which a NAME narrows to one object's edges)
@@ -350,8 +383,9 @@ both exit 1 with the same message.
             "table-storage-metrics, ddl, column-profiles, value-samples and "
             "join-coverage (required); the object itself for views and "
             "dependencies (optional); refused for tables, database, "
-            "databases, schemas, warehouses, unused-indexes, table-stats, "
-            "index-stats and runtime"
+            "databases, schemas, warehouses, routines, sequences, stages, "
+            "file-formats, pipes, tasks, streams, unused-indexes, "
+            "table-stats, index-stats and runtime"
         ),
     )
     # The three families that ask about a column or a second table carry the
@@ -578,6 +612,47 @@ def _handle_introspect_sync(args, backend: SnowflakeBackend, provider):
             data = _serialize_for_output(warehouses)
             provider.display_results(data, title="Warehouses")
 
+        # ---- the schema objects Snowflake names --------------------------
+        # Routines merges the two catalog views; sequences is core's
+        # ``SequenceInfo`` with Snowflake's extras; the remaining five are one
+        # stable catalog shape. None takes a NAME -- the listing answers for the
+        # configured schema.
+
+        elif args.type == "routines":
+            routines = introspector.list_routines(schema=None)
+            data = _serialize_for_output(routines)
+            provider.display_results(data, title="Routines")
+
+        elif args.type == "sequences":
+            sequences = introspector.list_sequences(schema=None)
+            data = _serialize_for_output(sequences)
+            provider.display_results(data, title="Sequences")
+
+        elif args.type == "stages":
+            stages = introspector.list_stages(schema=None)
+            data = _serialize_for_output(stages)
+            provider.display_results(data, title="Stages")
+
+        elif args.type == "file-formats":
+            file_formats = introspector.list_file_formats(schema=None)
+            data = _serialize_for_output(file_formats)
+            provider.display_results(data, title="File Formats")
+
+        elif args.type == "pipes":
+            pipes = introspector.list_pipes(schema=None)
+            data = _serialize_for_output(pipes)
+            provider.display_results(data, title="Pipes")
+
+        elif args.type == "tasks":
+            tasks = introspector.list_tasks(schema=None)
+            data = _serialize_for_output(tasks)
+            provider.display_results(data, title="Tasks")
+
+        elif args.type == "streams":
+            streams = introspector.list_streams(schema=None)
+            data = _serialize_for_output(streams)
+            provider.display_results(data, title="Streams")
+
         # ---- the operational families -------------------------------------
         # These read a statistics collector or the catalogue rather than the
         # schema structure: each one is a listing of the whole connection's
@@ -777,6 +852,44 @@ async def _handle_introspect_async(args, backend: AsyncSnowflakeBackend, provide
             warehouses = await introspector.list_warehouses()
             data = _serialize_for_output(warehouses)
             provider.display_results(data, title="Warehouses")
+
+        # The async twins of the schema-object branches above: same method and
+        # same title, awaited.
+
+        elif args.type == "routines":
+            routines = await introspector.list_routines(schema=None)
+            data = _serialize_for_output(routines)
+            provider.display_results(data, title="Routines")
+
+        elif args.type == "sequences":
+            sequences = await introspector.list_sequences(schema=None)
+            data = _serialize_for_output(sequences)
+            provider.display_results(data, title="Sequences")
+
+        elif args.type == "stages":
+            stages = await introspector.list_stages(schema=None)
+            data = _serialize_for_output(stages)
+            provider.display_results(data, title="Stages")
+
+        elif args.type == "file-formats":
+            file_formats = await introspector.list_file_formats(schema=None)
+            data = _serialize_for_output(file_formats)
+            provider.display_results(data, title="File Formats")
+
+        elif args.type == "pipes":
+            pipes = await introspector.list_pipes(schema=None)
+            data = _serialize_for_output(pipes)
+            provider.display_results(data, title="Pipes")
+
+        elif args.type == "tasks":
+            tasks = await introspector.list_tasks(schema=None)
+            data = _serialize_for_output(tasks)
+            provider.display_results(data, title="Tasks")
+
+        elif args.type == "streams":
+            streams = await introspector.list_streams(schema=None)
+            data = _serialize_for_output(streams)
+            provider.display_results(data, title="Streams")
 
         # The async twins of the nine branches above: same method, same
         # argument and same title, awaited. They are written out rather than
