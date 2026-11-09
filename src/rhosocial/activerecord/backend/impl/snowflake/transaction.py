@@ -1,9 +1,9 @@
+# src/rhosocial/activerecord/backend/impl/snowflake/transaction.py
 """Snowflake synchronous transaction manager implementation.
 
 This module provides Snowflake-specific transaction management.
 Snowflake only supports READ COMMITTED isolation level.
 """
-import logging
 from typing import TYPE_CHECKING
 
 from rhosocial.activerecord.backend.transaction import TransactionManager
@@ -41,5 +41,5 @@ class SnowflakeTransactionManager(SnowflakeTransactionMixin, TransactionManager)
         READ COMMITTED.
         """
         sql, params = self._build_begin_sql()
-        self.log(logging.DEBUG, f"Executing: {sql}")
+        # The backend execution path owns the canonical DEBUG SQL record.
         self._backend.execute(sql, params)

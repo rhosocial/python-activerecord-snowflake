@@ -27,6 +27,14 @@ class SnowflakeBackendMixin:
     and dialect property management.
     """
 
+    def _get_logger_name(self) -> str:
+        """Return the canonical Snowflake backend logger name.
+
+        Both the synchronous and asynchronous backends use the same library
+        logger, so application logging configuration has one name to target.
+        """
+        return "rhosocial.activerecord.backend.snowflake"
+
     def _register_snowflake_adapters(self) -> None:
         """Register Snowflake-specific type adapters."""
         adapters = [

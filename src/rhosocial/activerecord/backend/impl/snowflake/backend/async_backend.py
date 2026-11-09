@@ -1,3 +1,4 @@
+# src/rhosocial/activerecord/backend/impl/snowflake/backend/async_backend.py
 """Snowflake asynchronous backend implementation.
 
 This module provides the async Snowflake backend using a thread pool
@@ -26,7 +27,7 @@ backend will be updated to use it transparently.
 import asyncio
 import logging
 from concurrent.futures import Executor
-from typing import Any, Dict, Optional, Tuple
+from typing import Optional, Tuple
 
 from rhosocial.activerecord.backend.base import AsyncStorageBackend
 from rhosocial.activerecord.backend.errors import (
@@ -39,7 +40,6 @@ from rhosocial.activerecord.backend.errors import (
 from rhosocial.activerecord.backend.introspection.backend_mixin import IntrospectorBackendMixin
 from ..config import SnowflakeConnectionConfig
 from ..dialect import SnowflakeDialect
-from ..async_transaction import AsyncSnowflakeTransactionManager
 from ..mixins import SnowflakeBackendMixin, AsyncSnowflakeConcurrencyMixin
 
 
@@ -190,19 +190,19 @@ class AsyncSnowflakeBackend(
         category = self._classify_error(error)
         error_msg = str(error)
         if category == 'connection':
-            self.log(logging.ERROR, f"Connection error: {error_msg}")
+            self.log(logging.DEBUG, f"Connection error: {error_msg}")
             raise ConnectionError(error_msg) from error
         elif category == 'integrity':
-            self.log(logging.ERROR, f"Integrity error: {error_msg}")
+            self.log(logging.DEBUG, f"Integrity error: {error_msg}")
             raise IntegrityError(error_msg) from error
         elif category == 'query':
-            self.log(logging.ERROR, f"Query error: {error_msg}")
+            self.log(logging.DEBUG, f"Query error: {error_msg}")
             raise QueryError(error_msg) from error
         elif category == 'operational':
-            self.log(logging.ERROR, f"Operational error: {error_msg}")
+            self.log(logging.DEBUG, f"Operational error: {error_msg}")
             raise OperationalError(error_msg) from error
         else:
-            self.log(logging.ERROR, f"Database error: {error_msg}")
+            self.log(logging.DEBUG, f"Database error: {error_msg}")
             raise DatabaseError(error_msg) from error
 
     async def get_server_version(self) -> Tuple[int, ...]:
@@ -260,7 +260,7 @@ class AsyncSnowflakeBackend(
                 final_results.append(final_row)
             return final_results
         except Exception as e:
-            self.logger.error(f"Error processing async result set: {str(e)}", exc_info=True)
+            self.log(logging.DEBUG, f"Error processing async result set: {str(e)}")
             raise
 
     def _create_introspector(self):
