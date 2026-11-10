@@ -4,6 +4,10 @@ This module registers concrete implementations of test suite interfaces
 for the Snowflake backend.
 """
 from rhosocial.activerecord.testsuite.core.registry import ProviderRegistry
+from rhosocial.activerecord.testsuite.feature.cli.providers import (
+    GenericAsyncCLIProvider,
+    GenericSyncCLIProvider,
+)
 
 # Create a single, global instance of the ProviderRegistry.
 provider_registry = ProviderRegistry()
@@ -39,3 +43,7 @@ from .relation import RelationSyncProvider, RelationAsyncProvider
 provider_registry.register("feature.relation.IRelationProvider", RelationSyncProvider)
 provider_registry.register("feature.relation.IRelationSyncProvider", RelationSyncProvider)
 provider_registry.register("feature.relation.IRelationAsyncProvider", RelationAsyncProvider)
+
+# Register CLI providers, assembled from the basic and mixins providers above.
+provider_registry.register("feature.cli.ICLISyncProvider", GenericSyncCLIProvider)
+provider_registry.register("feature.cli.ICLIAsyncProvider", GenericAsyncCLIProvider)
