@@ -1,3 +1,4 @@
+# src/rhosocial/activerecord/backend/impl/snowflake/backend/backend.py
 """Snowflake synchronous backend implementation.
 
 This module provides the concrete implementation for interacting with Snowflake databases,
@@ -5,7 +6,7 @@ handling connections, queries, transactions, and type adaptations tailored for S
 specific behaviors and SQL dialect.
 """
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Tuple
 
 from rhosocial.activerecord.backend.base import StorageBackend
 from rhosocial.activerecord.backend.errors import (
@@ -15,11 +16,9 @@ from rhosocial.activerecord.backend.errors import (
     OperationalError,
     QueryError,
 )
-from rhosocial.activerecord.backend.result import QueryResult
 from rhosocial.activerecord.backend.introspection.backend_mixin import IntrospectorBackendMixin
 from ..config import SnowflakeConnectionConfig
 from ..dialect import SnowflakeDialect
-from ..transaction import SnowflakeTransactionManager
 from ..mixins import SnowflakeBackendMixin, SnowflakeConcurrencyMixin
 
 
@@ -158,19 +157,19 @@ class SnowflakeBackend(
         category = self._classify_error(error)
         error_msg = str(error)
         if category == 'connection':
-            self.log(logging.ERROR, f"Connection error: {error_msg}")
+            self.log(logging.DEBUG, f"Connection error: {error_msg}")
             raise ConnectionError(error_msg) from error
         elif category == 'integrity':
-            self.log(logging.ERROR, f"Integrity error: {error_msg}")
+            self.log(logging.DEBUG, f"Integrity error: {error_msg}")
             raise IntegrityError(error_msg) from error
         elif category == 'query':
-            self.log(logging.ERROR, f"Query error: {error_msg}")
+            self.log(logging.DEBUG, f"Query error: {error_msg}")
             raise QueryError(error_msg) from error
         elif category == 'operational':
-            self.log(logging.ERROR, f"Operational error: {error_msg}")
+            self.log(logging.DEBUG, f"Operational error: {error_msg}")
             raise OperationalError(error_msg) from error
         else:
-            self.log(logging.ERROR, f"Database error: {error_msg}")
+            self.log(logging.DEBUG, f"Database error: {error_msg}")
             raise DatabaseError(error_msg) from error
 
     def get_server_version(self) -> Tuple[int, ...]:
@@ -296,7 +295,7 @@ class SnowflakeBackend(
                 final_results.append(final_row)
             return final_results
         except Exception as e:
-            self.logger.error(f"Error processing result set: {str(e)}", exc_info=True)
+            self.log(logging.DEBUG, f"Error processing result set: {str(e)}")
             raise
 
     def _create_introspector(self):

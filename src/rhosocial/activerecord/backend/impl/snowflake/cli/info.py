@@ -8,7 +8,6 @@ falling back to --version flag when no connection is available.
 import argparse
 import inspect
 import json
-import logging
 from typing import Any, Dict, List, Tuple
 
 from rhosocial.activerecord.backend.dialect.protocols import (
@@ -28,11 +27,12 @@ from rhosocial.activerecord.backend.impl.snowflake.protocols import (
     SnowflakeCloneSupport,
     SnowflakeStageSupport,
 )
+from rhosocial.activerecord.logging.defaults import get_logger
 
 from .connection import add_connection_args, add_version_arg, resolve_connection_config_from_args
 from .output import INFO_OUTPUT_CHOICES, create_provider, RICH_AVAILABLE
 
-logger = logging.getLogger(__name__)
+logger = get_logger("rhosocial.activerecord.backend.snowflake")
 
 DIALECT_SPECIFIC_GROUPS = {"Snowflake-specific"}
 
@@ -112,7 +112,7 @@ def create_parser(subparsers):
 
 def handle(args):
     """Handle the info subcommand."""
-    provider = create_provider(args.output, ascii_borders=args.rich_ascii)
+    create_provider(args.output, ascii_borders=args.rich_ascii)
 
     is_connected = False
     dialect = None
@@ -349,7 +349,10 @@ def _display_info_rich(info: Dict, verbose: int, version_display: str, is_connec
     if is_connected:
         console.print(f"[bold]Snowflake Version:[/bold] {version_display} [dim](from actual connection)[/dim]\n")
     else:
-        console.print(f"[bold]Snowflake Version:[/bold] {version_display} [yellow](default value - no database connection)[/yellow]\n")
+        console.print(
+            f"[bold]Snowflake Version:[/bold] {version_display} "
+            "[yellow](default value - no database connection)[/yellow]\n"
+        )
 
     label = "Detailed" if verbose >= 2 else "Family Overview"
     console.print(f"[bold green]Protocol Support ({label}):[/bold green]")

@@ -96,7 +96,12 @@ class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
     def get_test_scenarios(self) -> List[str]:
         return list(get_enabled_scenarios().keys())
 
-    def _reset_table_sync(self, model_class, table_name: str) -> None:
+    def _reset_table_sync(
+        self,
+        model_class,
+        table_name: str,
+        schema_filename: str = None,
+    ) -> None:
         from rhosocial.activerecord.backend.options import ExecutionOptions
         from rhosocial.activerecord.backend.schema import StatementType
 
@@ -106,11 +111,16 @@ class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
         except Exception:
             pass
 
-        schema_sql = self._load_snowflake_schema(f"{table_name}.sql")
+        schema_sql = self._load_snowflake_schema(schema_filename or f"{table_name}.sql")
         model_class.__backend__.execute(schema_sql, (),
                                         options=ExecutionOptions(stmt_type=StatementType.DDL))
 
-    async def _reset_table_async(self, model_class, table_name: str) -> None:
+    async def _reset_table_async(
+        self,
+        model_class,
+        table_name: str,
+        schema_filename: str = None,
+    ) -> None:
         from rhosocial.activerecord.backend.options import ExecutionOptions
         from rhosocial.activerecord.backend.schema import StatementType
 
@@ -120,11 +130,17 @@ class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
         except Exception:
             pass
 
-        schema_sql = self._load_snowflake_schema(f"{table_name}.sql")
+        schema_sql = self._load_snowflake_schema(schema_filename or f"{table_name}.sql")
         await model_class.__backend__.execute(schema_sql, (),
                                               options=ExecutionOptions(stmt_type=StatementType.DDL))
 
-    def _setup_model(self, model_class: Type[ActiveRecord], scenario_name: str, table_name: str) -> Type[ActiveRecord]:
+    def _setup_model(
+        self,
+        model_class: Type[ActiveRecord],
+        scenario_name: str,
+        table_name: str,
+        schema_filename: str = None,
+    ) -> Type[ActiveRecord]:
         backend_class, config = get_scenario(scenario_name)
         model_class.configure(config, backend_class)
 
@@ -132,7 +148,7 @@ class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
         if backend_instance not in self._active_backends:
             self._active_backends.append(backend_instance)
 
-        self._reset_table_sync(model_class, table_name)
+        self._reset_table_sync(model_class, table_name, schema_filename)
         return model_class
 
     def _setup_multiple_models(self, model_classes: List[Tuple[Type[ActiveRecord], str]], scenario_name: str) -> Tuple[Type[ActiveRecord], ...]:
@@ -142,7 +158,13 @@ class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
             result.append(configured_model)
         return tuple(result)
 
-    async def _setup_model_async(self, model_class: Type[ActiveRecord], scenario_name: str, table_name: str) -> Type[ActiveRecord]:
+    async def _setup_model_async(
+        self,
+        model_class: Type[ActiveRecord],
+        scenario_name: str,
+        table_name: str,
+        schema_filename: str = None,
+    ) -> Type[ActiveRecord]:
         from rhosocial.activerecord.backend.impl.snowflake.backend.async_backend import (
             AsyncSnowflakeBackend,
         )
@@ -154,7 +176,7 @@ class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
         if backend_instance not in self._active_backends:
             self._active_backends.append(backend_instance)
 
-        await self._reset_table_async(model_class, table_name)
+        await self._reset_table_async(model_class, table_name, schema_filename)
         return model_class
 
     async def _setup_multiple_models_async(self, model_classes: List[Tuple[Type[ActiveRecord], str]], scenario_name: str) -> Tuple[Type[ActiveRecord], ...]:
@@ -234,7 +256,12 @@ class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
         from rhosocial.activerecord.testsuite.feature.basic.fixtures.models import (
             OrderItem as CompositeOrderItemBase,
         )
-        return self._setup_model(CompositeOrderItemBase, scenario_name, "order_items")
+        return self._setup_model(
+            CompositeOrderItemBase,
+            scenario_name,
+            "order_items",
+            "composite_order_items.sql",
+        )
 
     async def setup_async_order_fixtures(self, scenario_name: str) -> Tuple[Type[ActiveRecord], Type[ActiveRecord], Type[ActiveRecord]]:
         from rhosocial.activerecord.testsuite.feature.query.fixtures.async_models import AsyncUser, AsyncOrder, AsyncOrderItem
@@ -303,12 +330,17 @@ class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
             (AsyncProfile, "profiles"),
         ], scenario_name)
 
-    async def setup_order_item_model(self, scenario_name: str) -> Type[ActiveRecord]:
+    async def setup_async_order_item_model(self, scenario_name: str) -> Type[ActiveRecord]:
         """Set up the composite-PK AsyncOrderItem model for the query feature tests."""
         from rhosocial.activerecord.testsuite.feature.basic.fixtures.models import (
             AsyncOrderItem as AsyncCompositeOrderItemBase,
         )
-        return await self._setup_model_async(AsyncCompositeOrderItemBase, scenario_name, "order_items")
+        return await self._setup_model_async(
+            AsyncCompositeOrderItemBase,
+            scenario_name,
+            "order_items",
+            "composite_order_items.sql",
+        )
 
     async def cleanup_after_test_async(self, scenario_name: str) -> None:
         tables_to_drop = [
@@ -419,3 +451,45 @@ class QueryProvider(IQuerySyncProvider, WorkerTestProtocol):
         for table in tables:
             schemas[table] = self._load_snowflake_schema(f'{table}.sql')
         return schemas
+
+
+class AsyncQueryProvider(QueryProvider):
+    """Async query provider exposing the method names the testsuite awaits.
+
+    ``QueryProvider`` carries both sync and async setup helpers; the async
+    testsuite fixtures call the same method names as their sync counterparts,
+    so this adapter maps them onto the ``setup_async_*`` implementations.
+    """
+
+    async def setup_order_fixtures(self, scenario_name: str):
+        return await self.setup_async_order_fixtures(scenario_name)
+
+    async def setup_blog_fixtures(self, scenario_name: str):
+        return await self.setup_async_blog_fixtures(scenario_name)
+
+    async def setup_json_user_fixtures(self, scenario_name: str):
+        return await self.setup_async_json_user_fixtures(scenario_name)
+
+    async def setup_tree_fixtures(self, scenario_name: str):
+        return await self.setup_async_tree_fixtures(scenario_name)
+
+    async def setup_extended_order_fixtures(self, scenario_name: str):
+        return await self.setup_async_extended_order_fixtures(scenario_name)
+
+    async def setup_combined_fixtures(self, scenario_name: str):
+        return await self.setup_async_combined_fixtures(scenario_name)
+
+    async def setup_annotated_query_fixtures(self, scenario_name: str):
+        return await self.setup_async_annotated_query_fixtures(scenario_name)
+
+    async def setup_mapped_models(self, scenario_name: str):
+        return await self.setup_async_mapped_models(scenario_name)
+
+    async def setup_profile_fixtures(self, scenario_name: str):
+        return await self.setup_async_profile_fixtures(scenario_name)
+
+    async def setup_order_item_model(self, scenario_name: str):
+        return await self.setup_async_order_item_model(scenario_name)
+
+    async def cleanup_after_test(self, scenario_name: str) -> None:
+        await self.cleanup_after_test_async(scenario_name)

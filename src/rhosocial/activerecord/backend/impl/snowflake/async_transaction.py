@@ -1,9 +1,9 @@
+# src/rhosocial/activerecord/backend/impl/snowflake/async_transaction.py
 """Snowflake asynchronous transaction manager implementation.
 
 This module provides async transaction management for the Snowflake backend.
 Snowflake only supports READ COMMITTED isolation level.
 """
-import logging
 from typing import TYPE_CHECKING
 
 from rhosocial.activerecord.backend.transaction import AsyncTransactionManager
@@ -41,5 +41,5 @@ class AsyncSnowflakeTransactionManager(SnowflakeTransactionMixin, AsyncTransacti
         READ COMMITTED.
         """
         sql, params = self._build_begin_sql()
-        self.log(logging.DEBUG, f"Executing: {sql}")
+        # The backend execution path owns the canonical DEBUG SQL record.
         await self._backend.execute(sql, params)
