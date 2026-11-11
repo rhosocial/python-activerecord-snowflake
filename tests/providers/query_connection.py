@@ -6,7 +6,6 @@ from typing import Type, Tuple, Optional, List
 
 from rhosocial.activerecord.model import ActiveRecord, AsyncActiveRecord
 from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
-from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
 from rhosocial.activerecord.connection.pool import BackendPool, AsyncBackendPool, PoolConfig
 from rhosocial.activerecord.backend.options import ExecutionOptions
 from rhosocial.activerecord.backend.schema import StatementType
@@ -16,14 +15,20 @@ from .scenarios import get_scenario, get_enabled_scenarios
 
 
 class SyncQueryTestUser(ActiveRecord):
-    __table_name__ = "test_users"
+    @classmethod
+    def table_name(cls):
+        return "test_users"
+
     id: Optional[int] = None
     name: str
     email: str
 
 
 class AsyncQueryTestUser(AsyncActiveRecord):
-    __table_name__ = "test_users"
+    @classmethod
+    def table_name(cls):
+        return "test_users"
+
     id: Optional[int] = None
     name: str
     email: str
