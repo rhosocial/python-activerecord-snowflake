@@ -15,6 +15,7 @@ from rhosocial.activerecord.backend.errors import (
     IntegrityError,
     OperationalError,
     QueryError,
+    attach_diagnostics,
 )
 from rhosocial.activerecord.backend.introspection.backend_mixin import IntrospectorBackendMixin
 from ..config import SnowflakeConnectionConfig
@@ -148,6 +149,13 @@ class SnowflakeBackend(
     def _handle_error(self, error: Exception) -> None:
         """Handle and classify a Snowflake error.
 
+        Translates the driver exception into the shared error taxonomy and
+        attaches driver diagnostics (errno, SQLSTATE, operation, backend).
+        Only transient infrastructure failures (network timeouts, service
+        unavailability, lost connections) become retryable. Snowflake has weak
+        locking semantics, so lock/deadlock failures are not mapped to
+        LockError/DeadlockError.
+
         Args:
             error: The exception to handle.
 
@@ -155,22 +163,23 @@ class SnowflakeBackend(
             Appropriate rhosocial error based on classification.
         """
         category = self._classify_error(error)
+        target, transient = self._resolve_error_mapping(error, category)
         error_msg = str(error)
-        if category == 'connection':
+        diagnostics = self._error_diagnostics(error, transient)
+        if target == 'connection':
             self.log(logging.DEBUG, f"Connection error: {error_msg}")
-            raise ConnectionError(error_msg) from error
-        elif category == 'integrity':
+            raise attach_diagnostics(ConnectionError(error_msg), **diagnostics) from error
+        if target == 'integrity':
             self.log(logging.DEBUG, f"Integrity error: {error_msg}")
-            raise IntegrityError(error_msg) from error
-        elif category == 'query':
+            raise attach_diagnostics(IntegrityError(error_msg), **diagnostics) from error
+        if target == 'query':
             self.log(logging.DEBUG, f"Query error: {error_msg}")
-            raise QueryError(error_msg) from error
-        elif category == 'operational':
+            raise attach_diagnostics(QueryError(error_msg), **diagnostics) from error
+        if target == 'operational':
             self.log(logging.DEBUG, f"Operational error: {error_msg}")
-            raise OperationalError(error_msg) from error
-        else:
-            self.log(logging.DEBUG, f"Database error: {error_msg}")
-            raise DatabaseError(error_msg) from error
+            raise attach_diagnostics(OperationalError(error_msg), **diagnostics) from error
+        self.log(logging.DEBUG, f"Database error: {error_msg}")
+        raise attach_diagnostics(DatabaseError(error_msg), **diagnostics) from error
 
     def get_server_version(self) -> Tuple[int, ...]:
         """Get the Snowflake server version.
