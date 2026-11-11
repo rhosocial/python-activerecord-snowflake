@@ -11,10 +11,6 @@ from typing import Tuple
 from rhosocial.activerecord.backend.base import StorageBackend
 from rhosocial.activerecord.backend.errors import (
     ConnectionError,
-    DatabaseError,
-    IntegrityError,
-    OperationalError,
-    QueryError,
 )
 from rhosocial.activerecord.backend.introspection.backend_mixin import IntrospectorBackendMixin
 from ..config import SnowflakeConnectionConfig
@@ -31,6 +27,16 @@ class SnowflakeBackend(
     """Snowflake-specific backend implementation (synchronous).
 
     Uses snowflake-connector-python for database connectivity.
+
+    Execution notes:
+        ``execute``/``execute_many`` come from the core execution pipeline and
+        are not overridden. Snowflake has no row-level locking and no
+        deadlock/lock-wait semantics, so execute failures never surface as
+        ``LockError`` or ``DeadlockError``; they keep the driver's own
+        operational/programming category. The backend defines no
+        ``_handle_auto_commit``, so execute relies on the driver's
+        ``autocommit`` setting (``True`` by default) rather than issuing an
+        extra commit.
     """
 
     def __init__(self, **kwargs):
@@ -148,29 +154,23 @@ class SnowflakeBackend(
     def _handle_error(self, error: Exception) -> None:
         """Handle and classify a Snowflake error.
 
+        Framework ``DatabaseError`` instances are re-raised unchanged so
+        callers can still catch ``ConnectionError``, ``TypeConversionError`` or
+        ``TransactionError`` by their real type; they are never reclassified
+        into a driver category. All other exceptions are translated into the
+        shared error taxonomy and carry driver diagnostics (errno, SQLSTATE,
+        operation, backend). Only transient infrastructure failures (network
+        timeouts, service unavailability, lost connections) become retryable.
+
         Args:
             error: The exception to handle.
 
         Raises:
-            Appropriate rhosocial error based on classification.
+            The same instance when ``error`` is already a framework
+            ``DatabaseError``; otherwise the appropriate rhosocial error based
+            on classification.
         """
-        category = self._classify_error(error)
-        error_msg = str(error)
-        if category == 'connection':
-            self.log(logging.DEBUG, f"Connection error: {error_msg}")
-            raise ConnectionError(error_msg) from error
-        elif category == 'integrity':
-            self.log(logging.DEBUG, f"Integrity error: {error_msg}")
-            raise IntegrityError(error_msg) from error
-        elif category == 'query':
-            self.log(logging.DEBUG, f"Query error: {error_msg}")
-            raise QueryError(error_msg) from error
-        elif category == 'operational':
-            self.log(logging.DEBUG, f"Operational error: {error_msg}")
-            raise OperationalError(error_msg) from error
-        else:
-            self.log(logging.DEBUG, f"Database error: {error_msg}")
-            raise DatabaseError(error_msg) from error
+        self._raise_mapped_error(error)
 
     def get_server_version(self) -> Tuple[int, ...]:
         """Get the Snowflake server version.

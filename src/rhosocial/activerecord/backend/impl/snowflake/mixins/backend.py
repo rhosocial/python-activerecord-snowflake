@@ -6,8 +6,16 @@ Snowflake backends, including adapter registration, error classification,
 and dialect property management.
 """
 import logging
-from typing import Any, Dict, Optional, Tuple, Type
+from typing import Any, Dict, NoReturn, Optional, Tuple, Type
 
+from rhosocial.activerecord.backend.errors import (
+    ConnectionError,
+    DatabaseError,
+    IntegrityError,
+    OperationalError,
+    QueryError,
+    attach_diagnostics,
+)
 from rhosocial.activerecord.backend.type_adapter import SQLTypeAdapter
 
 from ..adapters import (
@@ -16,6 +24,79 @@ from ..adapters import (
     SnowflakeDecimalAdapter,
     SnowflakeTimestampAdapter,
     SnowflakeVariantAdapter,
+)
+
+# Driver messages are the last-resort signal, after driver code and exception
+# class (see the error-taxonomy backend mapping rules). Snowflake declares
+# UNIQUE constraints but does not enforce them by default, and has no row-level
+# deadlock/lock-wait semantics to classify, so lock and deadlock failures are
+# deliberately absent from this taxonomy: they fall back to the driver's own
+# Operational/Programming/Database class instead of LockError/DeadlockError.
+_INTEGRITY_SIGNALS = (
+    'already exists',
+    'duplicate',
+    'unique constraint',
+    'unique violation',
+    'primary key',
+    'foreign key',
+    'not null',
+    'non-nullable',
+    'null result',
+    'cannot be null',
+    'constraint violation',
+    'constraint failed',
+)
+_CONNECTION_SIGNALS = (
+    'incorrect username or password',
+    'invalid username',
+    'invalid password',
+    'authentication',
+    'login',
+    'credential',
+    'failed to connect',
+    'connect',
+    'connection',
+    'network',
+    'timeout',
+    'timed out',
+    'handshake',
+    'refused',
+    'service unavailable',
+    'gateway timeout',
+    'session is invalid',
+    'session has expired',
+    'connection is closed',
+    'temporarily unavailable',
+    'too many requests',
+)
+_QUERY_SIGNALS = (
+    'syntax error',
+    'invalid identifier',
+    'invalid object',
+    'invalid column',
+    'unknown column',
+    'unknown table',
+    'does not exist',
+    'not found',
+    'sql compilation error',
+)
+_PERMISSION_SIGNALS = (
+    'permission',
+    'not authorized',
+    'unauthorized',
+    'access denied',
+    'not allowed',
+    'privilege',
+)
+_INVALID_CREDENTIAL_SIGNALS = (
+    'incorrect username or password',
+    'invalid username',
+    'invalid password',
+    'authentication',
+    'login',
+    'credential',
+    'user is disabled',
+    'account is locked',
 )
 
 
@@ -59,20 +140,45 @@ class SnowflakeBackendMixin:
             self._dialect_cache = SnowflakeDialect(version=version)
         return self._dialect_cache
 
+    @staticmethod
+    def _matches(message: str, signals: Tuple[str, ...]) -> bool:
+        """Return whether any lowercase message signal occurs in the message."""
+        return any(signal in message for signal in signals)
+
     def _classify_error(self, error: Exception) -> str:
         """Classify a Snowflake error into a standard error category.
 
-        Uses snowflake.connector.errors exception type hierarchy for
-        accurate classification, with string matching as fallback for
-        non-Snowflake exceptions.
+        Framework errors (``rhosocial.activerecord.backend.errors.DatabaseError``
+        and every subclass, including ``ConnectionError``,
+        ``TypeConversionError`` and ``TransactionError``) are returned as
+        ``'framework'`` before any driver inspection. They already carry the
+        intended taxonomy type, and their messages can contain words such as
+        ``connection`` or ``timeout`` that the message fallback would otherwise
+        misread as a driver category.
+
+        For everything else, uses snowflake.connector.errors exception type
+        hierarchy for accurate classification, then driver messages for the
+        cases the class alone cannot express (unique/not-null constraints raised
+        as ProgrammingError, permission denials, login failures). String
+        matching remains the fallback for non-Snowflake exceptions.
+
+        Snowflake has weak locking semantics: lock waits and deadlocks are not
+        translated to LockError/DeadlockError; they keep the driver's own
+        operational/programming category.
 
         Args:
             error: The exception to classify.
 
         Returns:
             String category: 'connection', 'integrity', 'query',
-            'operational', or 'unknown'
+            'operational', 'framework', or 'unknown'
         """
+        # Short-circuit before the driver import: framework errors must not be
+        # re-translated, and must not reach the message fallback at the end of
+        # this method.
+        if isinstance(error, DatabaseError):
+            return 'framework'
+
         import snowflake.connector.errors as _errors
         SnowflakeError = _errors.Error
         SnowflakeInterfaceError = _errors.InterfaceError
@@ -92,6 +198,8 @@ class SnowflakeBackendMixin:
         SnowflakeRequestTimeoutError = getattr(_errors, "RequestTimeoutError", _missing)
         SnowflakeServiceUnavailableError = getattr(_errors, "ServiceUnavailableError", _missing)
 
+        message = str(error).lower()
+
         if isinstance(error, SnowflakeIntegrityError):
             return 'integrity'
 
@@ -104,48 +212,170 @@ class SnowflakeBackendMixin:
             return 'connection'
 
         if isinstance(error, SnowflakeOperationalError):
-            error_msg = str(error).lower()
-            if any(s in error_msg for s in [
-                'connection', 'network', 'timeout',
-                'handshake', 'connect', 'refused',
-            ]):
+            if self._matches(message, _CONNECTION_SIGNALS):
                 return 'connection'
             return 'operational'
 
-        if isinstance(error, SnowflakeProgrammingError):
-            return 'query'
-
-        if isinstance(error, SnowflakeDataError):
-            return 'query'
-
-        if isinstance(error, SnowflakeNotSupportedError):
+        if isinstance(error, (
+            SnowflakeProgrammingError,
+            SnowflakeDataError,
+            SnowflakeNotSupportedError,
+        )):
+            # Permission failures also arrive as ProgrammingError; keep them
+            # in the generic DatabaseError bucket rather than QueryError.
+            if self._matches(message, _PERMISSION_SIGNALS):
+                return 'unknown'
+            if self._matches(message, _INTEGRITY_SIGNALS):
+                return 'integrity'
             return 'query'
 
         if isinstance(error, SnowflakeHttpError):
             return 'connection'
 
-        if isinstance(error, SnowflakeDatabaseError):
+        if isinstance(error, (SnowflakeDatabaseError, SnowflakeError)):
+            if self._matches(message, _INTEGRITY_SIGNALS):
+                return 'integrity'
+            if self._matches(message, _CONNECTION_SIGNALS):
+                return 'connection'
+            if self._matches(message, _QUERY_SIGNALS):
+                return 'query'
             return 'unknown'
 
-        if isinstance(error, SnowflakeError):
-            return 'unknown'
-
-        error_msg = str(error).lower()
-        if any(s in error_msg for s in [
-            'connection', 'network', 'timeout', 'handshake',
-        ]):
+        if self._matches(message, _CONNECTION_SIGNALS):
             return 'connection'
-        if any(s in error_msg for s in [
-            'unique', 'constraint', 'duplicate',
-            'primary key', 'foreign key',
-        ]):
+        if self._matches(message, _INTEGRITY_SIGNALS):
             return 'integrity'
-        if any(s in error_msg for s in [
-            'syntax', 'invalid', 'not found', 'does not exist',
-        ]):
+        if self._matches(message, _QUERY_SIGNALS):
             return 'query'
 
         return 'unknown'
+
+    def _is_transient_infrastructure_error(self, error: Exception) -> bool:
+        """Return whether a connection/operational failure should clear on retry.
+
+        Only network timeouts, HTTP gateway/service failures and lost
+        connections are transient. Invalid credentials, permission denials,
+        syntax errors and integrity violations are not: retrying them cannot
+        succeed without an external change.
+        """
+        message = str(error).lower()
+        if self._matches(message, _INVALID_CREDENTIAL_SIGNALS):
+            return False
+
+        try:
+            import snowflake.connector.errors as _errors
+        except ImportError:  # pragma: no cover - driver optional at import time
+            _errors = None
+
+        if _errors is not None:
+            transient_types = tuple(
+                cls for cls in (
+                    getattr(_errors, "GatewayTimeoutError", None),
+                    getattr(_errors, "RequestTimeoutError", None),
+                    getattr(_errors, "ServiceUnavailableError", None),
+                ) if cls is not None
+            )
+            if transient_types and isinstance(error, transient_types):
+                return True
+            http_error = getattr(_errors, "HttpError", None)
+            if http_error is not None and isinstance(error, http_error):
+                return True
+            # InterfaceError covers driver-internal protocol failures; the
+            # existing contract keeps it a non-transient ConnectionError.
+            interface_error = getattr(_errors, "InterfaceError", None)
+            if interface_error is not None and isinstance(error, interface_error):
+                return False
+
+        return self._matches(message, _CONNECTION_SIGNALS)
+
+    def _resolve_error_mapping(self, error: Exception, category: str) -> Tuple[str, Any]:
+        """Decide the concrete taxonomy target and retry hint for a category.
+
+        Framework errors are never mapped: they return ``'framework'`` so
+        :meth:`_handle_error` can re-raise the original instance unchanged.
+        This check also covers ``category`` values computed elsewhere, because
+        the type of ``error`` is the authoritative signal.
+
+        Args:
+            error: The driver exception being translated.
+            category: Coarse category returned by :meth:`_classify_error`.
+
+        Returns:
+            ``(target, transient)`` where target is one of ``connection``,
+            ``operational``, ``integrity``, ``query``, ``framework`` or
+            ``database``. ``transient`` is ``True``/``False`` for infrastructure
+            failures and ``None`` otherwise.
+        """
+        if isinstance(error, DatabaseError) or category == 'framework':
+            return 'framework', None
+        if category == 'integrity':
+            return 'integrity', False
+        if category == 'query':
+            return 'query', False
+        if category == 'operational':
+            return 'operational', self._is_transient_infrastructure_error(error)
+        if category == 'connection':
+            if self._is_transient_infrastructure_error(error):
+                return 'operational', True
+            return 'connection', False
+        return 'database', None
+
+    @staticmethod
+    def _error_diagnostics(error: Exception, transient: Any) -> Dict[str, Any]:
+        """Build ``attach_diagnostics`` keyword arguments for a driver exception."""
+        return {
+            'operation': 'execute',
+            'driver_code': getattr(error, 'errno', None),
+            'sqlstate': getattr(error, 'sqlstate', None),
+            'backend': 'snowflake',
+            'transient': transient,
+        }
+
+    def _raise_mapped_error(self, error: Exception) -> NoReturn:
+        """Classify a driver exception and raise the matching taxonomy error.
+
+        Shared by the sync and async backends: classification is pure logic,
+        so only the ``_handle_error`` entry points differ (the async one is
+        awaitable). Framework ``DatabaseError`` instances are re-raised
+        unchanged instead of being translated into a driver category, so callers
+        can still catch ``ConnectionError``, ``TypeConversionError`` or
+        ``TransactionError`` by their real type.
+
+        Args:
+            error: The driver exception to classify.
+
+        Raises:
+            The same instance when ``error`` is already a framework
+            ``DatabaseError``; otherwise the mapped taxonomy error carrying
+            driver diagnostics.
+        """
+        # Contract front door: a framework error already has its final type.
+        # Re-raise the same instance, before any driver inspection or mapper.
+        if isinstance(error, DatabaseError):
+            raise error
+
+        category = self._classify_error(error)
+        target, transient = self._resolve_error_mapping(error, category)
+        if target == 'framework':
+            # Defensive: `_resolve_error_mapping` can only stall here if a
+            # future caller bypasses the check above.
+            raise error
+        error_msg = str(error)
+        diagnostics = self._error_diagnostics(error, transient)
+        if target == 'connection':
+            self.log(logging.DEBUG, f"Connection error: {error_msg}")
+            raise attach_diagnostics(ConnectionError(error_msg), **diagnostics) from error
+        if target == 'integrity':
+            self.log(logging.DEBUG, f"Integrity error: {error_msg}")
+            raise attach_diagnostics(IntegrityError(error_msg), **diagnostics) from error
+        if target == 'query':
+            self.log(logging.DEBUG, f"Query error: {error_msg}")
+            raise attach_diagnostics(QueryError(error_msg), **diagnostics) from error
+        if target == 'operational':
+            self.log(logging.DEBUG, f"Operational error: {error_msg}")
+            raise attach_diagnostics(OperationalError(error_msg), **diagnostics) from error
+        self.log(logging.DEBUG, f"Database error: {error_msg}")
+        raise attach_diagnostics(DatabaseError(error_msg), **diagnostics) from error
 
     def get_default_adapter_suggestions(self) -> Dict[Type, Tuple[SQLTypeAdapter, Type]]:
         """Provide default type adapter suggestions for Snowflake.
