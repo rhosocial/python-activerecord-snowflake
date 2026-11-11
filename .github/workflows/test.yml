@@ -34,7 +34,7 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
           pip install "rhosocial-activerecord @ git+https://github.com/rhosocial/python-activerecord.git@feature/error-taxonomy"  # NOSONAR
-          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/error-taxonomy#egg=rhosocial-activerecord-testsuite
+          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/error-taxonomy#egg=rhosocial-activerecord-testsuite  # NOSONAR
 
       - name: Install package
         run: |
@@ -85,7 +85,7 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
           pip install "rhosocial-activerecord @ git+https://github.com/rhosocial/python-activerecord.git@feature/error-taxonomy"  # NOSONAR
-          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/error-taxonomy#egg=rhosocial-activerecord-testsuite
+          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/error-taxonomy#egg=rhosocial-activerecord-testsuite  # NOSONAR
 
       - name: Install package
         run: |
@@ -118,7 +118,7 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
           pip install "rhosocial-activerecord @ git+https://github.com/rhosocial/python-activerecord.git@feature/error-taxonomy"  # NOSONAR
-          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/error-taxonomy#egg=rhosocial-activerecord-testsuite
+          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/error-taxonomy#egg=rhosocial-activerecord-testsuite  # NOSONAR
 
       - name: Install package
         run: |
