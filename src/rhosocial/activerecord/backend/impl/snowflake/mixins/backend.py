@@ -6,9 +6,16 @@ Snowflake backends, including adapter registration, error classification,
 and dialect property management.
 """
 import logging
-from typing import Any, Dict, Optional, Tuple, Type
+from typing import Any, Dict, NoReturn, Optional, Tuple, Type
 
-from rhosocial.activerecord.backend.errors import DatabaseError
+from rhosocial.activerecord.backend.errors import (
+    ConnectionError,
+    DatabaseError,
+    IntegrityError,
+    OperationalError,
+    QueryError,
+    attach_diagnostics,
+)
 from rhosocial.activerecord.backend.type_adapter import SQLTypeAdapter
 
 from ..adapters import (
@@ -323,6 +330,52 @@ class SnowflakeBackendMixin:
             'backend': 'snowflake',
             'transient': transient,
         }
+
+    def _raise_mapped_error(self, error: Exception) -> NoReturn:
+        """Classify a driver exception and raise the matching taxonomy error.
+
+        Shared by the sync and async backends: classification is pure logic,
+        so only the ``_handle_error`` entry points differ (the async one is
+        awaitable). Framework ``DatabaseError`` instances are re-raised
+        unchanged instead of being translated into a driver category, so callers
+        can still catch ``ConnectionError``, ``TypeConversionError`` or
+        ``TransactionError`` by their real type.
+
+        Args:
+            error: The driver exception to classify.
+
+        Raises:
+            The same instance when ``error`` is already a framework
+            ``DatabaseError``; otherwise the mapped taxonomy error carrying
+            driver diagnostics.
+        """
+        # Contract front door: a framework error already has its final type.
+        # Re-raise the same instance, before any driver inspection or mapper.
+        if isinstance(error, DatabaseError):
+            raise error
+
+        category = self._classify_error(error)
+        target, transient = self._resolve_error_mapping(error, category)
+        if target == 'framework':
+            # Defensive: `_resolve_error_mapping` can only stall here if a
+            # future caller bypasses the check above.
+            raise error
+        error_msg = str(error)
+        diagnostics = self._error_diagnostics(error, transient)
+        if target == 'connection':
+            self.log(logging.DEBUG, f"Connection error: {error_msg}")
+            raise attach_diagnostics(ConnectionError(error_msg), **diagnostics) from error
+        if target == 'integrity':
+            self.log(logging.DEBUG, f"Integrity error: {error_msg}")
+            raise attach_diagnostics(IntegrityError(error_msg), **diagnostics) from error
+        if target == 'query':
+            self.log(logging.DEBUG, f"Query error: {error_msg}")
+            raise attach_diagnostics(QueryError(error_msg), **diagnostics) from error
+        if target == 'operational':
+            self.log(logging.DEBUG, f"Operational error: {error_msg}")
+            raise attach_diagnostics(OperationalError(error_msg), **diagnostics) from error
+        self.log(logging.DEBUG, f"Database error: {error_msg}")
+        raise attach_diagnostics(DatabaseError(error_msg), **diagnostics) from error
 
     def get_default_adapter_suggestions(self) -> Dict[Type, Tuple[SQLTypeAdapter, Type]]:
         """Provide default type adapter suggestions for Snowflake.

@@ -32,11 +32,6 @@ from typing import Optional, Tuple
 from rhosocial.activerecord.backend.base import AsyncStorageBackend
 from rhosocial.activerecord.backend.errors import (
     ConnectionError,
-    DatabaseError,
-    IntegrityError,
-    OperationalError,
-    QueryError,
-    attach_diagnostics,
 )
 from rhosocial.activerecord.backend.introspection.backend_mixin import IntrospectorBackendMixin
 from ..config import SnowflakeConnectionConfig
@@ -207,38 +202,15 @@ class AsyncSnowflakeBackend(
         operation, backend). Only transient infrastructure failures (network
         timeouts, service unavailability, lost connections) become retryable.
 
-        Snowflake has weak locking semantics and this backend does not override
-        the core ``execute`` pipeline: execute failures never surface as
-        ``LockError`` or ``DeadlockError``. Lock waits and deadlocks stay in the
-        driver's operational/programming category.
-        """
-        # Contract front door: a framework error already has its final type.
-        # Re-raise the same instance, before any driver inspection or mapper.
-        if isinstance(error, DatabaseError):
-            raise error
+        Args:
+            error: The exception to handle.
 
-        category = self._classify_error(error)
-        target, transient = self._resolve_error_mapping(error, category)
-        if target == 'framework':
-            # Defensive: `_resolve_error_mapping` can only stall here if a
-            # future caller bypasses the check above.
-            raise error
-        error_msg = str(error)
-        diagnostics = self._error_diagnostics(error, transient)
-        if target == 'connection':
-            self.log(logging.DEBUG, f"Connection error: {error_msg}")
-            raise attach_diagnostics(ConnectionError(error_msg), **diagnostics) from error
-        if target == 'integrity':
-            self.log(logging.DEBUG, f"Integrity error: {error_msg}")
-            raise attach_diagnostics(IntegrityError(error_msg), **diagnostics) from error
-        if target == 'query':
-            self.log(logging.DEBUG, f"Query error: {error_msg}")
-            raise attach_diagnostics(QueryError(error_msg), **diagnostics) from error
-        if target == 'operational':
-            self.log(logging.DEBUG, f"Operational error: {error_msg}")
-            raise attach_diagnostics(OperationalError(error_msg), **diagnostics) from error
-        self.log(logging.DEBUG, f"Database error: {error_msg}")
-        raise attach_diagnostics(DatabaseError(error_msg), **diagnostics) from error
+        Raises:
+            The same instance when ``error`` is already a framework
+            ``DatabaseError``; otherwise the appropriate rhosocial error based
+            on classification.
+        """
+        self._raise_mapped_error(error)
 
     async def get_server_version(self) -> Tuple[int, ...]:
         """Get the Snowflake server version."""
