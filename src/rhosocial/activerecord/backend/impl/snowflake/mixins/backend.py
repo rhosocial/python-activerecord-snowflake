@@ -8,6 +8,7 @@ and dialect property management.
 import logging
 from typing import Any, Dict, Optional, Tuple, Type
 
+from rhosocial.activerecord.backend.errors import DatabaseError
 from rhosocial.activerecord.backend.type_adapter import SQLTypeAdapter
 
 from ..adapters import (
@@ -140,11 +141,19 @@ class SnowflakeBackendMixin:
     def _classify_error(self, error: Exception) -> str:
         """Classify a Snowflake error into a standard error category.
 
-        Uses snowflake.connector.errors exception type hierarchy for
-        accurate classification, then driver messages for the cases the class
-        alone cannot express (unique/not-null constraints raised as
-        ProgrammingError, permission denials, login failures). String matching
-        remains the fallback for non-Snowflake exceptions.
+        Framework errors (``rhosocial.activerecord.backend.errors.DatabaseError``
+        and every subclass, including ``ConnectionError``,
+        ``TypeConversionError`` and ``TransactionError``) are returned as
+        ``'framework'`` before any driver inspection. They already carry the
+        intended taxonomy type, and their messages can contain words such as
+        ``connection`` or ``timeout`` that the message fallback would otherwise
+        misread as a driver category.
+
+        For everything else, uses snowflake.connector.errors exception type
+        hierarchy for accurate classification, then driver messages for the
+        cases the class alone cannot express (unique/not-null constraints raised
+        as ProgrammingError, permission denials, login failures). String
+        matching remains the fallback for non-Snowflake exceptions.
 
         Snowflake has weak locking semantics: lock waits and deadlocks are not
         translated to LockError/DeadlockError; they keep the driver's own
@@ -155,8 +164,14 @@ class SnowflakeBackendMixin:
 
         Returns:
             String category: 'connection', 'integrity', 'query',
-            'operational', or 'unknown'
+            'operational', 'framework', or 'unknown'
         """
+        # Short-circuit before the driver import: framework errors must not be
+        # re-translated, and must not reach the message fallback at the end of
+        # this method.
+        if isinstance(error, DatabaseError):
+            return 'framework'
+
         import snowflake.connector.errors as _errors
         SnowflakeError = _errors.Error
         SnowflakeInterfaceError = _errors.InterfaceError
@@ -269,16 +284,23 @@ class SnowflakeBackendMixin:
     def _resolve_error_mapping(self, error: Exception, category: str) -> Tuple[str, Any]:
         """Decide the concrete taxonomy target and retry hint for a category.
 
+        Framework errors are never mapped: they return ``'framework'`` so
+        :meth:`_handle_error` can re-raise the original instance unchanged.
+        This check also covers ``category`` values computed elsewhere, because
+        the type of ``error`` is the authoritative signal.
+
         Args:
             error: The driver exception being translated.
             category: Coarse category returned by :meth:`_classify_error`.
 
         Returns:
             ``(target, transient)`` where target is one of ``connection``,
-            ``operational``, ``integrity``, ``query`` or ``database``.
-            ``transient`` is ``True``/``False`` for infrastructure failures and
-            ``None`` otherwise.
+            ``operational``, ``integrity``, ``query``, ``framework`` or
+            ``database``. ``transient`` is ``True``/``False`` for infrastructure
+            failures and ``None`` otherwise.
         """
+        if isinstance(error, DatabaseError) or category == 'framework':
+            return 'framework', None
         if category == 'integrity':
             return 'integrity', False
         if category == 'query':

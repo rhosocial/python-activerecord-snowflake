@@ -56,6 +56,16 @@ class AsyncSnowflakeBackend(
     driver for async compatibility. This follows the project's sync/async parity
     principle, providing the same API surface with async/await syntax.
 
+    Execution notes:
+        ``execute``/``execute_many`` come from the core execution pipeline and
+        are not overridden. Snowflake has no row-level locking and no
+        deadlock/lock-wait semantics, so execute failures never surface as
+        ``LockError`` or ``DeadlockError``; they keep the driver's own
+        operational/programming category. The backend defines no
+        ``_handle_auto_commit``, so execute relies on the driver's
+        ``autocommit`` setting (``True`` by default) rather than issuing an
+        extra commit.
+
     Caveats:
         - All I/O operations run in a thread pool executor, not truly async.
         - High-concurrency scenarios should inject a bounded executor to
@@ -189,15 +199,30 @@ class AsyncSnowflakeBackend(
     async def _handle_error(self, error: Exception) -> None:
         """Handle and classify a Snowflake error asynchronously.
 
-        Translates the driver exception into the shared error taxonomy and
-        attaches driver diagnostics (errno, SQLSTATE, operation, backend).
-        Only transient infrastructure failures (network timeouts, service
-        unavailability, lost connections) become retryable. Snowflake has weak
-        locking semantics, so lock/deadlock failures are not mapped to
-        LockError/DeadlockError.
+        Framework ``DatabaseError`` instances are re-raised unchanged so
+        callers can still catch ``ConnectionError``, ``TypeConversionError`` or
+        ``TransactionError`` by their real type; they are never reclassified
+        into a driver category. All other exceptions are translated into the
+        shared error taxonomy and carry driver diagnostics (errno, SQLSTATE,
+        operation, backend). Only transient infrastructure failures (network
+        timeouts, service unavailability, lost connections) become retryable.
+
+        Snowflake has weak locking semantics and this backend does not override
+        the core ``execute`` pipeline: execute failures never surface as
+        ``LockError`` or ``DeadlockError``. Lock waits and deadlocks stay in the
+        driver's operational/programming category.
         """
+        # Contract front door: a framework error already has its final type.
+        # Re-raise the same instance, before any driver inspection or mapper.
+        if isinstance(error, DatabaseError):
+            raise error
+
         category = self._classify_error(error)
         target, transient = self._resolve_error_mapping(error, category)
+        if target == 'framework':
+            # Defensive: `_resolve_error_mapping` can only stall here if a
+            # future caller bypasses the check above.
+            raise error
         error_msg = str(error)
         diagnostics = self._error_diagnostics(error, transient)
         if target == 'connection':
