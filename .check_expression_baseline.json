@@ -1,0 +1,245 @@
+{
+  "entries": {
+    "000fdb28d1e4b1f3": 1,
+    "0128cfc3d86e741c": 1,
+    "046928bfa9e93efc": 1,
+    "0dcc99864f33c99d": 1,
+    "12cb38c51f9062a1": 1,
+    "12ea12fb6987314d": 1,
+    "1e4cb0bc77e96ad9": 1,
+    "25a59eb9ca8081ee": 1,
+    "2c214789e0a3ff5e": 1,
+    "2e80c5cfff30cbf7": 1,
+    "395df3ab580b0c5c": 1,
+    "3c04f7889ceb01ff": 1,
+    "4110f75ce143a25c": 1,
+    "44ba077081b1b0ed": 1,
+    "4778dd97933f0117": 1,
+    "49c7576782073d89": 1,
+    "503a255157dab4e3": 1,
+    "51eb74491f34738b": 1,
+    "5926360061729558": 1,
+    "610a81662f02c94a": 1,
+    "699052faed699bb4": 1,
+    "70c4fe53aa42b628": 1,
+    "733a80ff99bde342": 1,
+    "97a47f891ca83e93": 1,
+    "98c81df0c74722d5": 1,
+    "a4dcb922b6c2d5bf": 1,
+    "bd84a4c82a61e389": 2,
+    "c7e7533c8557bd86": 1,
+    "c84cca3f916b1f33": 1,
+    "d0c211e378b61c9e": 1,
+    "d323840361b73af3": 1,
+    "d4a934f00ab61966": 1,
+    "d5d445a3d30cc2be": 1,
+    "d8c4291b982c504b": 1,
+    "e6062eaaf5788a68": 1,
+    "f1527465bc068d26": 1,
+    "f8a461376423c485": 1,
+    "fed8889710b52075": 2
+  },
+  "findings": [
+    {
+      "found": "core_kwargs: Any",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/materialized_view.py",
+      "rule": "ED-KWARGS"
+    },
+    {
+      "found": "auto_ingest: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/pipe.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "pipe_execution_paused: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/pipe.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "directory: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/stage.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "force: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/stage.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "purge: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/stage.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "header: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/stage.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "overwrite: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/stage.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "single: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/stage.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "append_only: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/stream.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "insert_only: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/stream.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "show_initial_rows: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/stream.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "copy_grants: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/stream.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "allow_overlapping_execution: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/task.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "auto_resume: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/warehouse.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "initially_suspended: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/warehouse.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "auto_resume: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/warehouse.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "auto_resume: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/warehouse_options.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "initially_suspended: Optional[bool]",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/expression/ddl/warehouse_options.py",
+      "rule": "ED-10.2"
+    },
+    {
+      "found": "getattr(action, \"if_not_exists\", None)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(action, \"if_exists\", None)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(action, \"if_exists\", None)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(action, \"cascade\", None)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"transient\", False)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl_database.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"clone\", None)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl_database.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"comment\", None)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl_type.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"cascade\", False)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl_type.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"restrict\", False)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl_type.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, 'definition_kind', type(expr).__name__)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl_type.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, 'action_kind', type(expr).__name__)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/ddl_type.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"overwrite\", False)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/dml.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr.type_, \"value\", expr.type_)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/file_format.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"with_data\", False)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/materialized_view.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"no_data\", False)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/materialized_view.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"or_replace\", False)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/materialized_view.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"if_not_exists\", False)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/materialized_view.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"column_aliases\", None)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/materialized_view.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"cluster_by\", None)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/materialized_view.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"comment\", None)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/materialized_view.py",
+      "rule": "ED-11.2"
+    },
+    {
+      "found": "getattr(expr, \"options\", None)",
+      "path": "src/rhosocial/activerecord/backend/impl/snowflake/mixins/time_travel.py",
+      "rule": "ED-11.2"
+    }
+  ],
+  "format": 1
+}
