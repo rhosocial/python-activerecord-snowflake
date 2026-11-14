@@ -1,4 +1,5 @@
 # tests/rhosocial/activerecord_snowflake_test/feature/basic/crud/test_crud.py
+# ruff: noqa: F401,F403 - bridge file: imports are pytest fixtures
 """Bridge file for basic CRUD tests from the testsuite."""
 from rhosocial.activerecord.testsuite.feature.basic.conftest import (
     user_class,
@@ -10,5 +11,3 @@ from rhosocial.activerecord.testsuite.feature.basic.conftest import (
     async_validated_user_class,
 )
 from rhosocial.activerecord.testsuite.feature.basic.crud.test_crud import *
-from rhosocial.activerecord.testsuite.feature.basic.crud.test_crud_async import *  # noqa: F403
-

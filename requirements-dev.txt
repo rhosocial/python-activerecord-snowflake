@@ -8,6 +8,12 @@ pytest-mock
 pytest-xdist
 pytest-cov
 
+# DuckDB-based Snowflake emulator. CI enables it whenever no real account is
+# configured, so the database-backed contracts run instead of silently skipping.
+# fakesnow imports snowflake.connector.converter, which the 5.x connector line
+# removed; pair it with `snowflake-connector-python<5` when installing locally.
+fakesnow>=0.12.1; python_version >= '3.11'
+
 # Python 3.13, including the free-threaded 3.13t build. The python_version
 # marker distinguishes release lines, not GIL configuration, so these two lines
 # pin both 3.13 builds. pydantic-core has no cp313t wheel after 2.41.4, and the

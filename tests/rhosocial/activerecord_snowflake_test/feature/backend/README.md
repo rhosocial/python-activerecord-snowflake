@@ -7,6 +7,7 @@
 
 | 科目 | 状态 | 文件 | 备注 |
 |------|------|------|------|
+| core/ | ✅ 已有 | `test_clause_pair_guard.py`、`test_driver_error_mapping.py`、`test_execute_error_contract.py`、`test_generated_column_capabilities.py`、`test_identifier_quoting.py`、`test_introspection_data_profile.py`、`test_snowflake_constraint_switches.py`、`test_snowflake_database_ddl.py`、`test_snowflake_ddl_improvements.py` | 后端专属后端级测试（原位于 `backend/` 根下）；按「测试文件与子目录不得并存」规则收敛到 `core/`。`expression_roundtrip_harness.py` 留在 `backend/` 根，供 `expression/`、`types/` 以顶层模块名导入 |
 | adapters/ | ✅ 已有 | `test_adapters.py` | VARIANT/ARRAY/Boolean/Decimal/Timestamp 适配器 |
 | backend/ | ✅ 已有 | `test_backend_mock.py`、`test_config.py` | mock 驱动测试；**缺** `test_error_handling.py`(+async)（§6 矩阵 F） |
 | cli/ | 🕳️ 空（README） | — | Tier-2 Fill（无 CLI 工具，暂不适用） |
@@ -52,11 +53,17 @@ fakesnow 模拟器仅覆盖部分场景），异步行为无法在本地验证�
 ## Snowflake 场景限制说明
 
 - **无真实服务实例**：CI（"Python Test" workflow）不提供 Snowflake 账号，
-  `feature/backend/conftest.py` 的 `snowflake_scenarios` / `snowflake_backend` fixtures
-  在 `config/snowflake_scenarios.yaml` 缺失或 `SNOWFLAKE_*` 环境变量缺失时整体 skip。
-  本地验证以 `pytest --co`（收集 0 error）为准。
+  `support/snowflake.py` 在既没有 `SNOWFLAKE_ACCOUNT`、又没有安装 `fakesnow`
+  时不会注册任何场景，依赖数据库的测试因此整体 skip（根 `conftest.py` 的
+  `backend_scenario` 参数集为空）。本地验证以 `pytest --co`（收集 0 error）为准。
+- **场景与库名**：场景只提供账户级连接参数（`support/snowflake.py`，可用
+  `SNOWFLAKE_SCENARIOS_CONFIG_PATH` 覆盖配置文件）；逻辑库名由测试目录派生，
+  `feature/backend/conftest.py` 以目录名注入并只在该 (场景, 库) 的首个测试前
+  重置一次，因此同一场景下各目录的表互不干扰。`backend/` 自身不声明 testsuite
+  的目录契约（`prepare` / `teardown`）：这些测试只用自己的 `snowflake_backend`
+  夹具，不请求 `environment`。
 - **fakesnow**：`tests/snowflake_fakesnow/`、`tests/mock/` 提供模拟场景
-  （providers/scenarios.py 注册 `fakesnow` scenario），用于可离线运行的测试。
-- **mock**：`backend/test_backend_mock.py` 通过 patch `snowflake.connector` 验证行为，不建连接。
+  用于可离线运行的测试。
+- **mock**：`backend/backend/test_backend_mock.py` 通过 patch `snowflake.connector` 验证行为，不建连接。
 - **异步**：`AsyncSnowflakeBackend` 基于 `asyncio.run_in_executor()`，无原生异步驱动；
-  在补齐异步测试前，其行为由同步路径 + mock 间接覆盖。
+  其行为由同步路径 + mock 间接覆盖。

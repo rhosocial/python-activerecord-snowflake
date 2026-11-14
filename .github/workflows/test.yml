@@ -1,3 +1,4 @@
+# .github/workflows/test.yml
 name: Python Test
 
 on:
@@ -16,6 +17,24 @@ on:
 permissions:
   contents: read
 
+# Every job below runs the backend wrapper tree (``tests/``), not a file list
+# copied out of the installed suite.  That is what makes ``backend_scenario``
+# (params in ``tests/conftest.py``) and each directory's
+# ``ensure_database`` / ``prepare`` / ``teardown`` contract load: the suite
+# plugin resolves the contract from the conftest pytest actually loaded, and a
+# run over the installed package would never load this backend's fixtures.
+#
+# The scenario: Snowflake is a hosted service, so CI has no server to point at.
+# On interpreters where ``fakesnow`` (the DuckDB emulator) is installable, the
+# job writes the scenario file that ``tests/support/snowflake.py`` reads and
+# exports ``SNOWFLAKE_SCENARIOS_CONFIG_PATH``; without that, ``SCENARIOS`` is
+# empty and every database-backed contract reports "got empty parameter set" -
+# a green run that tested nothing.  fakesnow requires Python >= 3.11 and needs
+# ``snowflake.connector.converter``, which connector 5.x no longer ships, so the
+# emulator legs pin the 4.x driver line.  On the 3.8 / 3.9 / 3.10 and
+# free-threaded legs the emulator cannot be installed; those legs run the unit
+# and dialect half of the tree, and the database contracts are skipped by name.
+
 jobs:
   test-with-coverage:
     name: Python 3.12 with coverage
@@ -33,26 +52,40 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-          pip install "rhosocial-activerecord @ git+https://github.com/rhosocial/python-activerecord.git@release/v1.0.0.dev30"  # NOSONAR
-          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@release/v1.0.0.dev17#egg=rhosocial-activerecord-testsuite  # NOSONAR
+          pip install "rhosocial-activerecord @ git+https://github.com/rhosocial/python-activerecord.git@feature/activerecord-ddl"  # NOSONAR
+          pip install "rhosocial-activerecord-testsuite @ git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/activerecord-ddl"  # NOSONAR
+
+      - name: Install the DuckDB emulator
+        run: |
+          # fakesnow imports snowflake.connector.converter, which the 5.x line
+          # removed; the emulator therefore rides the 4.x connector.
+          pip install "snowflake-connector-python>=3.0.0,<5" "fakesnow>=0.12.1"
+
+      - name: Create the fakesnow scenario config
+        run: |
+          cat > snowflake_scenarios.yaml <<'EOF'
+          scenarios:
+            fakesnow:
+              account: test-account.us-east-1
+              user: test_user
+              password: test_password
+              warehouse: TEST_WH
+              role: SYSADMIN
+          EOF
+          echo "SNOWFLAKE_SCENARIOS_CONFIG_PATH=$(pwd)/snowflake_scenarios.yaml" >> "$GITHUB_ENV"
 
       - name: Install package
         run: |
           pip install -e . --no-deps
 
-      - name: Run tests with coverage (unit only, no Snowflake instance)
-        # PYTHONPATH=src:tests puts the repository-local plugin
-        # (``-p plugins.expression_xdist``, registered in pyproject.toml) and
-        # the scenario providers on the path. pytest resolves ``-p`` before the
-        # ``pythonpath`` ini option is applied on older 8.x releases, so the
-        # environment variable -- which is how the sibling backends do it --
-        # is the reliable spelling rather than a second path mechanism.
+      - name: Run tests with coverage
+        # PYTHONPATH=src:tests puts the backend fixtures on the path; the
+        # testsuite directories carry ``xdist_group`` markers, so the distribution
+        # mode has to be loadgroup (the suite plugin refuses any other one).
         run: |
           export PYTHONPATH=src:tests
-          pytest tests/ -k "not integration" --ignore=tests/snowflake_fakesnow --tb=short
-          coverage run --source=src -m pytest tests/ -k "not integration" --ignore=tests/snowflake_fakesnow --tb=short
-          coverage xml
-          coverage report
+          pytest tests/ -n 4 --dist=loadgroup --tb=short \
+            --cov=src/rhosocial --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -69,7 +102,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.13', '3.14']
+        include:
+          # ``emulator`` says whether fakesnow is installable on this
+          # interpreter.  It is a matrix fact, not a version comparison in an
+          # ``if:`` expression: comparing version strings lexically is wrong
+          # ('3.8' sorts above '3.11').
+          - { python-version: '3.8', emulator: false }
+          - { python-version: '3.9', emulator: false }
+          - { python-version: '3.10', emulator: false }
+          - { python-version: '3.11', emulator: true }
+          - { python-version: '3.13', emulator: true }
+          - { python-version: '3.14', emulator: true }
 
     steps:
       - name: Check out the repository
@@ -84,17 +127,36 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-          pip install "rhosocial-activerecord @ git+https://github.com/rhosocial/python-activerecord.git@release/v1.0.0.dev30"  # NOSONAR
-          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@release/v1.0.0.dev17#egg=rhosocial-activerecord-testsuite  # NOSONAR
+          pip install "rhosocial-activerecord @ git+https://github.com/rhosocial/python-activerecord.git@feature/activerecord-ddl"  # NOSONAR
+          pip install "rhosocial-activerecord-testsuite @ git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/activerecord-ddl"  # NOSONAR
+
+      - name: Install the DuckDB emulator
+        if: matrix.emulator
+        run: |
+          pip install "snowflake-connector-python>=3.0.0,<5" "fakesnow>=0.12.1"
+
+      - name: Create the fakesnow scenario config
+        if: matrix.emulator
+        run: |
+          cat > snowflake_scenarios.yaml <<'EOF'
+          scenarios:
+            fakesnow:
+              account: test-account.us-east-1
+              user: test_user
+              password: test_password
+              warehouse: TEST_WH
+              role: SYSADMIN
+          EOF
+          echo "SNOWFLAKE_SCENARIOS_CONFIG_PATH=$(pwd)/snowflake_scenarios.yaml" >> "$GITHUB_ENV"
 
       - name: Install package
         run: |
           pip install -e . --no-deps
 
-      - name: Run tests (unit only, no Snowflake instance)
+      - name: Run tests
         run: |
           export PYTHONPATH=src:tests
-          pytest tests/ -k "not integration" --ignore=tests/snowflake_fakesnow --tb=short
+          pytest tests/ -n 4 --dist=loadgroup --tb=short
 
   test-free-threaded:
     name: Python ${{ matrix.python-version }} (free-threaded)
@@ -117,14 +179,17 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-          pip install "rhosocial-activerecord @ git+https://github.com/rhosocial/python-activerecord.git@release/v1.0.0.dev30"  # NOSONAR
-          pip install git+https://github.com/rhosocial/python-activerecord-testsuite.git@release/v1.0.0.dev17#egg=rhosocial-activerecord-testsuite  # NOSONAR
+          pip install "rhosocial-activerecord @ git+https://github.com/rhosocial/python-activerecord.git@feature/activerecord-ddl"  # NOSONAR
+          pip install "rhosocial-activerecord-testsuite @ git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/activerecord-ddl"  # NOSONAR
 
       - name: Install package
         run: |
           pip install -e . --no-deps
 
-      - name: Run tests (unit only, no Snowflake instance)
+      - name: Run tests
+        # No emulator leg here: duckdb/pyarrow do not publish a free-threaded
+        # wheel, so the database contracts are skipped by name on this
+        # interpreter while the unit and dialect half still runs.
         run: |
           export PYTHONPATH=src:tests
-          pytest tests/ -k "not integration" --ignore=tests/snowflake_fakesnow --tb=short
+          pytest tests/ -n 4 --dist=loadgroup --tb=short

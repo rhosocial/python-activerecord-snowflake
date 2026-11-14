@@ -4,6 +4,7 @@
 from typing import Tuple
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
+from rhosocial.activerecord.backend.expression.statements import ColumnPrimaryKeyConstraint
 
 
 class SnowflakeGeneratedColumnMixin:
@@ -150,6 +151,55 @@ class SnowflakeGeneratedColumnMixin:
     def supports_virtual_generated_columns(self) -> bool:
         """Snowflake exposes generated columns as virtual columns."""
         return True
+
+    def format_column_definition(self, col_def) -> Tuple[str, tuple]:
+        """Render one column, placing an auto-increment key as ``IDENTITY``.
+
+        Core renders a primary-key branch's ``is_auto_increment`` only where
+        that dialect's grammar carries the marker *inside* the constraint
+        (SQLite's ``PRIMARY KEY AUTOINCREMENT``).  Snowflake's ``IDENTITY`` is
+        a column property instead: the reference grammar puts
+        ``{ AUTOINCREMENT | IDENTITY } [ ( <start_num> , <step_num> ) ]``
+        after the data type and *before* the inline constraints, so appending
+        it to the rendered ``PRIMARY KEY`` would be the wrong grammar.
+
+        The values are the reference's own defaults, ``IDENTITY(1, 1)``, and
+        the generic flag carries no start or step to preserve.  Every other
+        part of the column -- attributes, constraints, generated expression,
+        comment -- is rendered in the shared order, so only the position of
+        the identity property differs.
+
+        https://docs.snowflake.com/en/sql-reference/sql/create-table
+        """
+        all_params = []
+        type_sql, _ = col_def.data_type.to_sql()
+        col_sql = f"{self.format_identifier(col_def.name)} {type_sql}"
+
+        if any(
+            isinstance(getattr(constraint, "branch", None), ColumnPrimaryKeyConstraint)
+            and constraint.branch.is_auto_increment
+            for constraint in col_def.constraints
+        ):
+            col_sql += " IDENTITY(1, 1)"
+
+        attr_sql, attr_params = self.format_column_attributes(col_def)
+        col_sql += attr_sql
+        all_params.extend(attr_params)
+        for constraint in col_def.constraints:
+            suffix, params = self.format_column_constraint(constraint)
+            col_sql += suffix
+            all_params.extend(params)
+
+        if col_def.generated_expression is not None:
+            gen_sql, gen_params = col_def.generated_expression.to_sql()
+            col_sql += gen_sql
+            all_params.extend(gen_params)
+
+        if col_def.comment is not None:
+            comment_sql, comment_params = self.format_column_comment_clause(col_def.comment)
+            col_sql += comment_sql
+            all_params.extend(comment_params)
+        return col_sql, tuple(all_params)
 
 
 __all__ = ['SnowflakeGeneratedColumnMixin']

@@ -288,6 +288,12 @@ SNOWFLAKE_NOT_IMPLEMENTED = [
     dialect_protocols.SQLXMLConstructionSupport,
     dialect_protocols.SQLXMLAggregationSupport,
     dialect_protocols.SQLXMLQueryingSupport,
+    # Snowflake DDL is auto-commit: a CREATE/ALTER/DROP commits the current
+    # transaction before running, so DDL cannot be rolled back with the
+    # transaction that issued it. The dialect therefore answers no
+    # ``supports_transactional_ddl`` at all rather than claiming a mode the
+    # engine does not have.
+    dialect_protocols.TransactionalDDLSupport,
 ]
 
 
