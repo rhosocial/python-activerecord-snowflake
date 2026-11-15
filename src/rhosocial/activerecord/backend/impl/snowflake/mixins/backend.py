@@ -6,7 +6,7 @@ Snowflake backends, including adapter registration, error classification,
 and dialect property management.
 """
 import logging
-from typing import Any, Dict, NoReturn, Optional, Tuple, Type
+from typing import Any, Dict, List, NoReturn, Optional, Tuple, Type
 
 from rhosocial.activerecord.backend.errors import (
     ConnectionError,
@@ -20,10 +20,15 @@ from rhosocial.activerecord.backend.type_adapter import SQLTypeAdapter
 
 from ..adapters import (
     SnowflakeArrayAdapter,
+    SnowflakeBitStringAdapter,
     SnowflakeBooleanAdapter,
     SnowflakeDecimalAdapter,
+    SnowflakeGeometryAdapter,
+    SnowflakeMacAddressAdapter,
+    SnowflakeRangeAdapter,
     SnowflakeTimestampAdapter,
     SnowflakeVariantAdapter,
+    SnowflakeVectorAdapter,
 )
 
 # Driver messages are the last-resort signal, after driver code and exception
@@ -121,9 +126,14 @@ class SnowflakeBackendMixin:
         adapters = [
             SnowflakeVariantAdapter(),
             SnowflakeArrayAdapter(),
+            SnowflakeBitStringAdapter(),
             SnowflakeBooleanAdapter(),
             SnowflakeDecimalAdapter(),
+            SnowflakeGeometryAdapter(),
+            SnowflakeMacAddressAdapter(),
+            SnowflakeRangeAdapter(),
             SnowflakeTimestampAdapter(),
+            SnowflakeVectorAdapter(),
         ]
 
         for adapter in adapters:
@@ -415,6 +425,32 @@ class SnowflakeBackendMixin:
                 )
 
         return suggestions
+
+    def get_type_adapters(self) -> List["SQLTypeAdapter"]:
+        """Return the adapter instances this backend provides.
+
+        This is a plain inventory: it says which adapters exist for this backend.
+        It carries no suggestion/default/priority semantics; the caller decides.
+
+        Two sources the backend already owns are combined: the adapter registry
+        (every adapter registered for this backend, including ones that carry
+        no default suggestion) and the adapters named by
+        :meth:`get_default_adapter_suggestions`. Instances are deduplicated by
+        class -- ``(module, qualname)`` -- and sorted by that pair, so the order
+        is deterministic and a new list is returned on every call.
+
+        The sync and async Snowflake backends share this mixin, so both inherit
+        the same inventory.
+        """
+        adapters = list(self.adapter_registry.get_all_adapters().values())
+        adapters.extend(
+            suggestion[0] for suggestion in self.get_default_adapter_suggestions().values()
+        )
+        unique: Dict[Tuple[str, str], SQLTypeAdapter] = {}
+        for adapter in adapters:
+            adapter_cls = type(adapter)
+            unique.setdefault((adapter_cls.__module__, adapter_cls.__qualname__), adapter)
+        return [unique[key] for key in sorted(unique)]
 
     def get_default_schema(self) -> Optional[str]:
         """Get the default schema for Snowflake.

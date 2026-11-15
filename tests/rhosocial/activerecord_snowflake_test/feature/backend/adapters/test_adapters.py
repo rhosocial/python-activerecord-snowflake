@@ -2,9 +2,7 @@
 """Tests for Snowflake type adapters."""
 import json
 from decimal import Decimal
-from typing import Any, Dict
 
-import pytest
 
 from rhosocial.activerecord.backend.impl.snowflake.adapters import (
     SnowflakeVariantAdapter,
