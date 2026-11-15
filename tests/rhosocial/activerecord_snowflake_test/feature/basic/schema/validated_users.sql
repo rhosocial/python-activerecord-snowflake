@@ -1,6 +1,0 @@
-CREATE TABLE validated_users (
-    id INTEGER AUTOINCREMENT PRIMARY KEY,
-    username VARCHAR(50) NOT NULL,
-    email VARCHAR(255) NOT NULL,
-    age INTEGER
-)
