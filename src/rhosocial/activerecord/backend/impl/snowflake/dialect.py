@@ -608,6 +608,15 @@ class SnowflakeDialect(
     def supports_data_type_snowflake_geometry(self) -> bool:
         return True
 
+    def supports_database_assigned_integer_column(self) -> bool:
+        """Snowflake assigns the value through its ``IDENTITY`` column property.
+
+        The ``AUTOINCREMENT`` / ``IDENTITY`` property supplies the next value
+        when the column is omitted on INSERT; Snowflake's identity probe already
+        answers ``True`` as a policy choice.
+        """
+        return True
+
     # ========== Snowflake-Specific SQL Formatting ==========
 
     # Time travel, VARIANT, ARRAY, CLONE, and stage formatting methods

@@ -51,6 +51,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     CreateViewSupport,
     CTESupport,
     DDLTypeSupport,
+    DatabaseAssignedColumnSupport,
     TimestampSupport,
     DqlOrderSupport,
     DropDatabaseSupport,
@@ -107,6 +108,7 @@ SNOWFLAKE_PROTOCOLS = [
     # the dialect can answer the question, not that every answer is "yes".
     AutoIncrementColumnSupport,
     IdentityColumnSupport,
+    DatabaseAssignedColumnSupport,
     CollationSupport,
     CTESupport,
     ColumnAttributeSupport,
