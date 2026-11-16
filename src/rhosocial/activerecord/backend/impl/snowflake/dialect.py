@@ -154,6 +154,7 @@ from .mixins import (
     SnowflakeTimeTravelMixin,
     SnowflakeTransactionMixin,
     SnowflakeTypeDDLMixin,
+    SnowflakeDataTypeSuggestionsMixin,
     SnowflakeTypeSupportMixin,
     # Column types: which column class each common Python type means on this
     # server. It subclasses core's ColumnTypeMixin, so the protocol's own
@@ -275,6 +276,10 @@ class SnowflakeDialect(
     AutoIncrementMixin,
     IdentityColumnMixin,
     SnowflakeTypeDDLMixin,
+    # Suggested data types: the DDL half of the type answer. Ahead of
+    # SnowflakeTypeSupportMixin, which inherits core's
+    # NotImplementedError-raising default, so this dialect's answers win.
+    SnowflakeDataTypeSuggestionsMixin,
     SnowflakeTypeSupportMixin,
     TransactionControlMixin,
     SetOperationMixin,

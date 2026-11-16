@@ -62,7 +62,7 @@ class SnowflakeTypeSupport(DataTypeSupport, Protocol):
         is: :meth:`~...mixins.types.SnowflakeTypeSupportMixin.format_data_type_snowflake_uuid`
         has to refuse with the version in the message rather than write a word
         the server will reject.  It is also what
-        :meth:`~...mixins.types.SnowflakeTypeSupportMixin.suggested_data_types`
+        :meth:`~...mixins.types.SnowflakeTypeSupportMixin.substitute_data_types`
         switches on — ``SnowflakeUuidType`` from 10.2 on, ``VarCharType`` below it.
         """
         ...

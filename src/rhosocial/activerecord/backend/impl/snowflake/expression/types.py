@@ -29,7 +29,7 @@ both), ``BINARY(n)``-vs-``VARBINARY(n)`` (``BINARY`` and ``VARBINARY`` are the
 same type), and a ``REAL`` that stores 4 bytes (Snowflake's ``REAL`` is its
 64-bit ``FLOAT``).  The core concepts that have no Snowflake counterpart are
 named in
-:meth:`~...mixins.types.SnowflakeTypeSupportMixin.suggested_data_types`
+:meth:`~...mixins.types.SnowflakeTypeSupportMixin.substitute_data_types`
 rather than being faked with a formatter.
 
 One class here is **conditional**: :class:`SnowflakeUuidType` renders the
@@ -291,7 +291,7 @@ class SnowflakeBinaryType(BlobType):
     with a default maximum of 8,388,608.  There is no fixed-length versus
     variable-length binary pair on this backend, because there is only one
     binary type — which is why core ``BinaryType``/``VarBinaryType`` are
-    *substituted* rather than rendered (see ``suggested_data_types()``).
+    *substituted* rather than rendered (see ``substitute_data_types()``).
 
     The optional ``length`` is Snowflake's own: ``BINARY(n)`` declares the
     maximum number of bytes and defaults to 8,388,608.  It is kept in
@@ -347,7 +347,7 @@ class SnowflakeUuidType(UUIDType):
     before 10.2 — the type page and the summary table both simply do not list it
     before then — so the formatter refuses below 10.2 rather than writing DDL the
     server will reject, and :meth:`~...mixins.types.SnowflakeTypeSupportMixin.
-    suggested_data_types` keeps pointing the core ``uuid`` concept at ``VARCHAR``
+    substitute_data_types` keeps pointing the core ``uuid`` concept at ``VARCHAR``
     there.  Above 10.2 the suggestion points here instead.
     https://docs.snowflake.com/en/sql-reference/intro-summary-data-types
 

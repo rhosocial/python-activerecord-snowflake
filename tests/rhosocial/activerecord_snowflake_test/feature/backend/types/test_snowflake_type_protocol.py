@@ -384,7 +384,7 @@ class TestSnowflakeTypeSupportProtocol:
 class TestNativeUuidType:
     """Snowflake has had a native ``UUID`` column type since server 10.2.
 
-    Before this, ``suggested_data_types()["uuid"]`` was ``VarCharType``
+    Before this, ``substitute_data_types()["uuid"]`` was ``VarCharType``
     unconditionally, with the claim that "Snowflake has no UUID type: a UUID is
     a 36-character string".  That was true of every release before 10.2 and is
     false of 10.2 onwards, where the manual says "The UUID data type stores
@@ -421,14 +421,14 @@ class TestNativeUuidType:
     def test_the_uuid_concept_switches_substitute_on_a_10_2_server(self):
         """``uuid`` stays substituted on both sides of 10.2 — the core name is
         not a Snowflake word either way — but the storage it names changes."""
-        suggested = self.dialect.suggested_data_types()
+        suggested = self.dialect.substitute_data_types()
         assert suggested["uuid"] is SnowflakeUuidType
         assert "snowflake_uuid" in self.dialect.supports_data_types()
 
     def test_the_uuid_concept_keeps_varchar_on_an_older_server(self):
         """Byte-identical to what this backend has always suggested."""
         old = SnowflakeDialect(version=(10, 1, 0))
-        assert old.suggested_data_types()["uuid"] is VarCharType
+        assert old.substitute_data_types()["uuid"] is VarCharType
         assert "snowflake_uuid" not in old.supports_data_types()
 
     def test_an_older_server_refuses_the_native_type_by_version(self):
@@ -451,7 +451,7 @@ class TestNativeUuidType:
         """
         for version in ((8, 0, 0), UUID_SERVER_VERSION, (10, 8, 0)):
             dialect = SnowflakeDialect(version=version)
-            substitute = dialect.suggested_data_types()["uuid"]
+            substitute = dialect.substitute_data_types()["uuid"]
             sql, _ = dialect.format_data_type(substitute(dialect))
             assert sql in ("UUID", "VARCHAR", "VARCHAR(16777216)"), f"{version} -> {sql!r}"
 
@@ -460,7 +460,7 @@ class TestNativeUuidType:
         for version in ((8, 0, 0), UUID_SERVER_VERSION):
             dialect = SnowflakeDialect(version=version)
             overlap = set(dialect.supports_data_types()) & set(
-                dialect.suggested_data_types()
+                dialect.substitute_data_types()
             )
             assert not overlap, f"{version}: {overlap}"
 
@@ -488,7 +488,7 @@ class TestNativeUuidType:
 class TestSuggestedDataTypes:
     def test_returns_a_dict_of_classes(self):
         dialect = SnowflakeDialect()
-        result = dialect.suggested_data_types()
+        result = dialect.substitute_data_types()
         assert isinstance(result, dict)
         for name, klass in result.items():
             assert isinstance(klass, type), f"{name}: value is not a class"
@@ -502,11 +502,11 @@ class TestSuggestedDataTypes:
         substitute to name.
         """
         dialect = SnowflakeDialect()
-        assert dialect.suggested_data_types()["enum"] is VarCharType
+        assert dialect.substitute_data_types()["enum"] is VarCharType
 
     def test_keys_are_disjoint_from_supported(self):
         dialect = SnowflakeDialect()
-        overlap = set(dialect.supports_data_types()) & set(dialect.suggested_data_types())
+        overlap = set(dialect.supports_data_types()) & set(dialect.substitute_data_types())
         assert not overlap, f"overlap between supported and suggested: {overlap}"
 
     def test_suggested_advice_is_named_in_the_refusal(self):
@@ -522,7 +522,7 @@ class TestSuggestedDataTypes:
         The message tells the caller "use X instead", so X has to produce SQL.
         """
         dialect = SnowflakeDialect()
-        for name, klass in dialect.suggested_data_types().items():
+        for name, klass in dialect.substitute_data_types().items():
             sql, _ = dialect.format_data_type(klass(dialect))
             assert sql, f"{name} -> {klass.__name__} rendered empty SQL"
 
@@ -535,7 +535,7 @@ class TestSuggestedDataTypes:
         """
         dialect = SnowflakeDialect()
         supported = dialect.supports_data_types()
-        suggested = dialect.suggested_data_types()
+        suggested = dialect.substitute_data_types()
         for name in [
             "array", "binary", "custom", "interval", "jsonb", "real",
             "timestamptz", "timetz", "tinyint", "uuid", "varbinary", "xml",
@@ -551,7 +551,7 @@ class TestSuggestedDataTypes:
         answer is the byte storage that does exist rather than a fake length.
         """
         dialect = SnowflakeDialect()
-        suggested = dialect.suggested_data_types()
+        suggested = dialect.substitute_data_types()
         assert suggested["binary"] is BlobType
         assert suggested["varbinary"] is BlobType
 
@@ -562,20 +562,20 @@ class TestSuggestedDataTypes:
         disagrees with the manual; the manual is what the server does.
         """
         dialect = SnowflakeDialect()
-        assert dialect.suggested_data_types()["xml"] is SnowflakeObjectType
+        assert dialect.substitute_data_types()["xml"] is SnowflakeObjectType
 
     def test_interval_falls_back_to_exact_numeric(self):
         """Snowflake has no INTERVAL: a time span is a NUMBER of units, and the
         unit is a function argument rather than a column property."""
         dialect = SnowflakeDialect()
-        assert dialect.suggested_data_types()["interval"] is DecimalType
+        assert dialect.substitute_data_types()["interval"] is DecimalType
 
     def test_array_falls_back_to_snowflakes_own_array(self):
         """A bare Snowflake ARRAY is the semi-structured form — elements are
         VARIANT and no element type is declared — so it is the substitute for a
         parameterised T[], not a rendering of one."""
         dialect = SnowflakeDialect()
-        assert dialect.suggested_data_types()["array"] is SnowflakeArrayType
+        assert dialect.substitute_data_types()["array"] is SnowflakeArrayType
 
     def test_uuid_and_jsonb_fall_back_to_what_snowflake_stores(self):
         """The pre-10.2 answer, pinned.
@@ -586,7 +586,7 @@ class TestSuggestedDataTypes:
         """
         dialect = SnowflakeDialect()
         assert dialect.version < SNOWFLAKE_UUID_TYPE_MIN_VERSION
-        suggested = dialect.suggested_data_types()
+        suggested = dialect.substitute_data_types()
         assert suggested["uuid"] is VarCharType
         assert suggested["jsonb"] is JsonType
 
@@ -707,7 +707,7 @@ class TestSpellingGates:
             # and the concept is declared either way
             assert (
                 klass.name in self.dialect.supports_data_types()
-                or klass.name in self.dialect.suggested_data_types()
+                or klass.name in self.dialect.substitute_data_types()
             ), f"{klass.__name__} is neither rendered nor suggested"
 
     @pytest.mark.parametrize(

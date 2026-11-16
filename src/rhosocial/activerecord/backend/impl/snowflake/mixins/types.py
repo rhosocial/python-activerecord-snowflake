@@ -1171,7 +1171,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
 
         return CustomType(dialect=self, raw=stripped)
 
-    def suggested_data_types(self) -> Dict[str, type]:
+    def substitute_data_types(self) -> Dict[str, type]:
         """Core types Snowflake stores some other way.
 
         Snowflake's numeric, string, binary, boolean, date/time and
