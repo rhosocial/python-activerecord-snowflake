@@ -2,7 +2,7 @@
 """Snowflake's answer to "what column does this common Python type mean here".
 
 :class:`SnowflakeColumnTypeMixin` answers the column-type protocol for this
-server: for each of the framework's eighteen common Python types it states the
+server: for each of the framework's twenty-four Python types it states the
 column class the type gets on Snowflake. There is no inherited table in core to
 override -- a table there would be a guess about a server core has never seen --
 so the whole answer lives here, and every entry is answered deliberately.
@@ -98,17 +98,32 @@ import enum
 import uuid
 from typing import Any, Dict, Tuple, Type
 
+from rhosocial.activerecord.backend.adapters import (
+    BitString,
+    Geometry,
+    MacAddress,
+    Multirange,
+    Range,
+    Vector,
+)
 from rhosocial.activerecord.backend.dialect.mixins.column_type import ColumnTypeMixin
 from rhosocial.activerecord.backend.expression.column_types import (
     BinaryColumn,
+    BitStringColumn,
     BooleanColumn,
     ColumnBase,
+    GeometryColumn,
     IntegerColumn,
+    IntervalColumn,
     JSONColumn,
+    MacAddressColumn,
+    MultirangeColumn,
     NumericColumn,
+    RangeColumn,
     StringColumn,
     TimestampColumn,
     UUIDColumn,
+    VectorColumn,
 )
 
 #: The evidence level of this whole table, stated once so a reader (and a test)
@@ -175,19 +190,17 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     datetime.date: TimestampColumn,
     datetime.time: TimestampColumn,
     datetime.datetime: TimestampColumn,
-    # **Group 5 -- duration.** ``NumericColumn``, and the reason is *not*
-    # that Snowflake lacks an interval type: the date & time page documents
-    # twelve storable interval data types ("To store interval values in a
-    # column, you can use interval data types") down to
-    # ``INTERVAL DAY TO SECOND``. Two things keep the answer numeric:
-    # core declares no interval column class yet, so there is nothing more
-    # precise to answer; and Snowflake's own interval storage is
-    # restricted enough that it is not the portable default -- "VARIANT
-    # values can't contain interval values", and clustered tables, dynamic
-    # tables and Iceberg tables "can't have interval columns". If core ever
-    # adds an interval column class, this cell is the one to revisit.
+    # **Group 5 -- duration.** ``IntervalColumn``, which names the value and
+    # promises no arithmetic. Snowflake does have interval storage -- the
+    # date & time page documents twelve storable interval data types ("To
+    # store interval values in a column, you can use interval data types")
+    # down to ``INTERVAL DAY TO SECOND`` -- and the class carries only the
+    # surface every column has. Its own interval restrictions ("VARIANT
+    # values can't contain interval values"; clustered, dynamic and Iceberg
+    # tables "can't have interval columns") are storage choices, not an
+    # operation surface, so they belong to the DDL layer.
     # 文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/data-types-datetime>
-    datetime.timedelta: NumericColumn,
+    datetime.timedelta: IntervalColumn,
     # **Group 6 -- UUID.** ``UUIDColumn`` at every version. Core's
     # ``UUIDColumn`` carries no UUID-specific operator (portable SQL has
     # none), so the arrival of a native ``UUID`` type in server 10.2
@@ -227,6 +240,19 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     # as text, which is what ``StringColumn`` means everywhere.
     # 文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/intro-summary-data-types>
     enum.Enum: StringColumn,
+    # -- Complex families ------------------------------------------------
+    # Their core classes promise only the surface every column has -- alias,
+    # null tests, casting and collation -- because no distance, containment,
+    # overlap, bitwise or similarity operation is spelled the same way on
+    # every backend. Richer family operations belong to a Snowflake-named
+    # subclass in this backend's extra table. Storage is answered in the
+    # data-type suggestion module.
+    Geometry: GeometryColumn,
+    Vector: VectorColumn,
+    BitString: BitStringColumn,
+    Range: RangeColumn,
+    Multirange: MultirangeColumn,
+    MacAddress: MacAddressColumn,
 }
 
 
@@ -237,7 +263,7 @@ class SnowflakeColumnTypeMixin(ColumnTypeMixin):
     and overrides the one method it requires. What differs from any other
     backend is the *answer*, not the question.
 
-    No entry is answered ``None``: every one of the eighteen has a column class
+    No entry is answered ``None``: every one of the twenty-four has a column class
     here, including ``dict`` and the four sequence types. That is a real
     difference from the backends with no JSON functions at all (Firebird),
     where an entry genuinely has nowhere to go and ``None`` -- with a reason --
