@@ -12,6 +12,20 @@ import pytest
 import support.snowflake
 
 from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
+from rhosocial.activerecord.testsuite.pytest_plugin import Declaration
+
+DECLARATION = Declaration(
+    parallel=False,
+    purpose=(
+        "Backend-owned Snowflake tests; the root stays unpinned so pure rendering"
+        " directories run in unlimited parallel."
+    ),
+    passes_means="backend rendering and capability assertions hold without a live emulator",
+    fails_means=(
+        "a backend-owned assertion is wrong; database-touching directories"
+        " override this with their own declaration"
+    ),
+)
 
 #: (scenario, database) pairs whose database has already been reset.
 _PREPARED_DATABASES = set()
@@ -35,22 +49,6 @@ def _prepare_database(scenario_name: str, database: str) -> None:
         return
     support.snowflake.scenario(scenario_name).reset_database(database)
     _PREPARED_DATABASES.add(key)
-
-
-def pytest_collection_modifyitems(config, items):
-    """Pin a backend directory's tests to one worker.
-
-    These directories create and drop tables in the directory's own database.
-    The suite plugin pins every *contract* directory already; backend-owned
-    directories resolve their database here instead of through a contract, so
-    two workers resetting the same database at once would race exactly the
-    same way.  Grouping by directory, not by module, is what keeps them apart.
-    """
-    for item in items:
-        parts = item.path.parts
-        if "backend" not in parts:
-            continue
-        item.add_marker(pytest.mark.xdist_group("snowflake-backend::" + str(item.path.parent)))
 
 
 @pytest.fixture(scope="module")
