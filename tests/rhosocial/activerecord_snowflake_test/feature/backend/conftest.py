@@ -7,12 +7,12 @@ directory carries its own fixtures instead of a suite contract.  The scenario
 supplies the account parameters; the database name is derived from the
 directory that owns the test, so two directories never share tables.
 """
+from rhosocial.activerecord.testsuite.pytest_plugin import Declaration
 import pytest
 
 import support.snowflake
 
 from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
-from rhosocial.activerecord.testsuite.pytest_plugin import Declaration
 
 DECLARATION = Declaration(
     parallel=False,

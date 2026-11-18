@@ -75,7 +75,10 @@ SNOWFLAKE_DATA_TYPE_SUGGESTIONS: Dict[Any, Optional[Any]] = {
     bool: BooleanType(),
     int: IntegerType(),
     float: DoubleType(),
-    decimal.Decimal: DecimalType(),
+    # A bare DecimalType renders NUMBER(38, 0), which truncates every fraction
+    # a Python Decimal may carry. Suggest a scale so an inferred column keeps
+    # the value the writer supplied, as the other backends' default does.
+    decimal.Decimal: DecimalType(precision=38, scale=9),
     # TEXT and VARCHAR are the same storage here; the concept stays TEXT and
     # renders at Snowflake's own default width.
     str: TextType(),
