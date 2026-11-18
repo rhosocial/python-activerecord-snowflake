@@ -15,6 +15,7 @@ import support.snowflake
 from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
 
 DECLARATION = Declaration(
+    uses_database=True,
     parallel=False,
     purpose=(
         "Backend-owned Snowflake tests; the root stays unpinned so pure rendering"

@@ -3,6 +3,7 @@
 from rhosocial.activerecord.testsuite.pytest_plugin import Declaration
 
 DECLARATION = Declaration(
+    uses_database=True,
     parallel=True,
     purpose=(
         "Snowflake core behavior: clause guards, error mapping, identifier quoting"

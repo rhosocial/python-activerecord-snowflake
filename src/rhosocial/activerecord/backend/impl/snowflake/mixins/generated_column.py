@@ -175,13 +175,6 @@ class SnowflakeGeneratedColumnMixin:
         type_sql, _ = col_def.data_type.to_sql()
         col_sql = f"{self.format_identifier(col_def.name)} {type_sql}"
 
-        if any(
-            isinstance(getattr(constraint, "branch", None), ColumnPrimaryKeyConstraint)
-            and constraint.branch.is_auto_increment
-            for constraint in col_def.constraints
-        ):
-            col_sql += " IDENTITY(1, 1)"
-
         attr_sql, attr_params = self.format_column_attributes(col_def)
         col_sql += attr_sql
         all_params.extend(attr_params)

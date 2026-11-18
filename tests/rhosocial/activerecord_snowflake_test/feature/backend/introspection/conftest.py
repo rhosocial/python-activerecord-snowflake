@@ -3,6 +3,7 @@
 from rhosocial.activerecord.testsuite.pytest_plugin import Declaration
 
 DECLARATION = Declaration(
+    uses_database=True,
     parallel=True,
     purpose="Snowflake SHOW-based schema and account-object introspection.",
     passes_means="introspection reports match the directory's emulator database",
