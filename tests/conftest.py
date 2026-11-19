@@ -71,6 +71,12 @@ def pytest_collection_modifyitems(config, items):
         skip_emulator_info_schema = pytest.mark.skip(
             reason="fakesnow's INFORMATION_SCHEMA lacks KIND/EXPRESSION"
         )
+        skip_emulator_explain = pytest.mark.skip(
+            reason=(
+                "fakesnow cannot parse EXPLAIN: it rewrites it to DESCRIBE and raises "
+                "DatabaseError (the shared test_explain contracts need a real account)"
+            )
+        )
         composite_returning_tests = (
             "test_natural_key_on_composite_pk_model",
             "test_conflict_without_matching_lookup_reraises",
@@ -112,3 +118,10 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(skip_emulator_transaction)
             if "test_introspection_data_profile.py" in item.nodeid:
                 item.add_marker(skip_emulator_info_schema)
+            # The shared testsuite's ``test_explain`` contracts execute a real
+            # EXPLAIN. fakesnow has no EXPLAIN grammar, so under the emulator they
+            # fail at execution rather than report a backend defect. Gate them by
+            # exact test name so the backend-local construction-level EXPLAIN
+            # tests (different names) keep running.
+            if "::test_explain[" in item.nodeid or item.nodeid.endswith("::test_explain"):
+                item.add_marker(skip_emulator_explain)
