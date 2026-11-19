@@ -59,6 +59,12 @@ def pytest_collection_modifyitems(config, items):
         skip_emulator_composite_returning = pytest.mark.skip(
             reason="fakesnow cannot RETURNING more than one column (composite primary key)"
         )
+        skip_emulator_composite_returning_bulk = pytest.mark.skip(
+            reason=(
+                "fakesnow cannot RETURNING more than one column: the seeded fixture's "
+                "bulk_create() on a composite-primary-key model fails under the emulator"
+            )
+        )
         skip_emulator_transaction = pytest.mark.skip(
             reason="fakesnow does not implement Snowflake's transaction semantics"
         )
@@ -69,6 +75,18 @@ def pytest_collection_modifyitems(config, items):
             "test_natural_key_on_composite_pk_model",
             "test_conflict_without_matching_lookup_reraises",
         )
+        # The cte/setop composite-PK bridges seed their tables through
+        # ``bulk_create`` on a composite-PK model. The emulator's RETURNING
+        # path unpacks a single column and dies on the two-column result.
+        # Narrow, name-based gate: it does not touch the passing
+        # ``test_cte_unsupported_backend`` test in the same module.
+        composite_returning_bulk_tests = (
+            "test_composite_pk_cte.py::TestCTEQueryCompositePK::test_cte_aggregate",
+            "test_composite_pk_cte.py::TestCTEQueryCompositePK::test_cte_pk_filter",
+            "test_composite_pk_set_operation.py::TestSetOperationCompositePK::test_union",
+            "test_composite_pk_set_operation.py::TestSetOperationCompositePK::test_intersect",
+            "test_composite_pk_set_operation.py::TestSetOperationCompositePK::test_except_",
+        )
         transaction_tests = (
             "test_optimistic_lock",
             "test_stale_record_error_is_database_error",
@@ -76,12 +94,20 @@ def pytest_collection_modifyitems(config, items):
             "test_bulk_create_update_delete",
         )
         for item in items:
-            if "integration" in str(item.fspath):
+            path = str(item.fspath)
+            # ``query_integration`` is a testsuite topic of combinational query
+            # bridges, not a real-account integration test. The name gate below
+            # must not blanket-skip it; its tests skip by capability (async
+            # backend, real-account marker) through the rules further down.
+            is_real_integration = "integration" in path and "query_integration" not in path
+            if is_real_integration:
                 item.add_marker(skip_integration)
             if "_async" in item.nodeid:
                 item.add_marker(skip_emulator_async)
             if any(name in item.nodeid for name in composite_returning_tests):
                 item.add_marker(skip_emulator_composite_returning)
+            if any(name in item.nodeid for name in composite_returning_bulk_tests):
+                item.add_marker(skip_emulator_composite_returning_bulk)
             if any(name in item.nodeid for name in transaction_tests):
                 item.add_marker(skip_emulator_transaction)
             if "test_introspection_data_profile.py" in item.nodeid:

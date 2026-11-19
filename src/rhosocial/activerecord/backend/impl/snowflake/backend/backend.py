@@ -16,6 +16,7 @@ from rhosocial.activerecord.backend.introspection.backend_mixin import Introspec
 from ..config import SnowflakeConnectionConfig
 from ..dialect import SnowflakeDialect
 from ..mixins import SnowflakeBackendMixin, SnowflakeConcurrencyMixin
+from ..transaction import SnowflakeTransactionManager
 
 
 class SnowflakeBackend(
@@ -81,6 +82,20 @@ class SnowflakeBackend(
     def dialect(self) -> SnowflakeDialect:
         """Get the Snowflake dialect instance."""
         return self._dialect_instance
+
+    @property
+    def transaction_manager(self) -> SnowflakeTransactionManager:
+        """Get the lazy-initialized Snowflake transaction manager.
+
+        The core mixin declares this property abstract; without a concrete
+        override ``bulk_create()`` and other paths that open a transaction
+        fail with ``'NoneType' object has no attribute 'transaction'``.
+        """
+        if self._transaction_manager is None:
+            if self._connection is None:
+                self.connect()
+            self._transaction_manager = SnowflakeTransactionManager(self, self.logger)
+        return self._transaction_manager
 
     def connect(self) -> None:
         """Establish a connection to the Snowflake database."""
