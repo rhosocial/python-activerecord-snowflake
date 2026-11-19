@@ -22,7 +22,12 @@ coverage at this layer is construction-level only.
 """
 
 import pytest
-from rhosocial.activerecord.backend.expression import Column, QueryStatement, RawSQL
+from rhosocial.activerecord.backend.expression import (
+    Column,
+    ComparisonPredicate,
+    Literal,
+    QueryStatement,
+)
 from rhosocial.activerecord.backend.expression.objects import Table
 from rhosocial.activerecord.backend.expression.statements import (
     ExplainFormat,
@@ -108,7 +113,12 @@ class TestSnowflakeExplainRendering:
 
     def test_inner_statement_parameters_are_preserved(self, dialect):
         """The explained statement's bound params survive the EXPLAIN wrapper."""
-        inner = RawSQL(dialect, 'SELECT "id" FROM "users" WHERE "age" > %s', (18,))
+        inner = QueryStatement(
+            dialect,
+            select=[Column(dialect, "id")],
+            from_=Table(dialect, "users"),
+            where=ComparisonPredicate(dialect, ">", Column(dialect, "age"), Literal(dialect, 18)),
+        )
         sql, params = ExplainStatement(dialect, inner).to_sql()
         assert sql == 'EXPLAIN SELECT "id" FROM "users" WHERE "age" > %s'
         assert params == (18,)
