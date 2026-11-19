@@ -84,7 +84,7 @@ jobs:
         # mode has to be loadgroup (the suite plugin refuses any other one).
         run: |
           export PYTHONPATH=src:tests
-          pytest tests/rhosocial/activerecord_snowflake_test/feature/backend tests/rhosocial/activerecord_snowflake_test/feature/basic tests/rhosocial/activerecord_snowflake_test/feature/query tests/rhosocial/activerecord_snowflake_test/feature/cte tests/rhosocial/activerecord_snowflake_test/feature/setop tests/rhosocial/activerecord_snowflake_test/feature/query_integration \
+          pytest tests/ \
             -n 4 --dist=loadgroup --tb=short --cov=src/rhosocial --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
@@ -156,7 +156,7 @@ jobs:
       - name: Run tests
         run: |
           export PYTHONPATH=src:tests
-          pytest tests/rhosocial/activerecord_snowflake_test/feature/backend tests/rhosocial/activerecord_snowflake_test/feature/basic  -n 4 --dist=loadgroup --tb=short tests/rhosocial/activerecord_snowflake_test/feature/query tests/rhosocial/activerecord_snowflake_test/feature/cte tests/rhosocial/activerecord_snowflake_test/feature/setop tests/rhosocial/activerecord_snowflake_test/feature/query_integration
+          pytest tests/ -n 4 --dist=loadgroup --tb=short
 
   test-free-threaded:
     name: Python ${{ matrix.python-version }} (free-threaded)
@@ -192,4 +192,4 @@ jobs:
         # interpreter while the unit and dialect half still runs.
         run: |
           export PYTHONPATH=src:tests
-          pytest tests/rhosocial/activerecord_snowflake_test/feature/backend tests/rhosocial/activerecord_snowflake_test/feature/basic  -n 4 --dist=loadgroup --tb=short tests/rhosocial/activerecord_snowflake_test/feature/query tests/rhosocial/activerecord_snowflake_test/feature/cte tests/rhosocial/activerecord_snowflake_test/feature/setop tests/rhosocial/activerecord_snowflake_test/feature/query_integration
+          pytest tests/ -n 4 --dist=loadgroup --tb=short
