@@ -77,6 +77,15 @@ def pytest_collection_modifyitems(config, items):
                 "DatabaseError (the shared test_explain contracts need a real account)"
             )
         )
+        skip_emulator_complex_types = pytest.mark.skip(
+            reason="fakesnow cannot round-trip the neutral adapter types (geometry/range/etc)"
+        )
+        skip_emulator_window_frame = pytest.mark.skip(
+            reason="fakesnow does not support window frame specifications"
+        )
+        skip_emulator_worker = pytest.mark.skip(
+            reason="fakesnow cannot connect from a worker subprocess"
+        )
         composite_returning_tests = (
             "test_natural_key_on_composite_pk_model",
             "test_conflict_without_matching_lookup_reraises",
@@ -125,3 +134,10 @@ def pytest_collection_modifyitems(config, items):
             # tests (different names) keep running.
             if "::test_explain[" in item.nodeid or item.nodeid.endswith("::test_explain"):
                 item.add_marker(skip_emulator_explain)
+            # Newly bridged contract directories that the emulator cannot honor.
+            if "/feature/adapters/" in item.nodeid:
+                item.add_marker(skip_emulator_complex_types)
+            if item.originalname in ("test_window_frame_specifications", "test_unbounded_window_frames"):
+                item.add_marker(skip_emulator_window_frame)
+            if item.originalname.startswith("test_parallel_"):
+                item.add_marker(skip_emulator_worker)
