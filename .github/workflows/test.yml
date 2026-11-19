@@ -86,7 +86,7 @@ jobs:
           export PYTHONPATH=src:tests
           pytest tests/ \
             --ignore=tests/benchmark \
-            -n 4 --dist=loadgroup --tb=short --cov=src/rhosocial --cov-report=xml --cov-report=term-missing
+            -n 4 --dist=loadgroup --tb=short --cov=rhosocial.activerecord.backend.impl.snowflake --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
