@@ -1,6 +1,11 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/backend/async_backend.py
 """Snowflake asynchronous backend implementation.
 
+EXPERIMENTAL — DO NOT USE IN PRODUCTION. snowflake-connector-python has no
+native async API; this class exists only for API-shape parity and is not
+recommended for production workloads. Use the synchronous ``SnowflakeBackend``
+instead.
+
 This module provides the async Snowflake backend using a thread pool
 wrapper around the synchronous snowflake-connector-python driver,
 since there is no native async driver for Snowflake.

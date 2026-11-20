@@ -1,6 +1,11 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/async_transaction.py
 """Snowflake asynchronous transaction manager implementation.
 
+EXPERIMENTAL — DO NOT USE IN PRODUCTION. snowflake-connector-python has no
+native async API; this class wraps synchronous transaction calls in a thread
+pool and is kept only for API parity. Use the synchronous transaction manager
+instead.
+
 This module provides async transaction management for the Snowflake backend.
 Snowflake only supports READ COMMITTED isolation level.
 """

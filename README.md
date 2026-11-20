@@ -113,6 +113,12 @@ one (a UUID, a Snowflake `sequence`, or a client-side ID) or let the table's
 
 ### Async
 
+> **Experimental — do not use in production.** `snowflake-connector-python`
+> has no native async driver. `AsyncSnowflakeBackend` is a thread-pool wrapper
+> (`asyncio.run_in_executor`) over synchronous calls, carries no performance
+> benefit, and is provided only for API-shape parity. Use the synchronous
+> `SnowflakeBackend` in production.
+
 `AsyncSnowflakeBackend` exposes the same method names, but it is a
 **thread-pool wrapper**, not a native async implementation:
 `snowflake-connector-python` has no async driver, so calls run through
@@ -154,6 +160,11 @@ warehouse backends.
 
 ## Known Limitations
 
+- **Async is experimental.** `snowflake-connector-python` has no native async
+  API. `AsyncSnowflakeBackend` / `AsyncSnowflakeTransactionManager` are
+  thread-pool (`asyncio.run_in_executor`) wrappers over synchronous calls, kept
+  only for API parity. **Do not use them in production** — use the synchronous
+  backend.
 - **No connection pooling.** `pool_size`, `pool_min_size`, `pool_max_size` and
   friends are accepted by the config class but not consumed by the backend.
 - **No `RETURNING` clause on the DML level.** `supports_returning_insert()`,
