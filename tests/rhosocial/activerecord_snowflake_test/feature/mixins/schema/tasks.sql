@@ -1,6 +1,0 @@
-CREATE TABLE tasks (
-    id INTEGER AUTOINCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    is_completed BOOLEAN NOT NULL DEFAULT FALSE,
-    deleted_at VARCHAR
-)

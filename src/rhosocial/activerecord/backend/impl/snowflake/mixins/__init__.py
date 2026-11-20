@@ -8,6 +8,7 @@ CLONE, stage, warehouse, stream, task, pipe, file format, routine,
 undrop, materialized view, table modifiers support.
 """
 
+from .integer_auto_increment_column_suggestion import SnowflakeIntegerAutoIncrementColumnSuggestionMixin
 from .array import SnowflakeArrayMixin
 from .backend import SnowflakeBackendMixin
 from .clone import SnowflakeCloneMixin
@@ -36,6 +37,7 @@ from .undrop import SnowflakeUndropMixin
 from .variant import SnowflakeVariantMixin
 from .types import SnowflakeTypeSupportMixin
 from .column_type import SnowflakeColumnTypeMixin
+from .data_type_suggestions import SnowflakeDataTypeSuggestionsMixin
 from .warehouse import SnowflakeWarehouseMixin
 from .ddl import SnowflakeAlterColumnModifierMixin
 from .ddl_type import SnowflakeTypeDDLMixin
@@ -58,6 +60,7 @@ from .ddl_database import SnowflakeDatabaseMixin
 from .sequence import SnowflakeSequenceMixin
 
 __all__ = [
+    'SnowflakeIntegerAutoIncrementColumnSuggestionMixin',
     "SnowflakeArrayMixin",
     "SnowflakeBackendMixin",
     "SnowflakeCloneMixin",
@@ -87,6 +90,7 @@ __all__ = [
     "SnowflakeWarehouseMixin",
     "SnowflakeAlterColumnModifierMixin",
     "SnowflakeTypeDDLMixin",
+    "SnowflakeDataTypeSuggestionsMixin",
     "SnowflakeDateTimeMixin",
     "SnowflakeCollationMixin",
     "SnowflakeTrimMixin",

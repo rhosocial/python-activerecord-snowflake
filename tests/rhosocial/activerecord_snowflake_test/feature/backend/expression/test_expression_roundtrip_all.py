@@ -88,7 +88,7 @@ from typing import Dict
 
 import pytest
 
-from rhosocial.activerecord.backend.dialect.exceptions import (
+from rhosocial.activerecord.backend.dialect.exceptions import (UnsupportedDataTypeError, 
     ProtocolNotImplementedError,
     UnsupportedFeatureError,
 )
@@ -1418,7 +1418,7 @@ LEGITIMATE_NON_RENDERS = {
     # TypeError, not UnsupportedFeatureError, because the class is incomplete
     # rather than the dialect being unable.
     "rhosocial.activerecord.backend.expression.types._base.DataType": (
-        TypeError,
+        UnsupportedDataTypeError,
         _NO_GENERIC_TYPE,
     ),
     # ---- generic types Snowflake spells differently -----------------------
@@ -1428,19 +1428,19 @@ LEGITIMATE_NON_RENDERS = {
     # shared dispatcher's, and its fragment is checked so that a type whose
     # formatter starts existing fails here.
     "rhosocial.activerecord.backend.expression.types.array.ArrayType": (
-        TypeError,
+        UnsupportedDataTypeError,
         _NO_GENERIC_TYPE,
     ),
     "rhosocial.activerecord.backend.expression.types.binary.BinaryType": (
-        TypeError,
+        UnsupportedDataTypeError,
         _NO_GENERIC_TYPE,
     ),
     "rhosocial.activerecord.backend.expression.types.binary.VarBinaryType": (
-        TypeError,
+        UnsupportedDataTypeError,
         _NO_GENERIC_TYPE,
     ),
     "rhosocial.activerecord.backend.expression.types.datetime_.IntervalType": (
-        TypeError,
+        UnsupportedDataTypeError,
         _NO_GENERIC_TYPE,
     ),
     # ENUM. MySQL/MariaDB native; core suggests text elsewhere, and this
@@ -1448,19 +1448,19 @@ LEGITIMATE_NON_RENDERS = {
     # names VarCharType. It became reachable when the constructor started
     # supplying a real values list.
     "rhosocial.activerecord.backend.expression.types.enum_.EnumType": (
-        TypeError,
+        UnsupportedDataTypeError,
         _NO_GENERIC_TYPE,
     ),
     "rhosocial.activerecord.backend.expression.types.json_.JsonBType": (
-        TypeError,
+        UnsupportedDataTypeError,
         _NO_GENERIC_TYPE,
     ),
     "rhosocial.activerecord.backend.expression.types.uuid_.UUIDType": (
-        TypeError,
+        UnsupportedDataTypeError,
         _NO_GENERIC_TYPE,
     ),
     "rhosocial.activerecord.backend.expression.types.xml_.XmlType": (
-        TypeError,
+        UnsupportedDataTypeError,
         _NO_GENERIC_TYPE,
     ),
 }

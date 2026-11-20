@@ -7,10 +7,33 @@ fakesnow replaces snowflake.connector.connect at import time,
 so SnowflakeBackend can be used normally without any code changes.
 """
 import pytest
-import fakesnow as _fakesnow
+
+try:
+    import fakesnow as _fakesnow
+except ImportError:  # pragma: no cover - fakesnow requires Python >= 3.11
+    _fakesnow = None
 
 from rhosocial.activerecord.backend.impl.snowflake.backend import SnowflakeBackend
 from rhosocial.activerecord.backend.impl.snowflake.config import SnowflakeConnectionConfig
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip this directory where the emulator cannot exist.
+
+    fakesnow is the DuckDB-backed Snowflake emulator and requires Python >= 3.11
+    (the workflow's emulator matrix says which jobs have it). Its absence is not
+    an error in these tests: the directory is skipped as a whole, by name, and
+    the reason states what is missing.
+    """
+    if _fakesnow is not None:
+        return
+    reason = (
+        "fakesnow is the Snowflake emulator this directory integrates with, and "
+        "it requires Python >= 3.11; this interpreter cannot install it"
+    )
+    skip = pytest.mark.skip(reason=reason)
+    for item in items:
+        item.add_marker(skip)
 
 # fakesnow patterns that should be treated as no-ops
 FAKESNOW_NOP_PATTERNS = [
@@ -25,9 +48,10 @@ FAKESNOW_NOP_PATTERNS = [
 def _fakesnow_patch():
     """Per-test fakesnow patch (function scope).
 
-    Detects if a fakesnow patch is already active (e.g. from
-    tests/providers/scenarios.py) and skips re-patching to avoid
-    conflicts (fakesnow.patch is not re-entrant).
+    Detects if a fakesnow patch is already active (e.g. the one
+    ``tests/support/snowflake.py`` enters at import time when the scenario
+    file names the emulator) and skips re-patching to avoid conflicts
+    (fakesnow.patch is not re-entrant).
     """
     if _is_fakesnow_already_patched():
         yield

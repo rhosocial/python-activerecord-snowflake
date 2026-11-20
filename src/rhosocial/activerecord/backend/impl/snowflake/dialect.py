@@ -154,6 +154,7 @@ from .mixins import (
     SnowflakeTimeTravelMixin,
     SnowflakeTransactionMixin,
     SnowflakeTypeDDLMixin,
+    SnowflakeDataTypeSuggestionsMixin,
     SnowflakeTypeSupportMixin,
     # Column types: which column class each common Python type means on this
     # server. It subclasses core's ColumnTypeMixin, so the protocol's own
@@ -182,10 +183,13 @@ from .mixins import (
     SnowflakeTruncateMixin,
     SnowflakeWildcardMixin,
     SnowflakeLiteralValueMixin,
+    SnowflakeIntegerAutoIncrementColumnSuggestionMixin,
 )
 
 
 class SnowflakeDialect(
+    # Backend suggestion first: no core mixin may shadow its answer.
+    SnowflakeIntegerAutoIncrementColumnSuggestionMixin,
     # The bases below come in bundles: a backend mixin, then the core bundle
     # it stands in for. The backend's answer has to come first -- a mixin
     # placed after the class it overrides never wins -- so a new mixin goes
@@ -275,6 +279,10 @@ class SnowflakeDialect(
     AutoIncrementMixin,
     IdentityColumnMixin,
     SnowflakeTypeDDLMixin,
+    # Suggested data types: the DDL half of the type answer. Ahead of
+    # SnowflakeTypeSupportMixin, which inherits core's
+    # NotImplementedError-raising default, so this dialect's answers win.
+    SnowflakeDataTypeSuggestionsMixin,
     SnowflakeTypeSupportMixin,
     TransactionControlMixin,
     SetOperationMixin,
@@ -606,6 +614,15 @@ class SnowflakeDialect(
         return True
 
     def supports_data_type_snowflake_geometry(self) -> bool:
+        return True
+
+    def supports_database_assigned_integer_column(self) -> bool:
+        """Snowflake assigns the value through its ``IDENTITY`` column property.
+
+        The ``AUTOINCREMENT`` / ``IDENTITY`` property supplies the next value
+        when the column is omitted on INSERT; Snowflake's identity probe already
+        answers ``True`` as a policy choice.
+        """
         return True
 
     # ========== Snowflake-Specific SQL Formatting ==========

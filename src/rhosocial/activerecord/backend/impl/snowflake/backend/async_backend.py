@@ -1,6 +1,11 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/backend/async_backend.py
 """Snowflake asynchronous backend implementation.
 
+EXPERIMENTAL — DO NOT USE IN PRODUCTION. snowflake-connector-python has no
+native async API; this class exists only for API-shape parity and is not
+recommended for production workloads. Use the synchronous ``SnowflakeBackend``
+instead.
+
 This module provides the async Snowflake backend using a thread pool
 wrapper around the synchronous snowflake-connector-python driver,
 since there is no native async driver for Snowflake.
@@ -37,6 +42,7 @@ from rhosocial.activerecord.backend.introspection.backend_mixin import Introspec
 from ..config import SnowflakeConnectionConfig
 from ..dialect import SnowflakeDialect
 from ..mixins import SnowflakeBackendMixin, AsyncSnowflakeConcurrencyMixin
+from ..async_transaction import AsyncSnowflakeTransactionManager
 
 
 class AsyncSnowflakeBackend(
@@ -123,6 +129,17 @@ class AsyncSnowflakeBackend(
     def dialect(self) -> SnowflakeDialect:
         """Get the Snowflake dialect instance."""
         return self._dialect_instance
+
+    @property
+    def transaction_manager(self) -> AsyncSnowflakeTransactionManager:
+        """Get the lazy-initialized async Snowflake transaction manager.
+
+        Mirrors :class:`SnowflakeBackend`'s override so the async backend does
+        not inherit the core mixin's abstract, ``None``-returning property.
+        """
+        if self._transaction_manager is None:
+            self._transaction_manager = AsyncSnowflakeTransactionManager(self, self.logger)
+        return self._transaction_manager
 
     async def connect(self) -> None:
         """Establish a connection to the Snowflake database."""

@@ -15,19 +15,34 @@ import uuid
 
 import pytest
 
+from rhosocial.activerecord.backend.adapters import (
+    BitString,
+    Geometry,
+    MacAddress,
+    Multirange,
+    Range,
+    Vector,
+)
 from rhosocial.activerecord.backend.dialect.mixins import ColumnTypeMixin
 from rhosocial.activerecord.backend.dialect.protocols import ColumnTypeSupport
 from rhosocial.activerecord.backend.expression.column_types import (
     ArrayColumn,
     BinaryColumn,
+    BitStringColumn,
     BooleanColumn,
     ColumnBase,
+    GeometryColumn,
     IntegerColumn,
+    IntervalColumn,
     JSONColumn,
+    MacAddressColumn,
+    MultirangeColumn,
     NumericColumn,
+    RangeColumn,
     StringColumn,
     TimestampColumn,
     UUIDColumn,
+    VectorColumn,
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.mixins import column_type
@@ -95,7 +110,7 @@ def test_the_table_answers_every_entry_of_the_common_list(table):
     exactly, in neither direction.
     """
     assert set(table) == set(COMMON_TYPES)
-    assert len(COMMON_TYPES) == 18
+    assert len(COMMON_TYPES) == 24
 
 
 def test_no_entry_is_refused(dialect, table):
@@ -171,7 +186,7 @@ def test_the_backend_offers_no_extra_types(dialect):
         (datetime.date, TimestampColumn),
         (datetime.time, TimestampColumn),
         (datetime.datetime, TimestampColumn),
-        (datetime.timedelta, NumericColumn),
+        (datetime.timedelta, IntervalColumn),
         (uuid.UUID, UUIDColumn),
         (dict, JSONColumn),
         (list, JSONColumn),
@@ -179,6 +194,12 @@ def test_the_backend_offers_no_extra_types(dialect):
         (set, JSONColumn),
         (frozenset, JSONColumn),
         (enum.Enum, StringColumn),
+        (Geometry, GeometryColumn),
+        (Vector, VectorColumn),
+        (BitString, BitStringColumn),
+        (Range, RangeColumn),
+        (Multirange, MultirangeColumn),
+        (MacAddress, MacAddressColumn),
     ],
     ids=lambda v: getattr(v, "__name__", str(v)),
 )
@@ -191,11 +212,11 @@ def test_the_documented_answer_per_entry(dialect, annotation, expected):
     family, and the precision difference lives in the DDL layer's
     ``DataType``. See the group-2 comment in the mixin.
 
-    ``timedelta -> NumericColumn`` is the one that reads like a mistake and is
-    not: Snowflake *does* document twelve storable interval data types, but core
-    declares no interval column class and Snowflake's interval storage is barred
-    from VARIANT, clustered, dynamic and Iceberg tables, so it is not the
-    portable default. See the group-5 comment in the mixin.
+    ``timedelta -> IntervalColumn`` names the value rather than the storage.
+    Snowflake documents twelve storable interval data types, and the class
+    promises no arithmetic, so it is honest both where intervals are allowed
+    and where they are barred (VARIANT, clustered, dynamic and Iceberg tables).
+    See the group-5 comment in the mixin.
 
     ``date``/``time`` answering ``TimestampColumn`` is likewise a core gap (no
     ``DateColumn``/``TimeColumn`` yet), not a claim that Snowflake conflates them

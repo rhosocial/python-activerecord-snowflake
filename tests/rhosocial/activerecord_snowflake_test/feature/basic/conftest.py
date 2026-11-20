@@ -1,17 +1,21 @@
 # tests/rhosocial/activerecord_snowflake_test/feature/basic/conftest.py
-"""Pytest configuration for basic feature tests.
+"""Fixtures shared by the ``basic`` topic, plus the emulator's structural limits.
 
-Imports fixtures from the testsuite, making them available
-to tests in this directory.
+The models and their per-test fixtures come from the testsuite; each leaf
+directory below this one declares its own table group, so this module only
+imports the shared fixture group.
 
-Adds skip markers for tests that cannot run under fakesnow
-(the DuckDB-based Snowflake emulator used when no real
-Snowflake credentials are available).
+When the run is against ``fakesnow`` (the DuckDB-based emulator used when no
+real Snowflake account is configured), a handful of tests depend on behaviour
+DuckDB cannot reproduce.  They are skipped here rather than failing, and the
+reasons are the emulator's limits, not the backend's.
 """
+
 import os
+
 import pytest
 
-from rhosocial.activerecord.testsuite.feature.basic.conftest import *
+from rhosocial.activerecord.testsuite.feature.basic.conftest import *  # noqa: F401,F403
 
 _FAKESNOW_ONLY = not bool(os.getenv("SNOWFLAKE_ACCOUNT"))
 

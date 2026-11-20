@@ -169,8 +169,9 @@ TYPE_MATRIX = [
     (SnowflakeTimeType, {"precision": 3}, "TIME(3)", (3,)),
     (SnowflakeBinaryType, {}, "BINARY", (None,)),
     (SnowflakeBinaryType, {"length": 512}, "BINARY(512)", (512,)),
-    (SnowflakeVariantType, {}, "VARIANT", ()),
-    (SnowflakeObjectType, {}, "OBJECT", ()),
+    # JsonType now declares a length parameter; these backends leave it unset.
+    (SnowflakeVariantType, {}, "VARIANT", (None,)),
+    (SnowflakeObjectType, {}, "OBJECT", (None,)),
     (SnowflakeArrayType, {}, "ARRAY", None),
     (SnowflakeGeographyType, {}, "GEOGRAPHY", ()),
     (SnowflakeGeometryType, {}, "GEOMETRY", ()),
