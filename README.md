@@ -137,7 +137,7 @@ repositories.
 > **⚠️ Development Stage:** This project is under active development. APIs may change, and some features —
 > notably the thread-pool async backend — are not yet production-ready.
 
-## Contributing, License, Links
+## Documentation
 
 ### Contributing
 
