@@ -34,7 +34,7 @@ class SnowflakeTimeTravelSupport(Protocol):
         """Whether time travel queries are supported."""
         ...
 
-    def format_time_travel_point(self, keyword: str, point: Tuple[str, Any]) -> str:
+    def build_time_travel_point(self, keyword: str, point: Tuple[str, Any]) -> str:
         """Render a single AT/BEFORE clause."""
         ...
 

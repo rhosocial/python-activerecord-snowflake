@@ -442,7 +442,7 @@ class SnowflakeDialect(
         """Snowflake supports IDENTIFIER() dynamic binding."""
         return True
 
-    def format_snowflake_identifier_expression(self, identifier: str) -> str:
+    def format_snowflake_identifier_expression(self, expr: str) -> str:
         """Format an IDENTIFIER(placeholder) dynamic object reference."""
         placeholder = self.get_parameter_placeholder()
         return f"IDENTIFIER({placeholder})"

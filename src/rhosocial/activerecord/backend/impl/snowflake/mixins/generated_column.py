@@ -4,7 +4,6 @@
 from typing import Tuple
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
-from rhosocial.activerecord.backend.expression.statements import ColumnPrimaryKeyConstraint
 
 
 class SnowflakeGeneratedColumnMixin:
@@ -152,7 +151,7 @@ class SnowflakeGeneratedColumnMixin:
         """Snowflake exposes generated columns as virtual columns."""
         return True
 
-    def format_column_definition(self, col_def) -> Tuple[str, tuple]:
+    def format_column_definition(self, expr) -> Tuple[str, tuple]:
         """Render one column, placing an auto-increment key as ``IDENTITY``.
 
         Core renders a primary-key branch's ``is_auto_increment`` only where
@@ -172,24 +171,24 @@ class SnowflakeGeneratedColumnMixin:
         https://docs.snowflake.com/en/sql-reference/sql/create-table
         """
         all_params = []
-        type_sql, _ = col_def.data_type.to_sql()
-        col_sql = f"{self.format_identifier(col_def.name)} {type_sql}"
+        type_sql, _ = expr.data_type.to_sql()
+        col_sql = f"{self.format_identifier(expr.name)} {type_sql}"
 
-        attr_sql, attr_params = self.format_column_attributes(col_def)
+        attr_sql, attr_params = self.format_column_attributes(expr)
         col_sql += attr_sql
         all_params.extend(attr_params)
-        for constraint in col_def.constraints:
+        for constraint in expr.constraints:
             suffix, params = self.format_column_constraint(constraint)
             col_sql += suffix
             all_params.extend(params)
 
-        if col_def.generated_expression is not None:
-            gen_sql, gen_params = col_def.generated_expression.to_sql()
+        if expr.generated_expression is not None:
+            gen_sql, gen_params = expr.generated_expression.to_sql()
             col_sql += gen_sql
             all_params.extend(gen_params)
 
-        if col_def.comment is not None:
-            comment_sql, comment_params = self.format_column_comment_clause(col_def.comment)
+        if expr.comment is not None:
+            comment_sql, comment_params = self.format_column_comment_clause(expr.comment)
             col_sql += comment_sql
             all_params.extend(comment_params)
         return col_sql, tuple(all_params)

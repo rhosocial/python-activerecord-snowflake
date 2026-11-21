@@ -40,7 +40,7 @@ class SnowflakeTimeTravelMixin:
         """Snowflake supports time travel queries."""
         return True
 
-    def format_time_travel_point(self, keyword: str, point: Tuple[str, Any]) -> str:
+    def build_time_travel_point(self, keyword: str, point: Tuple[str, Any]) -> str:
         """Render one ``AT`` / ``BEFORE`` clause.
 
         Args:
@@ -116,4 +116,4 @@ class SnowflakeTimeTravelMixin:
                 ),
             )
         keyword, point = next(iter(options.items()))
-        return self.format_time_travel_point(keyword, point), ()
+        return self.build_time_travel_point(keyword, point), ()
