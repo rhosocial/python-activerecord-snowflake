@@ -90,7 +90,7 @@ class SnowflakeTableModifierMixin:
         """
         return True
 
-    def format_table_comment(self, comment: str) -> Tuple[str, tuple]:
+    def format_table_comment(self, expr: str) -> Tuple[str, tuple]:
         """Render a table-level ``COMMENT = 'text'`` option.
 
         Snowflake's table-level comment form carries the ``=`` sign (unlike
@@ -98,7 +98,7 @@ class SnowflakeTableModifierMixin:
         generic core rendering emits); the column-level form stays bare and
         is rendered by the generic ``format_column_definition``.
         """
-        escaped = self.escape_sql_string(comment)
+        escaped = self.escape_sql_string(expr)
         return f"COMMENT = '{escaped}'", ()
 
     def supports_create_table_like(self) -> bool:

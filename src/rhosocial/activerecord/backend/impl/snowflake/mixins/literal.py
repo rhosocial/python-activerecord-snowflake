@@ -68,7 +68,7 @@ class SnowflakeLiteralValueMixin:
     never wins.
     """
 
-    def format_literal(self, value: Any) -> str:
+    def format_literal(self, expr: Any) -> str:
         """Render *value* as inline SQL text, Snowflake's spelling where it has one.
 
         Args:
@@ -82,15 +82,15 @@ class SnowflakeLiteralValueMixin:
                 literal form for -- ``timedelta`` among them, which is the
                 documented answer rather than a gap.
         """
-        if isinstance(value, (bytes, bytearray)):
+        if isinstance(expr, (bytes, bytearray)):
             # Rendered from the bytes rather than from the base64 spelling an
             # artifact carries: only the dialect layer knows which text form
             # its engine accepts. The digits go through ``format_literal`` so
             # the quoting is the base's, never a second copy of it.
-            hex_text = bytes(value).hex().upper()
+            hex_text = bytes(expr).hex().upper()
             return f"TO_BINARY({self.format_literal(hex_text)}, 'HEX')"
-        if isinstance(value, uuid.UUID):
+        if isinstance(expr, uuid.UUID):
             # The canonical 8-4-4-4-12 text is exactly the pattern the UUID
             # page describes, and quoting stays the base's escaping.
-            return self.format_literal(str(value))
-        return super().format_literal(value)
+            return self.format_literal(str(expr))
+        return super().format_literal(expr)

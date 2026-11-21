@@ -48,8 +48,8 @@ class SnowflakeAlterColumnModifierMixin:
         """
         return True
 
-    def format_add_column_action(self, action) -> Tuple[str, tuple]:
-        if getattr(action, "if_not_exists", None) is True:
+    def format_add_column_action(self, expr) -> Tuple[str, tuple]:
+        if getattr(expr, "if_not_exists", None) is True:
             # The kinds Snowflake's documented restriction names: DEFAULT,
             # IDENTITY (which ``AUTO_INCREMENT`` is a spelling of here), PRIMARY
             # KEY, FOREIGN KEY and UNIQUE.  The kind is the *branch class* now --
@@ -61,7 +61,7 @@ class SnowflakeAlterColumnModifierMixin:
                 ColumnUniqueConstraint,
             }
             if any(
-                type(c.branch) in forbidden for c in action.column.constraints
+                type(c.branch) in forbidden for c in expr.column.constraints
             ):
                 raise UnsupportedFeatureError(
                     self.name,
@@ -70,27 +70,27 @@ class SnowflakeAlterColumnModifierMixin:
                                "also specifies DEFAULT/AUTOINCREMENT/IDENTITY/UNIQUE/PK/FK. "
                                "Pre-check information_schema.COLUMNS instead.",
                 )
-            column_sql, column_params = self.format_column_definition(action.column)
+            column_sql, column_params = self.format_column_definition(expr.column)
             return f"ADD COLUMN IF NOT EXISTS {column_sql}", column_params
-        column_sql, column_params = self.format_column_definition(action.column)
+        column_sql, column_params = self.format_column_definition(expr.column)
         return f"ADD COLUMN {column_sql}", column_params
 
-    def format_drop_column_action(self, action) -> Tuple[str, tuple]:
-        name = self.format_identifier(action.column_name)
-        if getattr(action, "if_exists", None) is True:
+    def format_drop_column_action(self, expr) -> Tuple[str, tuple]:
+        name = self.format_identifier(expr.column_name)
+        if getattr(expr, "if_exists", None) is True:
             return f"DROP COLUMN IF EXISTS {name}", ()
         return f"DROP COLUMN {name}", ()
 
-    def format_drop_table_constraint_action(self, action) -> Tuple[str, tuple]:
-        if getattr(action, "if_exists", None) is True:
+    def format_drop_table_constraint_action(self, expr) -> Tuple[str, tuple]:
+        if getattr(expr, "if_exists", None) is True:
             raise UnsupportedFeatureError(
                 self.name,
                 "DROP CONSTRAINT IF EXISTS",
                 suggestion="Snowflake does not support IF EXISTS on DROP CONSTRAINT. "
                            "Pre-check information_schema.TABLE_CONSTRAINTS.",
             )
-        name = self.format_identifier(action.constraint_name)
+        name = self.format_identifier(expr.constraint_name)
         result = f"DROP CONSTRAINT {name}"
-        if getattr(action, "cascade", None):
+        if getattr(expr, "cascade", None):
             result += " CASCADE"
         return result, ()

@@ -354,7 +354,7 @@ class SnowflakeCapabilityMixin:
 
         return ModifyColumnAction(self, column=new_col)
 
-    def format_modify_column_action(self, action) -> Tuple[str, tuple]:
+    def format_modify_column_action(self, expr) -> Tuple[str, tuple]:
         """Render Snowflake ALTER TABLE ... MODIFY COLUMN <col> <type>.
 
         The MODIFY path re-spells the column's inline constraint list, which
@@ -370,7 +370,7 @@ class SnowflakeCapabilityMixin:
             ColumnNullableConstraint,
         )
 
-        col = action.column
+        col = expr.column
         type_sql, _ = self.format_data_type(col.data_type)
         parts = [type_sql]
         for c in col.constraints:

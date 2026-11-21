@@ -58,9 +58,9 @@ class SnowflakeStreamMixin:
         # AT / BEFORE is a clause, not part of the name, so it renders through
         # the same helper a time-travelled FROM reference uses.
         if expr.at is not None:
-            parts.append(self.format_time_travel_point("AT", expr.at))
+            parts.append(self.build_time_travel_point("AT", expr.at))
         if expr.before is not None:
-            parts.append(self.format_time_travel_point("BEFORE", expr.before))
+            parts.append(self.build_time_travel_point("BEFORE", expr.before))
         if expr.copy_grants is not None:
             parts.append(f"COPY_GRANTS = {str(bool(expr.copy_grants)).upper()}")
         if expr.comment is not None:
