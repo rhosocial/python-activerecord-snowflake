@@ -15,8 +15,7 @@ from rhosocial.activerecord.backend.dialect import PartitionSupport
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 from rhosocial.activerecord.backend.expression.statements import (
-    PartitionClause,
-    PartitionStrategy,
+    PartitionByRangeClause, PartitionClause,
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.mixins import SnowflakePartitionMixin
@@ -90,7 +89,7 @@ class TestSnowflakeGenericPartitionClauseRejected:
     """The generic RANGE/LIST/HASH PartitionClause is not valid Snowflake SQL."""
 
     def test_generic_partition_clause_rejected(self, dialect):
-        clause = PartitionClause(dialect, PartitionStrategy.RANGE, [MockKey(dialect, "id")])
+        clause = PartitionByRangeClause(dialect, [MockKey(dialect, "id")])
         with pytest.raises(UnsupportedFeatureError):
             clause.to_sql()
 

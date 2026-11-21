@@ -26,8 +26,8 @@ from rhosocial.activerecord.backend.expression.statements import (
     TableUniqueConstraint,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_partition import (
+    PartitionByRangeClause,
     PartitionClause,
-    PartitionStrategy,
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
@@ -127,9 +127,8 @@ TABLE_OPTIONS = (
     SnowflakeCreateTableOptions(None, transient=True),
 )
 STORAGE_OPTIONS = StorageOptionsExpression(None, {"engine": "MergeTree"})
-TABLE_PARTITION = PartitionClause(
+TABLE_PARTITION = PartitionByRangeClause(
     None,
-    PartitionStrategy.RANGE,
     [Column(None, "physical_value")],
 )
 TABLE_INHERITS = ["parent_a", "parent_b"]
