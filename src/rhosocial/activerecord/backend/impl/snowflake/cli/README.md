@@ -62,7 +62,7 @@ enumerate, not which schema to fetch.
 
 Exit codes follow that split: **1** is a runtime failure (connection, query,
 unexpected) and also "the named view or table is not there"; **2** is a request
-this backend cannot serve — a type whose capability switch is off, or a `NAME`
+this backend cannot serve — a type whose support switch is off, or a `NAME`
 on a list type.
 
 Three absences worth naming:

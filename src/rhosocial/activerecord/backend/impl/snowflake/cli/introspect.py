@@ -34,7 +34,7 @@ from rhosocial.activerecord.backend.impl.snowflake.backend.async_backend import 
 from .connection import add_connection_args, resolve_connection_config_from_args
 from .output import OUTPUT_CHOICES, create_provider
 
-#: CLI type -> the dialect capability switch that answers for it.
+#: CLI type -> the dialect support switch that answers for it.
 #:
 #: The advertised list is derived from this mapping, so a family cannot be
 #: answerable and unaskable at the same time -- adding a type here without
