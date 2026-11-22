@@ -131,17 +131,12 @@ class TestSnowflakeArray:
 # were identical to the base class's.  This module is what proves the deletion
 # changed neither the SQL nor equality.
 TYPE_MATRIX = [
-    # An undeclared width is Snowflake's own default, 16777216 — "If no length
-    # is specified, the default is 16777216"
-    # (https://docs.snowflake.com/en/sql-reference/data-types-text) — so the
-    # snapshot is ``VARCHAR(16777216)``, not a bare ``VARCHAR``.  The same now
-    # holds for the numeric rows, because core resolves ``DecimalType``'s
-    # declared precision and scale the way it resolves ``length``: a bare
-    # ``NUMBER`` is the ``NUMBER(38, 0)`` the manual documents and the server
-    # stores, and ``NUMBER(10)`` is ``NUMBER(10, 0)``.  Writing the server's own
-    # values out is what makes a bare declaration equal to what the catalog
-    # reports; the storage is the same column either way.
-    (SnowflakeVarcharType, {}, "VARCHAR(16777216)", (16777216,)),
+    # An undeclared width stays undeclared in the SQL — the server applies its
+    # own default of 16777216 ("If no length is specified, the default is
+    # 16777216"). Core no longer resolves default parameters onto a type, so a
+    # bare ``VARCHAR`` renders ``VARCHAR`` and a bare ``NUMBER`` renders
+    # ``NUMBER``; a declared ``NUMBER(10)`` renders exactly that.
+    (SnowflakeVarcharType, {}, "VARCHAR", (None,)),
     (SnowflakeVarcharType, {"length": 100}, "VARCHAR(100)", (100,)),
     (SnowflakeVarcharType, {"length": 255}, "VARCHAR(255)", (255,)),
     # ``unsigned`` is in the identity of both, appended after ``precision`` and
@@ -151,8 +146,8 @@ TYPE_MATRIX = [
     # unsigned form: Snowflake's numeric inventory has no unsigned row and its
     # column grammar has no modifier after ``<col_type>``.  See
     # ``test_snowflake_type_protocol.py::TestNumericSignedness``.
-    (SnowflakeNumberType, {}, "NUMBER(38, 0)", (38, 0, False)),
-    (SnowflakeNumberType, {"precision": 10}, "NUMBER(10, 0)", (10, 0, False)),
+    (SnowflakeNumberType, {}, "NUMBER", (None, None, False)),
+    (SnowflakeNumberType, {"precision": 10}, "NUMBER(10)", (10, None, False)),
     (SnowflakeNumberType, {"precision": 10, "scale": 2},
      "NUMBER(10, 2)", (10, 2, False)),
     (SnowflakeFloatType, {}, "FLOAT", (None, False)),
@@ -340,22 +335,19 @@ class TestDistinctParamsAreUnequal:
         ) != SnowflakeNumberType(self.dialect, precision=11)
 
     def test_a_precisionless_number_is_the_documented_default_pair(self):
-        """``NUMBER`` **is** ``NUMBER(38, 0)`` on this server, so they are equal.
+        """An undeclared precision/scale is distinct from an explicit pair.
 
-        "By default, precision is 38, and scale is 0; that is, NUMBER(38, 0)",
-        and ``DESC TABLE`` renders both spellings identically.  Core resolves
-        the dialect's declared pair onto the bare type, which is what makes the
-        declaration and the catalog's explicit pair one value object.  This is
-        not a general conflation of "absent" with "zero": a dialect that
-        declares no default keeps the two distinct, which is what the stub
-        dialects in core's declared-parameter suite pin.
+        Core no longer resolves default parameters from the dialect, so a bare
+        ``SnowflakeNumberType`` keeps its parameters unset and is no longer
+        equal to ``NUMBER(38, 0)`` even though the server stores the same column
+        for both. A caller that wants equality declares the pair explicitly.
         """
-        assert SnowflakeNumberType(self.dialect) == SnowflakeNumberType(
+        assert SnowflakeNumberType(self.dialect) != SnowflakeNumberType(
             self.dialect, precision=38, scale=0
         )
-        # ...and a different scale is still a different column.
-        assert SnowflakeNumberType(self.dialect) != SnowflakeNumberType(
-            self.dialect, precision=38, scale=2
+        # A declared pair is still a different column from a different scale.
+        assert SnowflakeNumberType(self.dialect, precision=38, scale=0) != (
+            SnowflakeNumberType(self.dialect, precision=38, scale=2)
         )
 
     def test_float_precisions_differ(self):

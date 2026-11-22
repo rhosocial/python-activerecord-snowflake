@@ -264,11 +264,11 @@ class TestSnowflakeSchemaDifferRoundTrip:
         """The bare form's half of the round trip.
 
         An unsized ``VARCHAR`` on Snowflake *is* ``VARCHAR(16777216)``, so the
-        catalog reports that width back and the bare declaration has to agree —
-        which it does because the dialect declares the server's default rather
-        than the parser inventing one.
+        catalog reports that width back and the parser fills it from the
+        dialect's documented default. Core no longer resolves the default onto
+        a bare declaration, so the declared side names it explicitly.
         """
-        declared = VarCharType(dialect)
+        declared = VarCharType(dialect, length=dialect._SNOW_VARCHAR_DEFAULT_LENGTH)
         introspected = _introspected_column("name", declared, dialect)
         declaration = _make_col("name", "VARCHAR", parsed_dt=declared)
 
@@ -311,12 +311,10 @@ class TestSnowflakeSchemaDifferRoundTrip:
 
         The catalog reports 38/0 for a bare ``NUMBER`` because that is what the
         server stores it as.  The introspected side carries those two numbers
-        explicitly and the declared side resolves them from the dialect's
-        declaration, so ``==`` calls the two one column and no change is
-        reported — the two routes meet on the same pair rather than one having
-        to be folded back to a bare word.
+        explicitly and the declared side names them explicitly too, so ``==``
+        calls the two one column and no change is reported.
         """
-        declared = DecimalType(dialect)
+        declared = DecimalType(dialect, precision=38, scale=0)
         introspected = _introspected_column("amount", declared, dialect)
         declaration = _make_col("amount", "NUMBER", parsed_dt=declared)
 

@@ -16,6 +16,9 @@ from rhosocial.activerecord.backend.impl.snowflake.introspection import (
     SnowflakeIntrospector,
     AsyncSnowflakeIntrospector,
 )
+from rhosocial.activerecord.backend.impl.snowflake.introspection.type_parser import (
+    SnowflakeTypeParser,
+)
 from rhosocial.activerecord.backend.introspection.types import (
     IntrospectionDatabaseInfo,
     TableType,
@@ -255,7 +258,7 @@ class TestSnowflakeIntrospectorParsing:
 
 
 # ================================================================== #
-# The catalog row's SIZE reaches parse_type
+# The catalog row's SIZE reaches the introspection type parser
 #
 # Snowflake splits one declared type across several INFORMATION_SCHEMA
 # columns: DATA_TYPE is "the standard Snowflake data type of the column"
@@ -273,7 +276,7 @@ class TestSnowflakeIntrospectorParsing:
 # dropped. Both are the same defect on two shapes.
 # ================================================================== #
 
-class TestSnowflakeCatalogSizeReachesParseType:
+class TestSnowflakeCatalogSizeReachesTypeParser:
     """Declared -> catalog row -> parsed, compared with ``==``.
 
     The whole point of these is the assertion at the end of each: two
@@ -338,17 +341,17 @@ class TestSnowflakeCatalogSizeReachesParseType:
         """A bare ``VarCharType`` and the column it produced must be one column.
 
         ``DESC TABLE`` renders a bare ``VARCHAR`` as ``VARCHAR(16777216)``,
-        so the catalog reports that width back and the declaration has to
-        agree -- which it does because the dialect declares the server's
-        default in ``type_parameter_defaults()`` rather than the parser
-        inventing one.
+        so the catalog reports that width back. The introspection parser
+        fills an unsized word from the dialect's documented default rather
+        than inventing one; a bare declaration no longer resolves a width.
         """
         from rhosocial.activerecord.backend.expression.types import VarCharType
 
-        declared = VarCharType(introspector_mixin._backend.dialect)
-        assert declared.length == 16777216
+        dialect = introspector_mixin._backend.dialect
+        declared = VarCharType(dialect, length=dialect._SNOW_VARCHAR_DEFAULT_LENGTH)
         parsed = self._parsed(
             introspector_mixin, self._row("VARCHAR", cml=16777216))
+        assert parsed.length == 16777216
         assert parsed == declared
 
     def test_a_legacy_text_data_type_word_still_keeps_the_width(self, introspector_mixin):
@@ -393,7 +396,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
 
         ``(38, 0)`` is deliberately **not** in this list: it is the
         documented default and therefore the bare form, which the next test
-        covers. ``parse_type`` keeps both halves of it -- composing
+        covers. The parser keeps both halves of it -- composing
         ``NUMBER(38)`` because a scale of ``0`` was read as absent would
         have been its own silent drop.
         """
@@ -415,10 +418,10 @@ class TestSnowflakeCatalogSizeReachesParseType:
         -- and ``DESC TABLE`` renders the bare ``NUMBER`` and an explicit
         ``NUMBER(38, 0)`` identically, so the catalog cannot tell them apart
         and neither should this backend invent a difference.  The catalog's two
-        columns are composed into the explicit pair (the bare-word folding this
-        method used to do was a stand-in for core resolution) and the parsed
-        value compares equal to a bare declaration because core resolves the
-        declared default onto ``DecimalType`` at read time.
+        columns are composed into the explicit pair, so the parsed value is
+        exactly ``DecimalType(precision=38, scale=0)``. Core no longer
+        resolves defaults onto a bare declaration, so the declaration that
+        compares equal has to name them explicitly.
         """
         from rhosocial.activerecord.backend.expression.types import DecimalType
 
@@ -427,11 +430,7 @@ class TestSnowflakeCatalogSizeReachesParseType:
         assert introspector_mixin._catalog_type_string(
             row, dialect) == "NUMBER(38, 0)"
         parsed = self._parsed(introspector_mixin, row)
-        assert parsed == DecimalType(dialect)
-        # and the declared default is where the resolution reads its number from
-        assert dialect.type_parameter_defaults()["decimal"] == {
-            "precision": 38, "scale": 0,
-        }
+        assert parsed == DecimalType(dialect, precision=38, scale=0)
 
     def test_the_length_is_not_fed_to_a_numeric_column(self, introspector_mixin):
         """Which column answers which shape, decided per type.
@@ -517,8 +516,8 @@ class TestSnowflakeCatalogSizeReachesParseType:
         """No size, no parentheses -- and no crash.
 
         The bare word is a legitimate answer rather than a fallback: it is
-        what ``DATA_TYPE`` really contains, and ``parse_type`` already
-        completes it from ``type_parameter_defaults()``.
+        what ``DATA_TYPE`` really contains, and the introspection parser
+        completes it from the dialect's documented defaults.
         """
         from rhosocial.activerecord.backend.expression.types import (
             DecimalType,
@@ -529,7 +528,8 @@ class TestSnowflakeCatalogSizeReachesParseType:
         dialect = introspector_mixin._backend.dialect
         parsed = self._parsed(introspector_mixin, full)
         expected = (
-            VarCharType(dialect) if row["DATA_TYPE"] == "VARCHAR"
+            VarCharType(dialect, length=dialect._SNOW_VARCHAR_DEFAULT_LENGTH)
+            if row["DATA_TYPE"] == "VARCHAR"
             else DecimalType(dialect)
         )
         assert parsed == expected
@@ -546,8 +546,8 @@ class TestSnowflakeCatalogSizeReachesParseType:
         good = self._row("VARCHAR", cml=50)
         good["COLUMN_NAME"] = "good"
         with patch.object(
-            type(introspector_mixin._backend.dialect),
-            "parse_type",
+            SnowflakeTypeParser,
+            "parse",
             side_effect=ValueError("not a type this backend can read"),
         ):
             with pytest.warns(RuntimeWarning, match="could not read"):

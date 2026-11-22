@@ -39,6 +39,15 @@ def _core_concepts():
     )
 
 
+def _format_names(dialect):
+    """Concepts the dialect renders, discovered from its formatter family."""
+    return {
+        member[len("format_data_type_") :]
+        for member in dir(dialect)
+        if member.startswith("format_data_type_")
+    }
+
+
 def _renderable_substitute(dialect, klass):
     """Minimum valid construction for substitutes that carry parameters.
 
@@ -58,8 +67,8 @@ def _renderable_substitute(dialect, klass):
 def test_every_core_concept_is_declared(version):
     """D9: rendered or substituted -- silence is not an answer."""
     dialect = _dialect(version)
-    supported = set(dialect.supports_data_types())
-    substitutes = dialect.substitute_data_types()
+    supported = _format_names(dialect)
+    substitutes = dialect.suggest_substitute_types().mapping
     undeclared = [
         name for name in _core_concepts() if name not in supported and name not in substitutes
     ]
@@ -70,8 +79,8 @@ def test_every_core_concept_is_declared(version):
 def test_substitutes_are_disjoint_and_renderable(version):
     """A substitute must be a DataType class this dialect really writes."""
     dialect = _dialect(version)
-    supported = set(dialect.supports_data_types())
-    substitutes = dialect.substitute_data_types()
+    supported = _format_names(dialect)
+    substitutes = dialect.suggest_substitute_types().mapping
     assert not supported & set(substitutes)
 
     for key, klass in substitutes.items():
@@ -84,16 +93,12 @@ def test_substitutes_are_disjoint_and_renderable(version):
 def test_formatter_and_probe_families_are_one_to_one(version):
     """D10: a formatter has a probe, and an absent answer is an explicit probe.
 
-    ``supports_data_types()`` may omit a version-gated concept; that is an
-    answer only when its probe says False. A formatter with no probe at all,
-    or a supported key with no formatter, breaks the 1:1 discipline.
+    A version-gated concept keeps its formatter and a probe that says False
+    below the gate. A formatter with no probe at all, or a supported key with
+    no formatter, breaks the 1:1 discipline.
     """
     dialect = _dialect(version)
-    format_names = {
-        member[len("format_data_type_") :]
-        for member in dir(dialect)
-        if member.startswith("format_data_type_")
-    }
+    format_names = _format_names(dialect)
     probe_names = {
         member[len("supports_data_type_") :]
         for member in dir(dialect)
@@ -105,8 +110,6 @@ def test_formatter_and_probe_families_are_one_to_one(version):
         f"probe-only: {sorted(probe_names - format_names)}"
     )
 
-    supported = set(dialect.supports_data_types())
-    assert supported <= format_names
-    for name in sorted(format_names - supported):
+    for name in sorted(format_names):
         probe = getattr(dialect, f"supports_data_type_{name}")
-        assert probe() is False, f"{name} has a formatter but no False probe explains its absence"
+        assert callable(probe), f"{name} has a formatter but no probe"

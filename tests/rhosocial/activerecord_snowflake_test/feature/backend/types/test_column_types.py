@@ -23,8 +23,7 @@ from rhosocial.activerecord.backend.adapters import (
     Range,
     Vector,
 )
-from rhosocial.activerecord.backend.dialect.mixins import ColumnTypeMixin
-from rhosocial.activerecord.backend.dialect.protocols import ColumnTypeSupport
+from rhosocial.activerecord.backend.suggestion.protocols import ColumnTypeSuggestionSupport
 from rhosocial.activerecord.backend.expression.column_types import (
     ArrayColumn,
     BinaryColumn,
@@ -68,7 +67,7 @@ def dialect():
 
 @pytest.fixture
 def table(dialect):
-    return dialect.suggested_column_types()
+    return dialect.suggest_column_types().table
 
 
 def _table_source():
@@ -91,14 +90,13 @@ def _table_source():
 def test_the_dialect_composes_the_column_type_protocol(dialect):
     """The rebuilt protocol, composed and answered.
 
-    ``ColumnTypeMixin`` is the core base (its ``suggested_column_types`` has no
-    default and raises when not overridden), ``ColumnTypeSupport`` is the
-    ``isinstance`` answer, and the mixin is the Snowflake half. All three have
-    to hold for a model's ``Model.c.<field>`` to resolve on this backend.
+    Core's column-type mixin was removed; the backend mixin is standalone and
+    answers ``ColumnTypeSuggestionSupport`` itself. Both the mixin composition
+    and the protocol answer have to hold for a model's ``Model.c.<field>`` to
+    resolve on this backend.
     """
-    assert issubclass(SnowflakeColumnTypeMixin, ColumnTypeMixin)
     assert isinstance(dialect, SnowflakeColumnTypeMixin)
-    assert isinstance(dialect, ColumnTypeSupport)
+    assert isinstance(dialect, ColumnTypeSuggestionSupport)
 
 
 def test_the_table_answers_every_entry_of_the_common_list(table):
@@ -139,8 +137,8 @@ def test_the_dialect_resolves_every_entry_to_the_table_answer(dialect, table):
     """What a model builds is what this dialect's table says.
 
     The selection step is the model layer's own (the testsuite's
-    ``resolve_column_class`` helper), which replaced the protocol's deleted
-    ``column_class_for``. Table-relative on purpose: the answer may
+    ``resolve_column_class`` helper), which reads the suggestion table.
+    Table-relative on purpose: the answer may
     legitimately differ from another backend's (``list`` is a document here
     and a native array on PostgreSQL), and what may not differ is the model
     and the table disagreeing.
@@ -151,9 +149,9 @@ def test_the_dialect_resolves_every_entry_to_the_table_answer(dialect, table):
 
 def test_the_table_is_a_copy_so_a_caller_cannot_corrupt_it(dialect):
     """Mutating the returned table must not change later resolutions."""
-    first = dialect.suggested_column_types()
+    first = dialect.suggest_column_types().table
     first[int] = StringColumn
-    assert dialect.suggested_column_types()[int] is IntegerColumn
+    assert dialect.suggest_column_types().table[int] is IntegerColumn
     assert SNOWFLAKE_COLUMN_TYPES[int] is IntegerColumn
 
 
@@ -165,7 +163,7 @@ def test_the_backend_offers_no_extra_types(dialect):
     answer here. An entry added later would be a new vocabulary item and
     belongs in this test deliberately.
     """
-    assert dialect.suggested_extra_column_types() == {}
+    assert dialect.suggest_extra_column_types().table == {}
 
 
 # ---------------------------------------------------------------------------
@@ -222,7 +220,7 @@ def test_the_documented_answer_per_entry(dialect, annotation, expected):
     ``DateColumn``/``TimeColumn`` yet), not a claim that Snowflake conflates them
     -- it has three distinct ``TIMESTAMP_*`` types.
     """
-    assert dialect.suggested_column_types()[annotation] is expected
+    assert dialect.suggest_column_types().table[annotation] is expected
 
 
 def test_uuid_is_answered_the_same_on_both_sides_of_the_10_2_gate(dialect):
@@ -235,8 +233,8 @@ def test_uuid_is_answered_the_same_on_both_sides_of_the_10_2_gate(dialect):
     """
     old = SnowflakeDialect(version=(10, 1, 0))
     new = SnowflakeDialect(version=(10, 2, 0))
-    assert old.suggested_column_types()[uuid.UUID] is UUIDColumn
-    assert new.suggested_column_types()[uuid.UUID] is UUIDColumn
+    assert old.suggest_column_types().table[uuid.UUID] is UUIDColumn
+    assert new.suggest_column_types().table[uuid.UUID] is UUIDColumn
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +265,7 @@ def test_the_provisional_cells_all_answer_json_column(dialect):
     and 议题 B has not yet decided whether core should carry the three
     semi-structured concepts separately.
     """
-    table = dialect.suggested_column_types()
+    table = dialect.suggest_column_types().table
     for entry in SNOWFLAKE_PROVISIONAL_COLUMN_TYPES:
         assert table[entry] is JSONColumn, entry
 

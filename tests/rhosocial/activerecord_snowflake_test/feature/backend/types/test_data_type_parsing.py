@@ -1,9 +1,12 @@
 # tests/rhosocial/activerecord_snowflake_test/feature/backend/types/test_data_type_parsing.py
-"""Tests for Snowflake DataType parsing (parse_type)."""
+"""Tests for Snowflake DataType parsing (introspection-only type parser)."""
 
 import pytest
 
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
+from rhosocial.activerecord.backend.impl.snowflake.introspection.type_parser import (
+    SnowflakeTypeParser,
+)
 from rhosocial.activerecord.backend.expression.types import (
     BigIntType,
     BooleanType,
@@ -29,60 +32,62 @@ def dialect():
     return SnowflakeDialect(version=(8, 0, 0))
 
 
+def _parse(dialect, raw):
+    """Read a type spelling through the backend's introspection-only parser."""
+    return SnowflakeTypeParser(dialect).parse(raw)
+
+
 class TestSnowflakeParseType:
     """Test Snowflake type string parsing."""
 
     def test_parse_integer_types(self, dialect):
-        assert isinstance(dialect.parse_type("INTEGER"), IntegerType)
-        assert isinstance(dialect.parse_type("INT"), IntegerType)
-        assert isinstance(dialect.parse_type("BIGINT"), BigIntType)
-        assert isinstance(dialect.parse_type("SMALLINT"), SmallIntType)
-        assert isinstance(dialect.parse_type("TINYINT"), IntegerType)
-        assert isinstance(dialect.parse_type("BYTEINT"), IntegerType)
+        assert isinstance(_parse(dialect, "INTEGER"), IntegerType)
+        assert isinstance(_parse(dialect, "INT"), IntegerType)
+        assert isinstance(_parse(dialect, "BIGINT"), BigIntType)
+        assert isinstance(_parse(dialect, "SMALLINT"), SmallIntType)
+        assert isinstance(_parse(dialect, "TINYINT"), IntegerType)
+        assert isinstance(_parse(dialect, "BYTEINT"), IntegerType)
 
     def test_parse_float_types(self, dialect):
-        assert isinstance(dialect.parse_type("FLOAT"), FloatType)
-        assert isinstance(dialect.parse_type("FLOAT4"), FloatType)
-        assert isinstance(dialect.parse_type("FLOAT8"), FloatType)
-        assert isinstance(dialect.parse_type("DOUBLE"), DoubleType)
-        assert isinstance(dialect.parse_type("DOUBLE PRECISION"), DoubleType)
-        assert isinstance(dialect.parse_type("REAL"), DoubleType)
+        assert isinstance(_parse(dialect, "FLOAT"), FloatType)
+        assert isinstance(_parse(dialect, "FLOAT4"), FloatType)
+        assert isinstance(_parse(dialect, "FLOAT8"), FloatType)
+        assert isinstance(_parse(dialect, "DOUBLE"), DoubleType)
+        assert isinstance(_parse(dialect, "DOUBLE PRECISION"), DoubleType)
+        assert isinstance(_parse(dialect, "REAL"), DoubleType)
 
     def test_parse_decimal_types(self, dialect):
-        """A bare numeric word parses to the column Snowflake stores for it.
+        """Declared parameters are kept; a bare word keeps none.
 
         ``DECIMAL``/``NUMERIC`` are documented as synonymous with ``NUMBER``,
         and a bare ``NUMBER`` is ``NUMBER(38, 0)`` by the manual's own words —
-        "By default, precision is 38, and scale is 0".  Core resolves the
-        declared pair onto the bare type at read time, so the parsed value
-        carries it rather than ``None`` and compares equal to the explicit
-        ``NUMBER(38, 0)`` the catalog round trip produces.  A declared precision
-        with no scale is the same story one parameter over: ``NUMBER(10)`` is
-        ``NUMBER(10, 0)``.
+        "By default, precision is 38, and scale is 0". Core no longer resolves
+        default parameters from the dialect, so the parser reports exactly what
+        the spelling declared: the server applies its own default on write.
         """
-        dt = dialect.parse_type("NUMBER(38, 2)")
+        dt = _parse(dialect, "NUMBER(38, 2)")
         assert isinstance(dt, DecimalType)
         assert dt.precision == 38
         assert dt.scale == 2
 
-        dt = dialect.parse_type("DECIMAL(10)")
+        dt = _parse(dialect, "DECIMAL(10)")
         assert isinstance(dt, DecimalType)
         assert dt.precision == 10
-        assert dt.scale == 0
+        assert dt.scale is None
 
-        dt = dialect.parse_type("NUMERIC")
+        dt = _parse(dialect, "NUMERIC")
         assert isinstance(dt, DecimalType)
-        assert dt.precision == 38
-        assert dt.scale == 0
-        assert dt == dialect.parse_type("NUMBER(38, 0)")
+        assert dt.precision is None
+        assert dt.scale is None
+        assert dt == _parse(dialect, "NUMBER")
 
     def test_parse_string_types(self, dialect):
-        assert isinstance(dialect.parse_type("VARCHAR(100)"), VarCharType)
-        assert isinstance(dialect.parse_type("VARCHAR"), VarCharType)
-        assert isinstance(dialect.parse_type("CHAR(10)"), CharType)
-        assert isinstance(dialect.parse_type("CHARACTER(10)"), CharType)
-        assert isinstance(dialect.parse_type("TEXT"), TextType)
-        assert isinstance(dialect.parse_type("STRING"), TextType)
+        assert isinstance(_parse(dialect, "VARCHAR(100)"), VarCharType)
+        assert isinstance(_parse(dialect, "VARCHAR"), VarCharType)
+        assert isinstance(_parse(dialect, "CHAR(10)"), CharType)
+        assert isinstance(_parse(dialect, "CHARACTER(10)"), CharType)
+        assert isinstance(_parse(dialect, "TEXT"), TextType)
+        assert isinstance(_parse(dialect, "STRING"), TextType)
 
     @pytest.mark.parametrize("word", ["TEXT", "STRING"])
     def test_a_sized_text_word_is_the_sized_string_the_manual_says_it_is(self, dialect, word):
@@ -103,7 +108,7 @@ class TestSnowflakeParseType:
         https://docs.snowflake.com/en/release-notes/bcr-bundles/un-bundled/bcr-1960
         https://docs.snowflake.com/en/sql-reference/data-types-text
         """
-        parsed = dialect.parse_type(f"{word}(50)")
+        parsed = _parse(dialect, f"{word}(50)")
         assert isinstance(parsed, VarCharType)
         assert not isinstance(parsed, TextType)
         assert parsed.length == 50
@@ -116,7 +121,7 @@ class TestSnowflakeParseType:
         honest reading of a bare ``TEXT`` -- and this is the branch that
         every unsized string column still needs.
         """
-        assert isinstance(dialect.parse_type(word), TextType)
+        assert isinstance(_parse(dialect, word), TextType)
 
     def test_a_sized_text_word_round_trips_to_the_same_width(self, dialect):
         """Rendering the parsed type and parsing it again keeps the width.
@@ -124,10 +129,10 @@ class TestSnowflakeParseType:
         Both halves have to hold, or the width is lost somewhere rather than
         recovered: ``VARCHAR(50)`` renders back to ``VARCHAR(50)``.
         """
-        first = dialect.parse_type("TEXT(50)")
+        first = _parse(dialect, "TEXT(50)")
         sql, _ = dialect.format_data_type(first)
         assert sql == "VARCHAR(50)"
-        assert dialect.parse_type(sql) == first
+        assert _parse(dialect, sql) == first
 
     def test_character_varying_is_variable_length(self, dialect):
         """D8: ``CHARACTER VARYING`` is the long form of ``VARCHAR``.
@@ -137,7 +142,7 @@ class TestSnowflakeParseType:
         because the schema differ would then compare a variable-length column
         and a fixed-length one as the same column.
         """
-        parsed = dialect.parse_type("CHARACTER VARYING(200)")
+        parsed = _parse(dialect, "CHARACTER VARYING(200)")
         assert isinstance(parsed, VarCharType)
         assert not isinstance(parsed, CharType)
         assert parsed.length == 200
@@ -145,26 +150,26 @@ class TestSnowflakeParseType:
 
     def test_char_varying_is_variable_length(self, dialect):
         """Snowflake's own spelling of the same thing, from the same manual."""
-        parsed = dialect.parse_type("CHAR VARYING(80)")
+        parsed = _parse(dialect, "CHAR VARYING(80)")
         assert isinstance(parsed, VarCharType)
         assert not isinstance(parsed, CharType)
         assert parsed.length == 80
 
     def test_character_stays_fixed_length(self, dialect):
         """The counterpart, so the fix above did not simply flip both words."""
-        parsed = dialect.parse_type("CHARACTER(10)")
+        parsed = _parse(dialect, "CHARACTER(10)")
         assert isinstance(parsed, CharType)
         assert not isinstance(parsed, VarCharType)
         assert parsed.length == 10
         assert parsed.spelling == "character"
 
     def test_char_stays_fixed_length(self, dialect):
-        parsed = dialect.parse_type("CHAR(10)")
+        parsed = _parse(dialect, "CHAR(10)")
         assert isinstance(parsed, CharType)
         assert not isinstance(parsed, VarCharType)
         assert parsed.length == 10
 
-    def test_parse_type_round_trip_preserves_string_width(self, dialect):
+    def test_parser_round_trip_preserves_string_width(self, dialect):
         """A parsed type must render back to the *same kind* of column.
 
         Rendering a concept as the word Snowflake prefers is normalisation and
@@ -183,10 +188,10 @@ class TestSnowflakeParseType:
             "CHARACTER(10)": CharType,
         }
         for raw, expected in cases.items():
-            parsed = dialect.parse_type(raw)
+            parsed = _parse(dialect, raw)
             assert isinstance(parsed, expected), f"{raw} -> {type(parsed).__name__}"
             sql, _ = dialect.format_data_type(parsed)
-            reparsed = dialect.parse_type(sql)
+            reparsed = _parse(dialect, sql)
             assert isinstance(reparsed, expected), (
                 f"{raw} -> {type(parsed).__name__} -> {sql} -> "
                 f"{type(reparsed).__name__}: the round trip changed the width class"
@@ -210,34 +215,34 @@ class TestSnowflakeParseType:
             "BOOLEAN", "DATE", "TIME", "TIMESTAMP_NTZ", "BINARY", "VARBINARY",
             "VARIANT", "OBJECT", "ARRAY",
         ]:
-            sql, _ = dialect.format_data_type(dialect.parse_type(raw))
+            sql, _ = dialect.format_data_type(_parse(dialect, raw))
             head = sql.split("(")[0]
             assert head in known, f"{raw} rendered {sql!r}, head not a Snowflake type"
 
     def test_parse_date_time_types(self, dialect):
-        assert isinstance(dialect.parse_type("DATE"), DateType)
-        assert isinstance(dialect.parse_type("TIME"), TimeType)
-        assert isinstance(dialect.parse_type("TIMESTAMP"), DateTimeType)
-        assert isinstance(dialect.parse_type("TIMESTAMP_NTZ"), DateTimeType)
-        assert isinstance(dialect.parse_type("DATETIME"), DateTimeType)
+        assert isinstance(_parse(dialect, "DATE"), DateType)
+        assert isinstance(_parse(dialect, "TIME"), TimeType)
+        assert isinstance(_parse(dialect, "TIMESTAMP"), DateTimeType)
+        assert isinstance(_parse(dialect, "TIMESTAMP_NTZ"), DateTimeType)
+        assert isinstance(_parse(dialect, "DATETIME"), DateTimeType)
 
     def test_parse_boolean_type(self, dialect):
-        assert isinstance(dialect.parse_type("BOOLEAN"), BooleanType)
+        assert isinstance(_parse(dialect, "BOOLEAN"), BooleanType)
 
     def test_parse_binary_types(self, dialect):
-        assert isinstance(dialect.parse_type("BINARY"), BlobType)
-        assert isinstance(dialect.parse_type("VARBINARY"), BlobType)
+        assert isinstance(_parse(dialect, "BINARY"), BlobType)
+        assert isinstance(_parse(dialect, "VARBINARY"), BlobType)
 
     def test_parse_variant_types(self, dialect):
-        assert isinstance(dialect.parse_type("VARIANT"), JsonType)
-        assert isinstance(dialect.parse_type("OBJECT"), JsonType)
-        assert isinstance(dialect.parse_type("ARRAY"), JsonType)
+        assert isinstance(_parse(dialect, "VARIANT"), JsonType)
+        assert isinstance(_parse(dialect, "OBJECT"), JsonType)
+        assert isinstance(_parse(dialect, "ARRAY"), JsonType)
 
     def test_parse_returns_only_core_classes(self, dialect):
         """A parsed type is a concept, not a backend spelling of one.
 
-        Returning ``SnowflakeVarcharType`` here would make ``parse_type("VARCHAR")``
-        and ``parse_type("TEXT")`` two different classes for one storage and force
+        Returning ``SnowflakeVarcharType`` here would make parsing ``VARCHAR``
+        and ``TEXT`` two different classes for one storage and force
         the differ to carry a table of strings.  100% core classes is what keeps
         introspection results comparable across backends.
 
@@ -253,19 +258,19 @@ class TestSnowflakeParseType:
             "DOUBLE PRECISION", "REAL", "BOOLEAN", "DATE", "TIME", "TIMESTAMP_NTZ",
             "BINARY", "VARBINARY", "VARIANT", "OBJECT", "ARRAY", "SOMETHING_ELSE",
         ]:
-            parsed = dialect.parse_type(raw)
+            parsed = _parse(dialect, raw)
             assert type(parsed).__module__.startswith(
                 "rhosocial.activerecord.backend.expression.types"
             ), f"{raw} parsed to backend class {type(parsed).__module__}.{type(parsed).__name__}"
 
     def test_parse_unknown_type(self, dialect):
-        assert isinstance(dialect.parse_type("CUSTOM_TYPE"), CustomType)
+        assert isinstance(_parse(dialect, "CUSTOM_TYPE"), CustomType)
 
 
 class TestParseUuid:
     """``UUID`` is a real column type on Snowflake 10.2 and newer.
 
-    Before it was recognised, ``parse_type("UUID")`` fell through to the
+    Before it was recognised, parsing ``UUID`` fell through to the
     ``CustomType`` escape hatch — which happened to render the right word,
     because ``CustomType`` writes the raw name back out verbatim.  That is right
     SQL for the wrong reason, and it hid the fact that this backend had a type
@@ -288,7 +293,7 @@ class TestParseUuid:
             SnowflakeUuidType,
         )
 
-        parsed = modern.parse_type("UUID")
+        parsed = _parse(modern, "UUID")
         assert isinstance(parsed, SnowflakeUuidType)
         assert not isinstance(parsed, CustomType)
 
@@ -298,13 +303,13 @@ class TestParseUuid:
         )
 
         for raw in ("UUID", "uuid", "Uuid"):
-            assert isinstance(modern.parse_type(raw), SnowflakeUuidType)
+            assert isinstance(_parse(modern, raw), SnowflakeUuidType)
 
     def test_parse_uuid_round_trips_to_the_same_class(self, modern):
-        parsed = modern.parse_type("UUID")
+        parsed = _parse(modern, "UUID")
         sql, _ = modern.format_data_type(parsed)
         assert sql == "UUID"
-        assert isinstance(modern.parse_type(sql), type(parsed))
+        assert isinstance(_parse(modern, sql), type(parsed))
 
     def test_uuid_is_not_confused_with_a_string_type(self, modern):
         """A UUID column is not a VARCHAR column with a convention on it.
@@ -317,8 +322,8 @@ class TestParseUuid:
             SnowflakeUuidType,
         )
 
-        assert not isinstance(modern.parse_type("UUID"), VarCharType)
-        assert modern.parse_type("UUID") != VarCharType(dialect=modern)
+        assert not isinstance(_parse(modern, "UUID"), VarCharType)
+        assert _parse(modern, "UUID") != VarCharType(dialect=modern)
         assert SnowflakeUuidType(dialect=modern) != VarCharType(dialect=modern)
 
     def test_the_pre_10_2_server_still_parses_the_word_to_the_same_class(self):
@@ -331,7 +336,7 @@ class TestParseUuid:
             SnowflakeUuidType,
         )
 
-        assert isinstance(SnowflakeDialect().parse_type("UUID"), SnowflakeUuidType)
+        assert isinstance(_parse(SnowflakeDialect(), "UUID"), SnowflakeUuidType)
 
 
 # ---------------------------------------------------------------------------
@@ -358,7 +363,7 @@ class TestTimestampVariantsStayDistinct:
             TimestampTzType,
         )
 
-        parsed = dialect.parse_type("TIMESTAMP_TZ")
+        parsed = _parse(dialect, "TIMESTAMP_TZ")
         assert isinstance(parsed, TimestampTzType)
         sql, _ = dialect.format_data_type(parsed)
         assert sql == "TIMESTAMP_TZ"
@@ -368,19 +373,19 @@ class TestTimestampVariantsStayDistinct:
             SnowflakeTimestampLtzType,
         )
 
-        parsed = dialect.parse_type("TIMESTAMP_LTZ")
+        parsed = _parse(dialect, "TIMESTAMP_LTZ")
         assert isinstance(parsed, SnowflakeTimestampLtzType)
         sql, _ = dialect.format_data_type(parsed)
         assert sql == "TIMESTAMP_LTZ"
 
     def test_timestamp_ntz_is_the_datetime_concept_still(self, dialect):
-        parsed = dialect.parse_type("TIMESTAMP_NTZ")
+        parsed = _parse(dialect, "TIMESTAMP_NTZ")
         assert isinstance(parsed, DateTimeType)
 
     def test_the_three_are_three_classes_now(self, dialect):
-        ltz = dialect.parse_type("TIMESTAMP_LTZ")
-        ntz = dialect.parse_type("TIMESTAMP_NTZ")
-        tz = dialect.parse_type("TIMESTAMP_TZ")
+        ltz = _parse(dialect, "TIMESTAMP_LTZ")
+        ntz = _parse(dialect, "TIMESTAMP_NTZ")
+        tz = _parse(dialect, "TIMESTAMP_TZ")
         assert ltz != ntz
         assert tz != ntz
 
@@ -393,12 +398,12 @@ class TestTemporalPrecisionIsKept:
     """
 
     def test_the_fractional_seconds_precision_is_read_back(self, dialect):
-        parsed = dialect.parse_type("TIME(9)")
+        parsed = _parse(dialect, "TIME(9)")
         assert isinstance(parsed, TimeType)
         assert parsed.precision == 9
         sql, _ = dialect.format_data_type(parsed)
         assert sql == "TIME(9)"
-        assert dialect.parse_type(sql) == parsed
+        assert _parse(dialect, sql) == parsed
 
 
 class TestOwnGeospatialWordsParseBackAsTheirOwnShapes:
@@ -417,7 +422,7 @@ class TestOwnGeospatialWordsParseBackAsTheirOwnShapes:
         ],
     )
     def test_each_word_reads_back_as_its_own_shape(self, dialect, word, expected_module):
-        parsed = dialect.parse_type(word)
+        parsed = _parse(dialect, word)
         assert type(parsed).__name__ == expected_module, word
         assert dialect.format_data_type(parsed) == (word.upper(), ())
 
@@ -437,7 +442,7 @@ class TestUserDefinedTypeReferenceParsesBack:
             SnowflakeUserDefinedType,
         )
 
-        parsed = dialect.parse_type('"my_udt"')
+        parsed = _parse(dialect, '"my_udt"')
         assert isinstance(parsed, SnowflakeUserDefinedType)
         assert parsed.type_name == "my_udt"
 
@@ -446,7 +451,7 @@ class TestUserDefinedTypeReferenceParsesBack:
             SnowflakeUserDefinedType,
         )
 
-        parsed = dialect.parse_type('"db"."s"."my_udt"')
+        parsed = _parse(dialect, '"db"."s"."my_udt"')
         assert isinstance(parsed, SnowflakeUserDefinedType)
         assert parsed.type_name == "my_udt"
         assert parsed.schema_name == "s"
@@ -475,6 +480,11 @@ class TestParseRoundTripSweep:
         "TimeTzType": "TimeType",
         "TimestampType": "DateTimeType",
         "SnowflakeVariantType": "JsonType",
+        # Core no longer resolves widths onto bare declarations: the parser
+        # fills the server's documented default on read, so these re-render at
+        # the default width rather than as the bare word that was read.
+        "CharType": ("CharType", "CHAR(1)"),
+        "VarCharType": ("VarCharType", "VARCHAR(16777216)"),
         "TextType": "VarCharType",
         "SnowflakeBinaryType": "BlobType",
         "SnowflakeBooleanType": "BooleanType",
@@ -484,7 +494,7 @@ class TestParseRoundTripSweep:
         "SnowflakeTimeType": "TimeType",
         "SnowflakeTimestampNtzType": "DateTimeType",
         "SnowflakeTimestampTzType": "TimestampTzType",
-        "SnowflakeVarcharType": "VarCharType",
+        "SnowflakeVarcharType": ("VarCharType", "VARCHAR(16777216)"),
         # TINYINT is the manual's documented synonym of INTEGER, and REAL
         # of DOUBLE: the answer class is the concept, and the re-render is
         # the canonical word rather than the synonym.

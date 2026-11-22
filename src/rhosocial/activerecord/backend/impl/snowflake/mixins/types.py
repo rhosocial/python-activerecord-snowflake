@@ -6,8 +6,7 @@ Uses DataTypeMixin naming-convention dispatch for Snowflake-specific type SQL.
 
 from __future__ import annotations
 
-import re
-from typing import Dict, Optional, Tuple
+from typing import Optional, Tuple
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.dialect.mixins.ddl_type import DataTypeMixin
@@ -58,6 +57,7 @@ from ..expression.types import (
     SnowflakeVariantType,
     SnowflakeVarcharType,
 )
+from rhosocial.activerecord.backend.suggestion.definitions import SubstituteTypeSuggestion
 from .ddl_type import SNOWFLAKE_TYPE_DDL_MIN_VERSION
 
 
@@ -120,82 +120,6 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
     #: SQL's is, which is why :meth:`format_data_type_char` writes ``CHAR(1)``
     #: rather than ``VARCHAR(1)`` and why padding plays no part here.
     _SNOW_CHAR_DEFAULT_LENGTH = 1
-
-    def type_parameter_defaults(self) -> Dict[str, Dict[str, object]]:
-        """The widths and precisions Snowflake supplies for a declaration that
-        named none.
-
-        Every number here is quoted from the manual and none is a guess: an
-        unsized ``VARCHAR`` on Snowflake **is** ``VARCHAR(16777216)``, an unsized
-        ``CHAR`` is ``CHAR(1)``, and an unsized ``NUMBER`` is ``NUMBER(38, 0)``.
-        That matters most because Snowflake's catalog will not tell you otherwise
-        -- ``INFORMATION_SCHEMA.COLUMNS`` reports ``DATA_TYPE`` as the bare word
-        (``VARCHAR``, ``NUMBER``, and since behaviour-change bundle BCR-1960
-        ``VARCHAR`` for every string column; before that bundle, which is
-        **postponed with no new release date**, the bare word is ``TEXT``) and
-        keeps the size in separate columns.  So a bare word reaching
-        :meth:`parse_type` is not an unusual thing to meet: on this backend it is
-        the normal case, and the value that fills it in has to be the server's
-        real default or the parser is inventing one.
-
-        **It used to invent 255**, which appears nowhere in Snowflake's
-        documentation and is not any server's default here.  The consequence was
-        not cosmetic: a ``VARCHAR(50)`` column introspected as
-        ``VarCharType(length=255)``, so the schema differ compared it against the
-        declaration that made it, found two different widths, and reported a
-        change on a column that had not changed.  16777216 is at least the width
-        Snowflake really gives an unsized declaration.
-
-        ``snowflake_varchar`` is declared separately from ``varchar`` because
-        :class:`~...impl.snowflake.expression.types.SnowflakeVarcharType` is the
-        same concept reached through this dialect's own entry point and carries
-        its own dispatch key.  Two names, one width -- and they are declared side
-        by side on purpose, because a dialect that let them drift apart would be
-        describing one storage two ways.  ``snowflake_number`` is declared for the
-        same reason beside ``decimal``.
-
-        ``decimal`` / ``snowflake_number`` are declared now, where they were not
-        before, and the reason is the *second* shape of the same defect: the
-        catalog reports a ``NUMBER`` column's size as ``NUMERIC_PRECISION`` and
-        ``NUMERIC_SCALE``, not as a length, so ``NUMBER(10, 2)`` introspected as
-        a bare ``DecimalType`` with both parameters dropped -- and the differ
-        reported a change on every sized numeric column.  The declaration is
-        load-bearing in both directions: core resolves ``precision`` and
-        ``scale`` at read time exactly as it resolves
-        :attr:`~...expression.types.VarCharType.length`, so a bare
-        ``DecimalType(dialect)`` carries -- and therefore compares as -- the
-        documented ``NUMBER(38, 0)`` the server actually stores, and the
-        introspector no longer has to fold the catalog's explicit pair back to
-        the bare word (see
-        :meth:`~...introspection.introspector.SnowflakeIntrospectorMixin._catalog_type_string`).
-        ``NUMBER(38, 0)`` and a bare ``NUMBER`` are one column on this server
-        -- "By default, precision is 38, and scale is 0; that is, NUMBER(38, 0)"
-        -- so the resolved pair is what makes the declaration and its own round
-        trip agree rather than merely render the same storage.
-
-        What is deliberately **not** declared: ``text``, whose
-        ``VARCHAR(16777216)`` is written out by :meth:`format_data_type_text`
-        rather than being a bare form at all; ``blob``, whose ``BINARY`` length
-        the manual states in **bytes** ("If no length is specified, the default is
-        8388608") while ``BlobType`` carries no width at all, so there is nothing
-        for the framework to fill in; and the integer and float shapes, whose
-        names the manual defines as ``NUMBER(38, 0)`` and a bare ``FLOAT``
-        respectively -- parameters "can't be specified" for the former, so
-        resolving one would be inventing a parameter the type refuses to accept.
-        """
-        return {
-            "char": {"length": self._SNOW_CHAR_DEFAULT_LENGTH},
-            "varchar": {"length": self._SNOW_VARCHAR_DEFAULT_LENGTH},
-            "snowflake_varchar": {"length": self._SNOW_VARCHAR_DEFAULT_LENGTH},
-            "decimal": {
-                "precision": self._SNOW_NUMBER_DEFAULT_PRECISION,
-                "scale": self._SNOW_NUMBER_DEFAULT_SCALE,
-            },
-            "snowflake_number": {
-                "precision": self._SNOW_NUMBER_DEFAULT_PRECISION,
-                "scale": self._SNOW_NUMBER_DEFAULT_SCALE,
-            },
-        }
 
     def supports_data_type_snowflake_user_defined(self) -> bool:
         version = getattr(self, "version", None)
@@ -272,15 +196,12 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
         said the two are different columns.  That is the silent-drop this
         replaces, so the combination is refused and the message names the field.
 
-        A type bound to *this* dialect never reaches that absence, because core
-        now resolves the undeclared precision to the value declared in
-        :meth:`type_parameter_defaults` before this method sees it:
-        ``SnowflakeNumberType(dialect, scale=2)`` renders ``NUMBER(38, 2)``, on
-        the manual's own statement that the default precision is 38.  The
-        refusal below therefore fires for a type bound to a dialect that
-        supplies no precision — or to none at all — where there is nothing
-        honest to fill in and writing a bare ``NUMBER`` on the caller's behalf
-        would decide a precision this framework does not know that server has.
+        The refusal below fires whenever a precision was not declared, because
+        core no longer resolves type parameters from the dialect: writing a
+        bare ``NUMBER`` on the caller's behalf would decide a precision this
+        framework does not know the server has.  A caller that wants
+        ``NUMBER(38, 2)`` declares ``precision=38`` explicitly, on the manual's
+        own statement that the default precision is 38.
         """
         if scale is not None and precision is None:
             raise ValueError(
@@ -471,7 +392,7 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
         ``UnsupportedFeatureError``, not ``ValueError``: this is a declaration the
         grammar cannot express at all rather than a wrong value, and the two
         exceptions do not share a base class.  This runs **before**
-        ``check_spelling`` and before every precision and scale check, so a
+        ``_check_spelling`` and before every precision and scale check, so a
         request wrong in two ways is told about the signedness first — that one
         is a stronger and less recoverable statement than a misspelled word or an
         out-of-range number.  Every one of those existing checks still fires
@@ -521,7 +442,7 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
         :meth:`_refuse_unsigned_integer`, which is also where the reason for
         the refusal is written down.
         """
-        self.check_spelling(expr, IntegerType)
+        self._check_spelling(expr, IntegerType)
         self._refuse_unsigned_integer(expr, "INTEGER")
         return "INTEGER", ()
 
@@ -544,7 +465,7 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
 
         ``unsigned`` is refused as well; see :meth:`_refuse_unsigned_integer`.
         """
-        self.check_spelling(expr, ("tinyint",))
+        self._check_spelling(expr, ("tinyint",))
         self._refuse_unsigned_integer(expr, "TINYINT")
         return "TINYINT", ()
 
@@ -554,7 +475,7 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
 
         ``unsigned`` is refused; see :meth:`_refuse_unsigned_integer`.
         """
-        self.check_spelling(expr, BigIntType)
+        self._check_spelling(expr, BigIntType)
         self._refuse_unsigned_integer(expr, "BIGINT")
         return "BIGINT", ()
 
@@ -566,7 +487,7 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
 
         ``unsigned`` is refused; see :meth:`_refuse_unsigned_integer`.
         """
-        self.check_spelling(expr, SmallIntType)
+        self._check_spelling(expr, SmallIntType)
         self._refuse_unsigned_integer(expr, "SMALLINT")
         return "SMALLINT", ()
 
@@ -608,7 +529,7 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
         ``unsigned`` is refused rather than ignored, **before** the spelling
         check; see :meth:`_refuse_unsigned_numeric`."""
         self._refuse_unsigned_numeric(expr, "DOUBLE")
-        self.check_spelling(expr, DoubleType)
+        self._check_spelling(expr, DoubleType)
         return "DOUBLE", ()
 
     def format_data_type_decimal(self, expr: DecimalType) -> Tuple[str, tuple]:
@@ -620,53 +541,39 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
         both halves of the ``NUMBER(p, s)`` syntax: it renders a declared scale,
         and refuses one declared without a precision.
 
-        ``unsigned`` is refused rather than ignored, **before** ``check_spelling``
+        ``unsigned`` is refused rather than ignored, **before** ``_check_spelling``
         and before :meth:`_format_number`'s "scale without a precision" refusal
         and its two range checks; see :meth:`_refuse_unsigned_numeric`.  All three
         of those still fire unchanged for a signed declaration."""
         self._refuse_unsigned_numeric(expr, "NUMBER")
-        self.check_spelling(expr, DecimalType)
+        self._check_spelling(expr, DecimalType)
         return self._format_number(expr.precision, expr.scale)
 
     def format_data_type_boolean(self, expr: BooleanType) -> Tuple[str, tuple]:
         """``BOOL`` is a Snowflake-accepted spelling of ``BOOLEAN``, so both
         render as ``BOOLEAN``."""
-        self.check_spelling(expr, BooleanType)
+        self._check_spelling(expr, BooleanType)
         return "BOOLEAN", ()
 
     def format_data_type_varchar(self, expr: VarCharType) -> Tuple[str, tuple]:
-        """Both spellings render ``VARCHAR``, and an undeclared width is written out.
+        """Both spellings render ``VARCHAR``; a declared width is written out.
 
         ``CHARACTER VARYING`` is SQL's own long form and not one of the words
         the Snowflake manual lists (it lists ``STRING``, ``TEXT``,
         ``VARCHAR2``, ``NVARCHAR`` and ``CHAR VARYING``), but it names the same
-        variable-length string and refusing it would refuse the spelling
-        ``parse_type()`` itself produces for that word, which would make the
-        round trip lossy in the wrong direction.  Snowflake's own word is what
-        gets written.
+        variable-length string and refusing it would refuse the spelling the
+        backend's introspection parser produces for that word, which would
+        make the round trip lossy in the wrong direction.  Snowflake's own
+        word is what gets written.
 
-        **A bare declaration now renders ``VARCHAR(16777216)`` where it used to
-        render a bare ``VARCHAR``, and the two are the same column.**  The
-        manual is explicit — "If no length is specified, the default is
-        16777216" — and the value is resolved onto the type by
-        :meth:`type_parameter_defaults`, so this formatter is writing a width the
-        type actually carries rather than substituting one of its own.  Two
-        things follow, and both are the point:
-
-        * the declared type and the catalog's report of the column it produced
-          are now **the same value**.  A bare ``VarCharType`` used to render
-          ``VARCHAR`` while carrying no length, and ``parse_type("VARCHAR")``
-          answered 255, so the declaration compared unequal to its own
-          round trip and the differ invented a change on every undeclared
-          string column.
-        * on Snowflake an undeclared ``VARCHAR`` and unbounded text are the same
-          storage, so this now renders exactly what
-          :meth:`format_data_type_text` renders — ``VARCHAR(16777216)``.  The
-          classes stay distinct, because the differ is entitled to see that a
-          caller declared a bounded concept rather than text; the *server* does
-          not distinguish them and does not pretend to.
+        An undeclared width stays undeclared in the SQL: the type carries no
+        length and the server applies its documented default of 16777216.
+        Type-parameter default resolution was removed from core; a caller that
+        needs the width in the declaration writes it explicitly.  Reading a
+        catalog spelling back into a ``DataType`` is the job of the
+        introspection-only ``SnowflakeTypeParser``.
         """
-        self.check_spelling(expr, VarCharType)
+        self._check_spelling(expr, VarCharType)
         if expr.length is not None:
             return f"VARCHAR({expr.length})", ()
         return "VARCHAR", ()
@@ -676,13 +583,11 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
         both are accepted; the rendered length is Snowflake's own default of
         ``CHAR(1)`` when none was declared.
 
-        That default is now resolved onto the type by
-        :meth:`type_parameter_defaults`, so ``CharType(dialect)`` carries the 1
-        rather than the formatter substituting it.  **The SQL is unchanged**: it
-        was already ``CHAR(1)`` for a bare declaration, and the manual's "except
-        the default length is ``VARCHAR(1)``" is what that 1 is.
+        The formatter substitutes that default because core no longer resolves
+        type parameters from the dialect.  The manual's "except the default
+        length is ``VARCHAR(1)``" is what that 1 is.
         """
-        self.check_spelling(expr, CharType)
+        self._check_spelling(expr, CharType)
         return (f"CHAR({expr.length})" if expr.length is not None else "CHAR(1)"), ()
 
     def format_data_type_text(self, expr: TextType) -> Tuple[str, tuple]:
@@ -694,7 +599,7 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
         word, but it is the concept's second spelling and both denote the same
         unbounded string, so it is accepted and normalised rather than refused.
         """
-        self.check_spelling(expr, TextType)
+        self._check_spelling(expr, TextType)
         return "VARCHAR(16777216)", ()
 
     def format_data_type_blob(self, expr: BlobType) -> Tuple[str, tuple]:
@@ -706,7 +611,7 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
         spelling, which is the one every plain ``BlobType(dialect)`` carries,
         so the spelling is normalised instead.
         """
-        self.check_spelling(expr, BlobType)
+        self._check_spelling(expr, BlobType)
         return "BINARY", ()
 
     def format_data_type_datetime(self, expr: DateTimeType) -> Tuple[str, tuple]:
@@ -768,9 +673,9 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
     def format_data_type_custom(self, expr: CustomType) -> Tuple[str, tuple]:
         """Write the caller-supplied type name verbatim.
 
-        This is the honest-ignorance escape hatch, and it is what
-        ``parse_type()`` produces for a name it does not recognise — without it
-        the round trip through introspection loses the name it just read.  It is
+        This is the honest-ignorance escape hatch, and it is what the
+        introspection-only parser produces for a name it does not recognise —
+        without it the round trip through introspection loses the name it read.  It is
         safe to emit: ``CustomType`` runs the raw string through
         ``validate_type_name`` at construction, so what arrives here is an
         identifier-shaped name and never a fragment of SQL.  A type used often
@@ -787,14 +692,14 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
         spelling gate is here too rather than only on the core formatter, so
         neither route can be handed a spelling Snowflake does not write.
 
-        It is also declared under its own ``snowflake_varchar`` key in
-        :meth:`type_parameter_defaults`, which is what keeps the two routes
-        resolving to the same width: this class is not the core ``VarCharType``
-        and so is not handed its declaration by inheritance, exactly as
+        This class is not the core ``VarCharType`` and so does not share its
+        declaration by inheritance, exactly as
         :class:`~...impl.sqlserver.expression.types.SQLServerNVarCharMaxType` is
         not handed SQL Server's ``VARCHAR`` width merely for deriving from one.
+        Core no longer resolves type parameters from the dialect, so an
+        undeclared width stays undeclared here too.
         """
-        self.check_spelling(expr, VarCharType)
+        self._check_spelling(expr, VarCharType)
         if expr.length is not None:
             return f"VARCHAR({expr.length})", ()
         return "VARCHAR", ()
@@ -816,7 +721,7 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
         :meth:`_refuse_unsigned_numeric`, which is also where the reasoning about
         the two class hierarchies is written down."""
         self._refuse_unsigned_numeric(expr, "NUMBER")
-        self.check_spelling(expr, DecimalType)
+        self._check_spelling(expr, DecimalType)
         return self._format_number(expr.precision, expr.scale)
 
     def format_data_type_snowflake_float(self, expr: SnowflakeFloatType) -> Tuple[str, tuple]:
@@ -825,7 +730,7 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
 
         ``unsigned`` is refused rather than ignored, before the precision check —
         see :meth:`_refuse_unsigned_numeric`.  ``spelling`` is not a field of this
-        class, so :meth:`check_spelling` is deliberately **not** called here:
+        class, so :meth:`_check_spelling` is deliberately **not** called here:
         there is no word on the concept to gate."""
         self._refuse_unsigned_numeric(expr, "FLOAT")
         if expr.precision is not None:
@@ -866,7 +771,7 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
     def format_data_type_snowflake_blob(self, expr: SnowflakeBinaryType) -> Tuple[str, tuple]:
         """``BINARY(n)`` states the maximum byte count; without one, Snowflake's
         default of 8,388,608 applies and is left implicit."""
-        self.check_spelling(expr, ("blob",))
+        self._check_spelling(expr, ("blob",))
         if expr.length is not None:
             return f"BINARY({expr.length})", ()
         return "BINARY", ()
@@ -937,241 +842,7 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
     def format_data_type_snowflake_geometry(self, expr: SnowflakeGeometryType) -> Tuple[str, tuple]:
         return "GEOMETRY", ()
 
-    # ------------------------------------------------------------------
-    # DataTypeSupport — parsing
-    # ------------------------------------------------------------------
-
-    _SNOW_INTEGER_TYPES = re.compile(r"^(?:INT|INTEGER|BIGINT|SMALLINT|TINYINT|BYTEINT)\b", re.IGNORECASE)
-    _SNOW_FLOAT_TYPES = re.compile(r"^(?:FLOAT|FLOAT4|FLOAT8|DOUBLE|DOUBLE\s+PRECISION|REAL)\b", re.IGNORECASE)
-    _SNOW_DECIMAL_TYPES = re.compile(r"^(?:NUMBER|DECIMAL|NUMERIC)\b", re.IGNORECASE)
-    _SNOW_STRING_TYPES = re.compile(r"^(?:VARCHAR|CHAR|CHARACTER|STRING|TEXT)\b", re.IGNORECASE)
-    _SNOW_BINARY_TYPES = re.compile(r"^(?:BINARY|VARBINARY)\b", re.IGNORECASE)
-    _SNOW_DATE_TYPES = re.compile(r"^(?:DATETIME|TIMESTAMP(?:_[A-Z]+)?|DATE|TIME)\b", re.IGNORECASE)
-    _SNOW_BOOLEAN_TYPES = re.compile(r"^(?:BOOLEAN)\b", re.IGNORECASE)
-    _SNOW_VARIANT_TYPES = re.compile(r"^(?:VARIANT|OBJECT|ARRAY)\b", re.IGNORECASE)
-    _SNOW_UUID_TYPES = re.compile(r"^UUID\b", re.IGNORECASE)
-    _SNOW_GEO_TYPES = re.compile(r"^(?:GEOGRAPHY|GEOMETRY)\b", re.IGNORECASE)
-    # ``UNSIGNED`` as a whole word anywhere in a type string.  Snowflake has no
-    # unsigned type and no attribute slot to write one in, so no catalog row can
-    # carry this; ``parse_type`` is also the reader for caller-supplied DDL, and
-    # reading the attribute off there would hand back a signed value object for a
-    # declaration that says otherwise.  Refused by name instead --
-    # ``_refuse_unsigned_type_string``.
-    _UNSIGNED_ATTRIBUTE = re.compile(r"\bUNSIGNED\b", re.IGNORECASE)
-
-    def _refuse_unsigned_type_string(self, raw: str) -> None:
-        """Refuse a type string that carries an ``UNSIGNED`` attribute.
-
-        :meth:`_refuse_unsigned_numeric` closes the door on the way *in* — a
-        declaration.  This closes it on the way *out*: a string.  Same field, same
-        loss, other direction, and a real hole because ``parse_type`` reads two
-        sources: Snowflake's own ``SHOW COLUMNS`` rows **and** caller-supplied DDL
-        such as a dump or a hand-written migration.
-
-        Without this the ``_SNOW_INTEGER_TYPES`` / ``_SNOW_FLOAT_TYPES`` /
-        ``_SNOW_DECIMAL_TYPES`` branches would match the word in front of it and
-        return a *signed* type: ``parse_type("NUMBER(10,2) UNSIGNED")`` would be
-        ``DecimalType(precision=10, scale=2)``, and ``==`` would call that equal to
-        the signed column — the differ reporting no change for the one change the
-        string describes.
-
-        Nothing here claims a catalog row is at stake: Snowflake's numeric
-        inventory has no unsigned row and its column grammar leaves no modifier
-        after ``<col_type>``, so no server can have written this string.  The
-        branch guards the caller-supplied path and says so.
-        """
-        raise UnsupportedFeatureError(
-            self.name,
-            f"an UNSIGNED attribute in a type string ({raw!r}) "
-            f"(Snowflake has no unsigned numeric type, so no declaration and no "
-            f"catalog row can carry UNSIGNED: the summary table of every numeric "
-            f"data type it has has no unsigned row, unsigned integers are on the "
-            f"manual's own list of Parquet features that aren't supported, and "
-            f"the column grammar leaves no modifier after <col_type> in which "
-            f"UNSIGNED could go. Reading the attribute off and returning a signed "
-            f"type would compare equal to the signed column, which is the silent "
-            f"loss this refuses.)",
-            suggestion=(
-                "Declare the column signed and enforce the range with a CHECK "
-                "constraint if negatives must be rejected."
-            ),
-        )
-
-    def parse_type(self, raw: str) -> DataType:
-        stripped = raw.strip()
-        upper = stripped.upper()
-
-        if self._UNSIGNED_ATTRIBUTE.search(stripped):
-            self._refuse_unsigned_type_string(stripped)
-
-        if self._SNOW_INTEGER_TYPES.match(upper):
-            if upper.startswith("BIGINT"):
-                return BigIntType(dialect=self)
-            if upper.startswith("SMALLINT"):
-                return SmallIntType(dialect=self)
-            return IntegerType(dialect=self)
-
-        if self._SNOW_FLOAT_TYPES.match(upper):
-            if "DOUBLE" in upper or "REAL" in upper:
-                return DoubleType(dialect=self)
-            return FloatType(dialect=self)
-
-        if self._SNOW_DECIMAL_TYPES.match(upper):
-            nums = re.findall(r"\d+", stripped)
-            if len(nums) >= 2:
-                return DecimalType(dialect=self, precision=int(nums[0]), scale=int(nums[1]))
-            if len(nums) == 1:
-                return DecimalType(dialect=self, precision=int(nums[0]))
-            return DecimalType(dialect=self)
-
-        if self._SNOW_STRING_TYPES.match(upper):
-            length_match = re.search(r"\((\d+)", stripped)
-            length = int(length_match.group(1)) if length_match else None
-            # An unsized declaration is completed from ``type_parameter_defaults()``
-            # rather than from a number written here, so the parser cannot claim a
-            # width Snowflake does not document.  It used to invent 255, which is
-            # in no Snowflake document; the declared default is 16777216 and the
-            # manual says so outright.
-            #
-            # A *bare* word from the catalog is no longer the only case, but it is
-            # still a real one: ``parse_type`` is called on caller-supplied DDL as
-            # well as on catalog rows, so ``parse_type("VARCHAR")`` has to keep
-            # answering the server's default.
-            #
-            # ``VARYING`` has to be decided first: both ``CHARACTER VARYING`` and
-            # Snowflake's own ``CHAR VARYING`` name the *variable-length* string,
-            # and a plain prefix test for ``CHAR`` would silently hand back a
-            # fixed-length ``CharType`` — a wrong-width column that the differ
-            # would then compare as equal to the one that was actually declared.
-            if upper.startswith("CHARACTER VARYING") or upper.startswith("CHAR VARYING"):
-                return VarCharType(
-                    dialect=self,
-                    length=length or self._SNOW_VARCHAR_DEFAULT_LENGTH,
-                    spelling="character varying",
-                )
-            if "VARCHAR" in upper:
-                return VarCharType(
-                    dialect=self, length=length or self._SNOW_VARCHAR_DEFAULT_LENGTH)
-            # ``TEXT`` and ``STRING`` are documented synonyms of ``VARCHAR``, and
-            # this branch is what the catalog's own word reaches: behaviour-change
-            # bundle BCR-1960 makes ``DATA_TYPE`` read ``VARCHAR`` for every string
-            # column, and the postponed bundle it replaced had it reading ``TEXT``
-            # for all of them.
-            # https://docs.snowflake.com/en/release-notes/bcr-bundles/un-bundled/bcr-1960
-            #
-            # A **sized** ``TEXT(50)`` is therefore a 50-character variable-length
-            # string and nothing else -- the manual puts ``TEXT`` in the same list
-            # as ``VARCHAR2`` and ``NVARCHAR``, all "Synonymous with VARCHAR" -- so
-            # it parses as one.  It used to parse as the unbounded concept
-            # regardless of the size, which lost the width outright: a ``VARCHAR(50)``
-            # column on an account that has not enabled BCR-1960 came back as a bare
-            # ``TextType``.  A **bare** ``TEXT`` still parses as
-            # :class:`TextType`, because the bare form genuinely is the unbounded
-            # concept on this server.
-            # https://docs.snowflake.com/en/sql-reference/data-types-text
-            if ("TEXT" in upper or "STRING" in upper) and length is not None:
-                return VarCharType(dialect=self, length=length)
-            if "TEXT" in upper or "STRING" in upper:
-                return TextType(dialect=self)
-            if upper.startswith("CHARACTER"):
-                return CharType(
-                    dialect=self,
-                    length=length or self._SNOW_CHAR_DEFAULT_LENGTH,
-                    spelling="character",
-                )
-            return CharType(dialect=self, length=length or self._SNOW_CHAR_DEFAULT_LENGTH)
-
-        if self._SNOW_BINARY_TYPES.match(upper):
-            return BlobType(dialect=self)
-
-        if self._SNOW_DATE_TYPES.match(upper):
-            # The three TIMESTAMP_* words are three storages and the catalog
-            # reports each verbatim, so each parses to its own class. The
-            # branch used to answer the NTZ concept for all three, which
-            # collapsed a TIMESTAMP_LTZ column and a TIMESTAMP_TZ column
-            # into the NTZ one -- a difference the differ could not see,
-            # found by the render-parse-re-render sweep over this backend's
-            # own registry.
-            # Three TIMESTAMP_* words, answered by the core-class design
-            # this parse follows: the concept that renders the word. That
-            # used to be DateTimeType for all three, which collapsed a
-            # TIMESTAMP_LTZ column and a TIMESTAMP_TZ column into the NTZ
-            # concept -- a difference the differ could not see, found by the
-            # round-trip sweep. TIMESTAMP_TZ is what core's
-            # :class:`TimestampTzType` renders here, so it answers; LTZ has
-            # no core rendering and follows the UUID exception's shape --
-            # a backend-native word with no core spelling parses to the
-            # backend's own class.
-            if "TIMESTAMP" in upper:
-                if "TIMESTAMP_LTZ" in upper:
-                    return SnowflakeTimestampLtzType(dialect=self)
-                if "TIMESTAMP_TZ" in upper:
-                    return TimestampTzType(dialect=self)
-                return DateTimeType(dialect=self)
-            # The fractional-seconds precision is part of a TIME column's
-            # identity, so it is read off the rendering rather than
-            # dropped: parse_type("TIME(9)") used to answer a bare TimeType
-            # that re-rendered "TIME", silently widening the column.
-            if upper.startswith("TIME"):
-                nums = re.findall(r"\d+", stripped)
-                precision = int(nums[0]) if nums else None
-                return TimeType(dialect=self, precision=precision)
-            if upper.startswith("DATE"):
-                if upper.strip() == "DATE":
-                    return DateType(dialect=self)
-                return DateTimeType(dialect=self)
-            return DateTimeType(dialect=self)
-
-        if self._SNOW_BOOLEAN_TYPES.match(upper):
-            return BooleanType(dialect=self)
-
-        # Semi-structured: one concept, three words. The design this parse
-        # follows -- pinned in test_data_type_parsing.py -- is that parse
-        # answers *concepts*, and the semi-structured concept is JsonType:
-        # VARIANT serves JSON, OBJECT and ARRAY alike, so all three words
-        # parse to it and the differ, comparing two introspected columns,
-        # stays internally consistent. The words the *own* classes render
-        # are recorded in the round-trip sweep's table as (class, string)
-        # entries instead: a declared SnowflakeArrayType parses to the
-        # concept and re-renders as VARIANT, which the table states as a
-        # reviewable fact rather than as string instability.
-        if self._SNOW_VARIANT_TYPES.match(upper):
-            return JsonType(dialect=self)
-
-        # Geospatial: own words with own classes, each rendering a single
-        # word the catalog reports verbatim. They used to fall through to
-        # CustomType -- a dialect that renders a word its own parse does
-        # not model has a gap on one side or the other.
-        if self._SNOW_GEO_TYPES.match(upper):
-            if upper.startswith("GEOGRAPHY"):
-                return SnowflakeGeographyType(dialect=self)
-            return SnowflakeGeometryType(dialect=self)
-
-        if self._SNOW_UUID_TYPES.match(upper):
-            return SnowflakeUuidType(dialect=self)
-
-        # A user-defined type reference renders as its quoted, optionally
-        # database- and schema-qualified name -- and the catalog reports the
-        # same back. The type-name validation guarding CustomType refuses a
-        # quoted name by design, so the quoted forms are recognised here
-        # and rebuilt as the UDT they came from: collapsing them to
-        # CustomType raised on this dialect's own rendering, and answering
-        # an unquoted raw would have been a different name.
-        udt_match = re.match(r'^(?:"[^"]+"\s*\.\s*){0,2}"[^"]+"$', stripped)
-        if udt_match is not None:
-            parts = re.findall(r'"([^"]+)"', stripped)
-            if len(parts) == 1:
-                return SnowflakeUserDefinedType(dialect=self, type_name=parts[0])
-            if len(parts) == 2:
-                return SnowflakeUserDefinedType(
-                    dialect=self, type_name=parts[1], schema_name=parts[0])
-            return SnowflakeUserDefinedType(
-                dialect=self, type_name=parts[2], schema_name=parts[1],
-                database_name=parts[0])
-
-        return CustomType(dialect=self, raw=stripped)
-
-    def substitute_data_types(self) -> Dict[str, type]:
+    def suggest_substitute_types(self) -> SubstituteTypeSuggestion:
         """Core types Snowflake stores some other way.
 
         Snowflake's numeric, string, binary, boolean, date/time and
@@ -1249,7 +920,7 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
         """
         from ..expression.types import SnowflakeArrayType, SnowflakeObjectType
 
-        return {
+        return SubstituteTypeSuggestion(mapping={
             "array": SnowflakeArrayType,
             "binary": BlobType,
             "varbinary": BlobType,
@@ -1262,5 +933,5 @@ class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
             ),
             "xml": SnowflakeObjectType,
             "enum": VarCharType,
-        }
+        })
 

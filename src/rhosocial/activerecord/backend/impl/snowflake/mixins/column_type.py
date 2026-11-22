@@ -106,7 +106,6 @@ from rhosocial.activerecord.backend.adapters import (
     Range,
     Vector,
 )
-from rhosocial.activerecord.backend.dialect.mixins.column_type import ColumnTypeMixin
 from rhosocial.activerecord.backend.expression.column_types import (
     BinaryColumn,
     BitStringColumn,
@@ -124,6 +123,10 @@ from rhosocial.activerecord.backend.expression.column_types import (
     TimestampColumn,
     UUIDColumn,
     VectorColumn,
+)
+from rhosocial.activerecord.backend.suggestion.definitions import (
+    ColumnTypeSuggestion,
+    ExtraColumnTypeSuggestion,
 )
 
 #: The evidence level of this whole table, stated once so a reader (and a test)
@@ -256,12 +259,13 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
 }
 
 
-class SnowflakeColumnTypeMixin(ColumnTypeMixin):
+class SnowflakeColumnTypeMixin:
     """Snowflake's column-class answers: one class per common Python type.
 
-    Subclasses core's :class:`~...dialect.mixins.column_type.ColumnTypeMixin`
-    and overrides the one method it requires. What differs from any other
-    backend is the *answer*, not the question.
+    The core column-type mixin was removed with the suggestion refactor, so this
+    mixin is standalone and implements the ``ColumnTypeSuggestionSupport``
+    contract itself. What differs from any other backend is the *answer*, not
+    the question.
 
     No entry is answered ``None``: every one of the twenty-four has a column class
     here, including ``dict`` and the four sequence types. That is a real
@@ -270,7 +274,7 @@ class SnowflakeColumnTypeMixin(ColumnTypeMixin):
     is the honest answer.
     """
 
-    def suggested_column_types(self) -> Dict[Any, Type[ColumnBase]]:
+    def suggest_column_types(self) -> ColumnTypeSuggestion:
         """Snowflake's table, one column class per common Python type.
 
         Every key of the framework's common types is answered with a class; no
@@ -278,7 +282,11 @@ class SnowflakeColumnTypeMixin(ColumnTypeMixin):
         carry its reason where the entry is written. The returned dict is a
         copy, so a caller cannot corrupt what later lookups will read.
         """
-        return dict(SNOWFLAKE_COLUMN_TYPES)
+        return ColumnTypeSuggestion(table=dict(SNOWFLAKE_COLUMN_TYPES))
+
+    def suggest_extra_column_types(self) -> ExtraColumnTypeSuggestion:
+        """No backend-owned extra column types."""
+        return ExtraColumnTypeSuggestion(table={})
 
 
 __all__ = [

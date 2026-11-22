@@ -35,7 +35,6 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     AutoIncrementColumnSupport,
     CollationSupport,
     ColumnAttributeSupport,
-    ColumnTypeSupport,
     CommentSupport,
     ConstraintSupport,
     CreateDatabaseSupport,
@@ -66,7 +65,6 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     FulltextIndexSupport,
     GeneratedColumnSupport,
     IdentityColumnSupport,
-    IntegerAutoIncrementColumnSuggestionSupport,
     ILIKESupport,
     IndexObjectSupport,
     IntrospectionSupport,
@@ -95,6 +93,10 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     WildcardSupport,
     WindowFunctionSupport,
 )
+from rhosocial.activerecord.backend.suggestion.protocols import (
+    ColumnTypeSuggestionSupport,
+    IntegerAutoIncrementColumnSuggestionSupport,
+)
 
 
 # All protocols that SnowflakeDialect should implement
@@ -116,7 +118,7 @@ SNOWFLAKE_PROTOCOLS = [
     ColumnAttributeSupport,
     # Column classes: which operations a value carries, where DataTypeSupport
     # answers how it is stored. SnowflakeColumnTypeMixin supplies the table.
-    ColumnTypeSupport,
+    ColumnTypeSuggestionSupport,
     CommentSupport,
     DataTypeSupport,
     ExplainSupport,

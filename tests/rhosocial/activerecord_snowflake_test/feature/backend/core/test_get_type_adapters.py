@@ -83,5 +83,6 @@ def test_inventory_includes_the_snowflake_specific_adapters(backend):
 
 
 def test_default_adapter_suggestions_is_unchanged(backend):
-    assert callable(backend.get_default_adapter_suggestions)
-    assert backend.get_default_adapter_suggestions()
+    assert callable(backend.suggest_data_adapters)
+    assert backend.suggest_data_adapters().table
+    assert backend.suggest_extra_data_adapters().table == {}

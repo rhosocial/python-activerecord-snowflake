@@ -47,6 +47,9 @@ from rhosocial.activerecord.backend.expression.types import (
 )
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
+from rhosocial.activerecord.backend.impl.snowflake.introspection.type_parser import (
+    SnowflakeTypeParser,
+)
 from rhosocial.activerecord.backend.impl.snowflake.mixins.types import (
     SNOWFLAKE_UUID_TYPE_MIN_VERSION,
 )
@@ -81,6 +84,20 @@ TYPES_WITHOUT_CUSTOM_EQ = [
     SnowflakeVariantType, SnowflakeObjectType,
     SnowflakeGeographyType, SnowflakeGeometryType,
 ]
+
+
+def _format_names(dialect):
+    """Concepts a dialect renders, discovered from its formatter family."""
+    return {
+        m[len("format_data_type_"):]
+        for m in dir(dialect)
+        if m.startswith("format_data_type_")
+    }
+
+
+def _parse(dialect, raw):
+    """Read a type spelling through the backend's introspection-only parser."""
+    return SnowflakeTypeParser(dialect).parse(raw)
 
 
 class TestNamespacePrefix:
@@ -189,37 +206,40 @@ class TestNoHandWrittenEqHash:
             )
 
 
-class TestSupportsDataTypes:
-    def test_returns_dict(self):
-        dialect = SnowflakeDialect()
-        result = dialect.supports_data_types()
-        assert isinstance(result, dict)
+class TestDataTypeFormatFamily:
+    """Support is now stated by the naming-convention formatter family."""
 
-    def test_dict_values_are_types(self):
+    @staticmethod
+    def _format_names(dialect):
+        return {
+            m[len("format_data_type_"):]
+            for m in dir(dialect)
+            if m.startswith("format_data_type_")
+        }
+
+    def test_family_is_non_empty_and_all_callable(self):
         dialect = SnowflakeDialect()
-        result = dialect.supports_data_types()
-        for name, cls in result.items():
-            assert isinstance(name, str)
-            assert isinstance(cls, type)
+        names = self._format_names(dialect)
+        assert names
+        for name in names:
+            assert callable(getattr(dialect, f"format_data_type_{name}")), name
 
     def test_contains_core_types(self):
-        dialect = SnowflakeDialect()
-        result = dialect.supports_data_types()
+        names = self._format_names(SnowflakeDialect())
         for name in ["integer", "bigint", "smallint", "float", "double",
                       "decimal", "boolean", "varchar", "char", "text",
                       "blob", "datetime", "date", "time", "timestamp", "json"]:
-            assert name in result, f"Missing core type: {name}"
+            assert name in names, f"Missing core type: {name}"
 
     def test_contains_snowflake_types(self):
-        dialect = SnowflakeDialect()
-        result = dialect.supports_data_types()
+        names = self._format_names(SnowflakeDialect())
         for name in ["snowflake_varchar", "snowflake_number", "snowflake_float",
                       "snowflake_boolean", "snowflake_timestamp_ltz",
                       "snowflake_timestamp_ntz", "snowflake_timestamp_tz",
                       "snowflake_date", "snowflake_time", "snowflake_blob",
                       "snowflake_variant", "snowflake_object", "snowflake_array",
                       "snowflake_geography", "snowflake_geometry"]:
-            assert name in result, f"Missing Snowflake type: {name}"
+            assert name in names, f"Missing Snowflake type: {name}"
 
 
 class TestSupportsFormat1To1:
@@ -384,7 +404,7 @@ class TestSnowflakeTypeSupportProtocol:
 class TestNativeUuidType:
     """Snowflake has had a native ``UUID`` column type since server 10.2.
 
-    Before this, ``substitute_data_types()["uuid"]`` was ``VarCharType``
+    Before this, ``suggest_substitute_types().mapping["uuid"]`` was ``VarCharType``
     unconditionally, with the claim that "Snowflake has no UUID type: a UUID is
     a 36-character string".  That was true of every release before 10.2 and is
     false of 10.2 onwards, where the manual says "The UUID data type stores
@@ -421,15 +441,15 @@ class TestNativeUuidType:
     def test_the_uuid_concept_switches_substitute_on_a_10_2_server(self):
         """``uuid`` stays substituted on both sides of 10.2 — the core name is
         not a Snowflake word either way — but the storage it names changes."""
-        suggested = self.dialect.substitute_data_types()
+        suggested = self.dialect.suggest_substitute_types().mapping
         assert suggested["uuid"] is SnowflakeUuidType
-        assert "snowflake_uuid" in self.dialect.supports_data_types()
+        assert self.dialect.supports_data_type_snowflake_uuid() is True
 
     def test_the_uuid_concept_keeps_varchar_on_an_older_server(self):
         """Byte-identical to what this backend has always suggested."""
         old = SnowflakeDialect(version=(10, 1, 0))
-        assert old.substitute_data_types()["uuid"] is VarCharType
-        assert "snowflake_uuid" not in old.supports_data_types()
+        assert old.suggest_substitute_types().mapping["uuid"] is VarCharType
+        assert old.supports_data_type_snowflake_uuid() is False
 
     def test_an_older_server_refuses_the_native_type_by_version(self):
         """A refusal with no version in it is indistinguishable from "never
@@ -451,7 +471,7 @@ class TestNativeUuidType:
         """
         for version in ((8, 0, 0), UUID_SERVER_VERSION, (10, 8, 0)):
             dialect = SnowflakeDialect(version=version)
-            substitute = dialect.substitute_data_types()["uuid"]
+            substitute = dialect.suggest_substitute_types().mapping["uuid"]
             sql, _ = dialect.format_data_type(substitute(dialect))
             assert sql in ("UUID", "VARCHAR", "VARCHAR(16777216)"), f"{version} -> {sql!r}"
 
@@ -459,36 +479,42 @@ class TestNativeUuidType:
         """The two declarations must not collide on either server."""
         for version in ((8, 0, 0), UUID_SERVER_VERSION):
             dialect = SnowflakeDialect(version=version)
-            overlap = set(dialect.supports_data_types()) & set(
-                dialect.substitute_data_types()
+            overlap = set(_format_names(dialect)) & set(
+                dialect.suggest_substitute_types().mapping
             )
             assert not overlap, f"{version}: {overlap}"
 
-    def test_parse_type_recognises_the_word(self):
+    def test_the_introspection_parser_recognises_the_word(self):
         """Introspection used to hand this back as ``CustomType``, which then
         rendered the raw name — right SQL by accident, for the wrong reason."""
-        parsed = self.dialect.parse_type("UUID")
+        parsed = _parse(self.dialect, "UUID")
         assert isinstance(parsed, SnowflakeUuidType)
         assert self.dialect.format_data_type(parsed)[0] == "UUID"
 
-    def test_parse_type_round_trips(self):
-        parsed = self.dialect.parse_type("UUID")
+    def test_the_introspection_parser_round_trips(self):
+        parsed = _parse(self.dialect, "UUID")
         sql, _ = self.dialect.format_data_type(parsed)
-        assert isinstance(self.dialect.parse_type(sql), SnowflakeUuidType)
+        assert isinstance(_parse(self.dialect, sql), SnowflakeUuidType)
 
-    def test_the_capability_list_gains_the_type_only_at_10_2(self):
-        assert "snowflake_uuid" in SnowflakeDialect(
+    def test_the_version_probe_gates_the_type_only_at_10_2(self):
+        assert "snowflake_uuid" in _format_names(
+            SnowflakeDialect(version=UUID_SERVER_VERSION)
+        )
+        assert SnowflakeDialect(
             version=UUID_SERVER_VERSION
-        ).supports_data_types()
-        assert "snowflake_uuid" not in SnowflakeDialect(
+        ).supports_data_type_snowflake_uuid() is True
+        assert "snowflake_uuid" in _format_names(
+            SnowflakeDialect(version=(10, 1, 0))
+        )
+        assert SnowflakeDialect(
             version=(10, 1, 0)
-        ).supports_data_types()
+        ).supports_data_type_snowflake_uuid() is False
 
 
 class TestSuggestedDataTypes:
     def test_returns_a_dict_of_classes(self):
         dialect = SnowflakeDialect()
-        result = dialect.substitute_data_types()
+        result = dialect.suggest_substitute_types().mapping
         assert isinstance(result, dict)
         for name, klass in result.items():
             assert isinstance(klass, type), f"{name}: value is not a class"
@@ -502,11 +528,11 @@ class TestSuggestedDataTypes:
         substitute to name.
         """
         dialect = SnowflakeDialect()
-        assert dialect.substitute_data_types()["enum"] is VarCharType
+        assert dialect.suggest_substitute_types().mapping["enum"] is VarCharType
 
     def test_keys_are_disjoint_from_supported(self):
         dialect = SnowflakeDialect()
-        overlap = set(dialect.supports_data_types()) & set(dialect.substitute_data_types())
+        overlap = set(_format_names(dialect)) & set(dialect.suggest_substitute_types().mapping)
         assert not overlap, f"overlap between supported and suggested: {overlap}"
 
     def test_suggested_advice_is_named_in_the_refusal(self):
@@ -522,7 +548,7 @@ class TestSuggestedDataTypes:
         The message tells the caller "use X instead", so X has to produce SQL.
         """
         dialect = SnowflakeDialect()
-        for name, klass in dialect.substitute_data_types().items():
+        for name, klass in dialect.suggest_substitute_types().mapping.items():
             sql, _ = dialect.format_data_type(klass(dialect))
             assert sql, f"{name} -> {klass.__name__} rendered empty SQL"
 
@@ -534,8 +560,8 @@ class TestSuggestedDataTypes:
         nothing more.
         """
         dialect = SnowflakeDialect()
-        supported = dialect.supports_data_types()
-        suggested = dialect.substitute_data_types()
+        supported = _format_names(dialect)
+        suggested = dialect.suggest_substitute_types().mapping
         for name in [
             "array", "binary", "custom", "interval", "jsonb", "real",
             "timestamptz", "timetz", "tinyint", "uuid", "varbinary", "xml",
@@ -551,7 +577,7 @@ class TestSuggestedDataTypes:
         answer is the byte storage that does exist rather than a fake length.
         """
         dialect = SnowflakeDialect()
-        suggested = dialect.substitute_data_types()
+        suggested = dialect.suggest_substitute_types().mapping
         assert suggested["binary"] is BlobType
         assert suggested["varbinary"] is BlobType
 
@@ -562,20 +588,20 @@ class TestSuggestedDataTypes:
         disagrees with the manual; the manual is what the server does.
         """
         dialect = SnowflakeDialect()
-        assert dialect.substitute_data_types()["xml"] is SnowflakeObjectType
+        assert dialect.suggest_substitute_types().mapping["xml"] is SnowflakeObjectType
 
     def test_interval_falls_back_to_exact_numeric(self):
         """Snowflake has no INTERVAL: a time span is a NUMBER of units, and the
         unit is a function argument rather than a column property."""
         dialect = SnowflakeDialect()
-        assert dialect.substitute_data_types()["interval"] is DecimalType
+        assert dialect.suggest_substitute_types().mapping["interval"] is DecimalType
 
     def test_array_falls_back_to_snowflakes_own_array(self):
         """A bare Snowflake ARRAY is the semi-structured form — elements are
         VARIANT and no element type is declared — so it is the substitute for a
         parameterised T[], not a rendering of one."""
         dialect = SnowflakeDialect()
-        assert dialect.substitute_data_types()["array"] is SnowflakeArrayType
+        assert dialect.suggest_substitute_types().mapping["array"] is SnowflakeArrayType
 
     def test_uuid_and_jsonb_fall_back_to_what_snowflake_stores(self):
         """The pre-10.2 answer, pinned.
@@ -586,7 +612,7 @@ class TestSuggestedDataTypes:
         """
         dialect = SnowflakeDialect()
         assert dialect.version < SNOWFLAKE_UUID_TYPE_MIN_VERSION
-        suggested = dialect.substitute_data_types()
+        suggested = dialect.suggest_substitute_types().mapping
         assert suggested["uuid"] is VarCharType
         assert suggested["jsonb"] is JsonType
 
@@ -656,8 +682,8 @@ class TestNewCoreRenderers:
             )
 
     def test_custom_writes_the_validated_name_back_out(self):
-        """The escape hatch parse_type() falls back to has to be renderable, or
-        a round trip through introspection loses the name it just read."""
+        """The escape hatch the introspection parser falls back to has to be
+        renderable, or a round trip loses the name it just read."""
         sql, _ = self.dialect.format_data_type(
             CustomType(self.dialect, raw="MY_EXTENSION_TYPE")
         )
@@ -706,8 +732,8 @@ class TestSpellingGates:
                 ) from exc
             # and the concept is declared either way
             assert (
-                klass.name in self.dialect.supports_data_types()
-                or klass.name in self.dialect.substitute_data_types()
+                klass.name in _format_names(self.dialect)
+                or klass.name in self.dialect.suggest_substitute_types().mapping
             ), f"{klass.__name__} is neither rendered nor suggested"
 
     @pytest.mark.parametrize(
@@ -718,19 +744,15 @@ class TestSpellingGates:
             (SmallIntType, "int2", "SMALLINT"),
             (TinyIntType, "tinyint", "TINYINT"),
             (CharType, "character", "CHAR(1)"),
-            # An undeclared width renders Snowflake's own default, 16777216, so
-            # this row moved from a bare "VARCHAR" when the default became a
-            # declared value on the type.  The *word* is unmoved — the spelling
-            # gate is not what changed it, the resolved width is — and the
-            # column is the same one.
-            (VarCharType, "character varying", "VARCHAR(16777216)"),
+            # An undeclared width renders the bare word; the server applies its
+            # own default of 16777216. Core no longer resolves defaults onto a
+            # type, so this row is back to "VARCHAR".
+            (VarCharType, "character varying", "VARCHAR"),
             (TextType, "clob", "VARCHAR(16777216)"),
-            # The same move for the numeric concept, now that core resolves the
-            # declared precision and scale: the word is still the one the gate
-            # checks, and the resolved pair is what the server stores for a bare
-            # ``NUMBER`` — "that is, NUMBER(38, 0)".
-            (DecimalType, "dec", "NUMBER(38, 0)"),
-            (DecimalType, "numeric", "NUMBER(38, 0)"),
+            # A bare numeric concept renders the bare ``NUMBER``; the resolved
+            # default pair is no longer written onto the type by core.
+            (DecimalType, "dec", "NUMBER"),
+            (DecimalType, "numeric", "NUMBER"),
             (DoubleType, "double precision", "DOUBLE"),
             (BooleanType, "bool", "BOOLEAN"),
             (BlobType, "bytea", "BINARY"),
@@ -1007,7 +1029,7 @@ class TestNumericSignedness:
     def test_a_type_string_carrying_unsigned_is_refused_rather_than_read(self):
         """The same rule in the *reading* direction.
 
-        Every ``parse_type`` branch matches on the word in front of the attribute, so
+        Every parser branch matches on the word in front of the attribute, so
         without a check ``"NUMBER(10,2) UNSIGNED"`` came back as a **signed**
         ``DecimalType(10, 2)`` — a value object ``==`` calls equal to the signed
         column, and the differ would report no change for the one change the string
@@ -1016,12 +1038,12 @@ class TestNumericSignedness:
         for raw in ("NUMBER(10,2) UNSIGNED", "FLOAT UNSIGNED", "DOUBLE UNSIGNED",
                     "REAL UNSIGNED", "INTEGER UNSIGNED", "NUMBER UNSIGNED"):
             with pytest.raises(UnsupportedFeatureError) as excinfo:
-                self.dialect.parse_type(raw)
+                _parse(self.dialect, raw)
             assert "UNSIGNED" in str(excinfo.value), raw
         # ... and unsigned-free strings of the same shapes are untouched.
-        assert self.dialect.parse_type("NUMBER(10,2)") == DecimalType(
+        assert _parse(self.dialect, "NUMBER(10,2)") == DecimalType(
             self.dialect, 10, 2)
-        assert self.dialect.parse_type("DOUBLE") == DoubleType(self.dialect)
+        assert _parse(self.dialect, "DOUBLE") == DoubleType(self.dialect)
 
     @pytest.mark.parametrize("case,expected", [
         # the pre-existing ValueErrors, still firing for a *signed* declaration
@@ -1040,18 +1062,16 @@ class TestNumericSignedness:
 
         Pinned by *type*, because the point is that each of these still raises what
         it always raised — in particular the "scale requires a precision" refusal,
-        which is the one the signedness gate sits in front of.  That refusal is
-        now reached only when the bound dialect supplies no precision (core fills
-        in the declared 38 on the real dialect), so its case is built against
-        :class:`_SnowflakeWithoutNumericDefaults` while the formatter under test
-        stays the real dialect's.
+        which is the one the signedness gate sits in front of.  Core no longer
+        fills in a missing precision from the dialect, so the refusal is now
+        reached through the ordinary formatter path.
         """
         built = {
             "number_precision": DecimalType(self.dialect, precision=99),
             "number_scale": DecimalType(self.dialect, scale=99),
             "float_precision": FloatType(self.dialect, precision=999),
             "number_scale_without_precision": DecimalType(
-                _SnowflakeWithoutNumericDefaults(), scale=2),
+                SnowflakeDialect(), scale=2),
             "decimal_bad_spelling": DecimalType(self.dialect, precision=10,
                                                 spelling="fixed"),
             "double_bad_spelling": DoubleType(self.dialect, spelling="float"),
@@ -1154,21 +1174,6 @@ class TestPrecisionValidation:
             SnowflakeNumberType(dialect, precision=10, scale=-1).to_sql()
 
 
-class _SnowflakeWithoutNumericDefaults(SnowflakeDialect):
-    """This dialect minus the numeric entry, so the fallback refusal stays testable.
-
-    On the real dialect the missing precision is resolved to 38 in core before
-    the formatter runs, which is the desired behaviour — but it leaves the
-    "scale with no precision" guard with no way to fire.  The guard still
-    protects a type bound to a dialect that supplies no precision, so it is
-    exercised here through the ordinary formatter path rather than deleted
-    along with its old pin.
-    """
-
-    def type_parameter_defaults(self):
-        return {}
-
-
 class TestNumberScaleIsNotDropped:
     """``scale`` is in ``PARAMETERS``, so it is part of the type's identity.
 
@@ -1181,35 +1186,22 @@ class TestNumberScaleIsNotDropped:
     the right of the decimal point", maximum 37), so this one is *honoured*, not
     refused.
 
-    A scale with no declared precision is now honoured too.  Core resolves the
-    missing precision to the documented default of 38 before the formatter sees
-    it, so ``SnowflakeNumberType(dialect, scale=2)`` renders ``NUMBER(38, 2)``
-    — which is the column the server stores for a declaration whose precision
-    the default supplies.  The refusal that remains in ``_format_number`` fires
-    only for a type bound to a dialect that supplies no precision at all.
+    A scale with no declared precision is refused by name: there is no
+    ``NUMBER(scale)`` form, and core no longer fills in the documented default
+    precision from the dialect.  A caller that wants ``NUMBER(38, 2)`` declares
+    ``precision=38`` explicitly.
     """
 
     def setup_method(self):
         self.dialect = SnowflakeDialect()
 
-    def test_two_scales_without_a_precision_now_render_differently(self):
-        """The defect, stated as the measurement that found it.
-
-        Before the scale was honoured at all, both declarations rendered a bare
-        ``NUMBER`` — one column, for two declarations ``==`` called different.
-        Before the dialect default was resolved onto the type they both raised
-        instead.  The documented default precision of 38 is what fills the
-        missing half now, so each renders the column the server would store.
-        """
-        two, _ = self.dialect.format_data_type(
-            SnowflakeNumberType(self.dialect, scale=2)
-        )
-        seven, _ = self.dialect.format_data_type(
-            SnowflakeNumberType(self.dialect, scale=7)
-        )
-        assert two == "NUMBER(38, 2)"
-        assert seven == "NUMBER(38, 7)"
-        assert two != seven
+    def test_two_scales_without_a_precision_are_refused_by_name(self):
+        """A scale is the optional second argument; it cannot stand alone."""
+        for scale in (2, 7):
+            with pytest.raises(ValueError, match="precision"):
+                self.dialect.format_data_type(
+                    SnowflakeNumberType(self.dialect, scale=scale)
+                )
 
     @pytest.mark.parametrize("scale", [0, 1, 2, 10, 37])
     def test_a_declared_scale_is_written_out(self, scale):
@@ -1235,22 +1227,18 @@ class TestNumberScaleIsNotDropped:
             DecimalType(self.dialect, precision=20, scale=2)
         )
         assert sql == "NUMBER(20, 2)"
-        sql, _ = self.dialect.format_data_type(
-            DecimalType(self.dialect, scale=2)
-        )
-        assert sql == "NUMBER(38, 2)"
+        with pytest.raises(ValueError, match="precision"):
+            self.dialect.format_data_type(DecimalType(self.dialect, scale=2))
 
     def test_a_scale_without_a_precision_is_refused_when_nothing_supplies_one(self):
         """Snowflake's grammar is ``NUMBER [ ( precision [, scale] ) ]``.
 
         The scale is the optional *second* argument inside the parenthesis; there
-        is no ``NUMBER(scale)`` form.  Core fills the missing precision from this
-        dialect's declaration, so on the real backend the combination renders
-        ``NUMBER(38, 2)``; when the bound dialect declares no precision there is
-        nothing to fill in, and writing a bare ``NUMBER`` would silently decide
+        is no ``NUMBER(scale)`` form.  Core no longer fills a missing precision
+        from the dialect, and writing a bare ``NUMBER`` would silently decide
         ``NUMBER(38, 0)``.  So the formatter refuses and names the field.
         """
-        dialect = _SnowflakeWithoutNumericDefaults()
+        dialect = SnowflakeDialect()
         with pytest.raises(ValueError) as excinfo:
             dialect.format_data_type(
                 SnowflakeNumberType(dialect, scale=2)
@@ -1262,7 +1250,7 @@ class TestNumberScaleIsNotDropped:
 
     def test_the_refusal_says_what_to_declare_instead(self):
         """A refusal with no route forward is the same as silence, only louder."""
-        dialect = _SnowflakeWithoutNumericDefaults()
+        dialect = SnowflakeDialect()
         with pytest.raises(ValueError) as excinfo:
             dialect.format_data_type(
                 SnowflakeNumberType(dialect, scale=4)
@@ -1271,7 +1259,7 @@ class TestNumberScaleIsNotDropped:
 
     def test_the_suggested_precision_actually_renders(self):
         """The advice names a declaration; check it is one this dialect accepts."""
-        dialect = _SnowflakeWithoutNumericDefaults()
+        dialect = SnowflakeDialect()
         with pytest.raises(ValueError) as excinfo:
             dialect.format_data_type(
                 SnowflakeNumberType(dialect, scale=4)
@@ -1291,19 +1279,16 @@ class TestNumberScaleIsNotDropped:
         assert a != b
         assert hash(a) != hash(b)
 
-    def test_precision_only_now_writes_the_servers_scale_too(self):
-        """``NUMBER(10)`` is stored as ``NUMBER(10, 0)``, and now says so.
+    def test_precision_only_writes_the_declared_precision(self):
+        """``NUMBER(10)`` writes exactly the precision the caller declared.
 
-        The manual gives the defaults as "precision is 38, and scale is 0; that
-        is, NUMBER(38, 0)", and a declaration that names a precision and no
-        scale is still a column with scale 0.  Core resolves the declared scale
-        onto the type, so the formatter writes the pair out.  The two spellings
-        are one column; the explicit one is what the catalog reports.
+        Core no longer resolves a scale onto the type, so the server's default
+        scale of 0 is applied on write rather than written into the SQL.
         """
         sql, _ = self.dialect.format_data_type(
             SnowflakeNumberType(self.dialect, precision=10)
         )
-        assert sql == "NUMBER(10, 0)"
+        assert sql == "NUMBER(10)"
 
     def test_float_precision_valid(self):
         dialect = SnowflakeDialect()
@@ -1352,12 +1337,12 @@ class TestNumberScaleIsNotDropped:
 
 
 class TestDeclaredParameterDefaults:
-    """What this server supplies for a declaration that named nothing.
+    """Server defaults are documented constants, not dialect-resolved fields.
 
-    Core resolves a declared default onto the type at read time, keyed by the
-    type's own ``name`` — so the declaration has to be right for the concept it
-    is filed under, and a backend type reached through this dialect's own entry
-    point has to declare under its own name too.
+    Core removed type-parameter default resolution: a bare ``VarCharType`` /
+    ``DecimalType`` keeps its parameters unset and renders the bare word, while
+    the introspection parser fills an unsized catalog spelling from the
+    dialect's documented constants.
     https://docs.snowflake.com/en/sql-reference/data-types-text
     https://docs.snowflake.com/en/sql-reference/data-types-numeric
     """
@@ -1366,67 +1351,35 @@ class TestDeclaredParameterDefaults:
         self.dialect = SnowflakeDialect()
 
     def test_the_widths_are_the_manuals_own_numbers(self):
-        declared = self.dialect.type_parameter_defaults()
         # "If no length is specified, the default is 16777216."
-        assert declared["varchar"] == {"length": 16777216}
+        assert self.dialect._SNOW_VARCHAR_DEFAULT_LENGTH == 16777216
         # "CHAR ... except that if the length is not specified, CHAR(1) is the
         # default."
-        assert declared["char"] == {"length": 1}
-        # A backend type is the same concept through its own entry point, so it
-        # declares under its own dispatch key. Two names, one width — declared
-        # side by side because a dialect that let them drift would be describing
-        # one storage two ways.
-        assert declared["snowflake_varchar"] == declared["varchar"]
+        assert self.dialect._SNOW_CHAR_DEFAULT_LENGTH == 1
 
     def test_the_numeric_default_is_the_manuals_own_pair(self):
-        declared = self.dialect.type_parameter_defaults()
         # "By default, precision is 38, and scale is 0; that is, NUMBER(38, 0)."
-        assert declared["decimal"] == {"precision": 38, "scale": 0}
-        assert declared["snowflake_number"] == declared["decimal"]
+        assert self.dialect._SNOW_NUMBER_DEFAULT_PRECISION == 38
+        assert self.dialect._SNOW_NUMBER_DEFAULT_SCALE == 0
 
-    def test_declaring_the_numeric_default_now_reaches_the_formatter(self):
-        """The resolved default is what the server stores, so it is what is written.
-
-        ``DecimalType.precision``/``scale`` now resolve at read time exactly as
-        ``VarCharType.length`` does, so the declaration added to stop the
-        introspector dropping a sized NUMBER's precision and scale is
-        load-bearing in the other direction too: a bare declaration renders
-        ``NUMBER(38, 0)`` rather than a bare ``NUMBER``.  That is a rendering
-        change and it is the correct one — "By default, precision is 38, and
-        scale is 0; that is, NUMBER(38, 0)" — and ``NUMBER(38, 0)`` is
-        semantically the same column as ``NUMBER``, which ``DESC TABLE`` renders
-        identically.  The explicit pair is also what the catalog reports, so
-        writing it is what makes a bare declaration compare equal to its own
-        round trip.
-        """
-        assert DecimalType(self.dialect).precision == 38
-        assert DecimalType(self.dialect).scale == 0
-        sql, _ = DecimalType(self.dialect).to_sql()
-        assert sql == "NUMBER(38, 0)"
-        assert DecimalType(self.dialect) == DecimalType(
+    def test_a_bare_declaration_keeps_its_parameters_unset(self):
+        assert VarCharType(self.dialect).length is None
+        assert DecimalType(self.dialect).precision is None
+        assert DecimalType(self.dialect).scale is None
+        assert DecimalType(self.dialect) != DecimalType(
             self.dialect, precision=38, scale=0
         )
+        sql, _ = DecimalType(self.dialect).to_sql()
+        assert sql == "NUMBER"
         sql, _ = SnowflakeNumberType(self.dialect).to_sql()
-        assert sql == "NUMBER(38, 0)"
-        # ...while the declared width reaches the formatter, as it always did.
-        assert VarCharType(self.dialect).length == 16777216
+        assert sql == "NUMBER"
 
-    def test_concepts_the_manual_defines_without_parameters_are_not_declared(self):
-        """Declaring a parameter the type refuses to accept would be inventing it.
-
-        * the integer names: "Synonymous with NUMBER, except precision and scale
-          can't be specified" — there is nothing to supply.
-        * the float family: ``DESC TABLE`` renders a bare ``FLOAT``.
-        * ``text``: ``VARCHAR(16777216)`` is written out by its own formatter, so
-          it is not a bare form with a default to fill in.
-        * ``blob``: ``BINARY``'s length is in **bytes** and ``BlobType`` carries
-          no width at all, so there is no field for the framework to resolve.
-        """
-        declared = self.dialect.type_parameter_defaults()
-        for absent in ("integer", "bigint", "smallint", "tinyint",
-                       "float", "snowflake_float", "double", "real",
-                       "text", "blob", "snowflake_blob"):
-            assert absent not in declared, f"{absent} should declare nothing"
+    def test_the_parser_fills_an_unsized_catalog_spelling(self):
+        assert _parse(self.dialect, "VARCHAR").length == 16777216
+        assert _parse(self.dialect, "CHAR").length == 1
+        assert _parse(self.dialect, "NUMBER(38, 0)") == DecimalType(
+            self.dialect, precision=38, scale=0
+        )
 
 
 class TestFormatting:
@@ -1434,38 +1387,38 @@ class TestFormatting:
         self.dialect = SnowflakeDialect()
 
     def test_varchar_no_length(self):
-        """No declared width means Snowflake's default, written out.
+        """No declared width renders the bare word; the server supplies the default.
 
         "If no length is specified, the default is 16777216."
         (https://docs.snowflake.com/en/sql-reference/data-types-text)
         """
         sql, _ = SnowflakeVarcharType(self.dialect).to_sql()
-        assert sql == "VARCHAR(16777216)"
-        assert SnowflakeVarcharType(self.dialect).length == 16777216
-        # and the declared width is the one the catalog's word parses back to.
-        # The classes stay apart on purpose — ``parse_type`` yields core classes
-        # only, see ``test_parse_returns_only_core_classes`` — so this compares
-        # the widths, which is what the differ compares within one concept.
-        assert self.dialect.parse_type("VARCHAR").length == 16777216
-        assert VarCharType(self.dialect) == self.dialect.parse_type("VARCHAR")
+        assert sql == "VARCHAR"
+        assert SnowflakeVarcharType(self.dialect).length is None
+        # The introspection parser fills the documented default when it reads a
+        # catalog spelling. The classes stay apart on purpose — the parser
+        # yields core classes only — so this compares the widths.
+        assert _parse(self.dialect, "VARCHAR").length == 16777216
+        assert VarCharType(
+            self.dialect, length=16777216
+        ) == _parse(self.dialect, "VARCHAR")
 
     def test_varchar_with_length(self):
         sql, _ = SnowflakeVarcharType(self.dialect, length=255).to_sql()
         assert sql == "VARCHAR(255)"
 
     def test_number_no_params(self):
-        """A bare ``NUMBER`` is ``NUMBER(38, 0)``, and the default is now resolved.
+        """A bare ``NUMBER`` renders the bare word; the server applies 38/0.
 
-        "By default, precision is 38, and scale is 0; that is, NUMBER(38, 0)"
-        and ``DESC TABLE`` renders both spellings identically — core resolves
-        the dialect's declared pair onto the type, so the rendering carries it.
+        "By default, precision is 38, and scale is 0; that is, NUMBER(38, 0)",
+        but core no longer resolves that pair onto the type.
         """
         sql, _ = SnowflakeNumberType(self.dialect).to_sql()
-        assert sql == "NUMBER(38, 0)"
+        assert sql == "NUMBER"
 
     def test_number_precision_only(self):
         sql, _ = SnowflakeNumberType(self.dialect, precision=10).to_sql()
-        assert sql == "NUMBER(10, 0)"
+        assert sql == "NUMBER(10)"
 
     def test_number_precision_scale(self):
         sql, _ = SnowflakeNumberType(

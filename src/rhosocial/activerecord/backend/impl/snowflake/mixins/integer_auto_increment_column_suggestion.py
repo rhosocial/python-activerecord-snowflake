@@ -9,10 +9,8 @@ formatter owns the SQL spelling.
 
 from typing import TYPE_CHECKING
 
-from ....expression.statements import (
-    IdentityClause,
-    IntegerAutoIncrementColumnSuggestion,
-)
+from ....expression.statements import IdentityClause
+from ....suggestion import IntegerAutoIncrementColumnSuggestion
 
 if TYPE_CHECKING:  # pragma: no cover
     from ....expression.types._base import DataType

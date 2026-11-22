@@ -856,7 +856,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
     #: therefore a 50-character variable-length string, and it is parsed as one;
     #: a bare ``TEXT`` stays :class:`~...expression.types.TextType`, because the
     #: bare form genuinely is the unbounded concept.  See
-    #: :meth:`~...mixins.types.SnowflakeTypeSupportMixin.parse_type`.
+    #: :class:`~.type_parser.SnowflakeTypeParser`.
     _SNOW_WIDTH_COLUMN = {
         "varchar": "CHARACTER_MAXIMUM_LENGTH",
         "char": "CHARACTER_MAXIMUM_LENGTH",
@@ -946,10 +946,10 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         row: Dict[str, Any],
         dialect: Any,
     ) -> str:
-        """The one type string ``parse_type`` is asked to read, size included.
+        """The one type string the introspection parser is asked to read, size included.
 
         Snowflake splits what a caller writes as a single type across several
-        catalog columns, so handing ``parse_type`` the bare ``DATA_TYPE`` alone
+        catalog columns, so handing the parser the bare ``DATA_TYPE`` alone
         throws away the size and only the size.  Measured on this worktree with
         the query in :meth:`~...mixins.introspection.SnowflakeIntrospectionMixin.format_column_info_query_statement`:
         a ``VARCHAR(50)`` column answered ``16777216`` -- the *bare* word reached
@@ -987,20 +987,17 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         The exact numeric shape is the one whose reported pair used to be folded
         back to the bare word, and that folding is gone.  It existed only because
         a declaration that named no precision could carry none: the bare word was
-        the one thing it could compare equal to.  Core now resolves
-        ``DecimalType.precision``/``scale`` against
-        :meth:`~...mixins.types.SnowflakeTypeSupportMixin.type_parameter_defaults`
-        at read time, so ``DecimalType(dialect)`` carries 38/0 and
+        the one thing it could compare equal to.  The introspection parser reads
         ``NUMBER(38, 0)`` -- the pair the catalog reported, and the manual's own
-        words for a bare ``NUMBER`` -- parses to an equal object.  Composing the
-        pair the catalog actually reported is therefore both safe and more
-        honest: ``data_type_full`` says what the size is instead of repeating a
-        word whose size was only implied.
+        words for a bare ``NUMBER`` -- as a type carrying that precision and
+        scale.  Composing the pair the catalog actually reported is therefore
+        both safe and more honest: ``data_type_full`` says what the size is
+        instead of repeating a word whose size was only implied.
         """
-        from rhosocial.activerecord.backend.expression.types._base import DataType
+        from .type_parser import SnowflakeTypeParser
 
         word = row.get("DATA_TYPE") or "VARCHAR"
-        # Which concept the catalog's word names is the dialect's answer, not
+        # Which concept the catalog's word names is the parser's answer, not
         # this file's: parse the bare word and read the identity off the result.
         # An unreadable word is caught here rather than raised, because not being
         # able to name its concept is the same as not knowing which column would
@@ -1008,7 +1005,7 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         # on, and :meth:`parse_data_type` is where the unreadable type is
         # reported and degraded to ``None`` for that one column.
         try:
-            concept = getattr(DataType.parse_data_type_str(dialect, word), "name", None)
+            concept = getattr(SnowflakeTypeParser(dialect).parse(word), "name", None)
         except Exception:  # noqa: BLE001 -- see the docstring
             concept = None
         width_column = self._SNOW_WIDTH_COLUMN.get(concept)
@@ -1042,19 +1039,19 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
         same reason.
 
         The string handed in is built by :meth:`_catalog_type_string` and is read
-        by the dialect's own ``parse_type``, so a type Snowflake adds cannot
-        fail here unless it fails in ``parse_type`` too -- and ``parse_type``
+        by the introspection-only ``SnowflakeTypeParser``, so a type Snowflake
+        adds cannot fail here unless it fails in the parser too -- and the parser
         ends in ``CustomType``, whose constructor validates the raw name, so an
         unmodelled type still parses rather than raises.
         """
-        from rhosocial.activerecord.backend.expression.types._base import DataType
+        from .type_parser import SnowflakeTypeParser
 
         try:
-            return DataType.parse_data_type_str(dialect, composed)
+            return SnowflakeTypeParser(dialect).parse(composed)
         except Exception as exc:  # noqa: BLE001 -- see the docstring
             warnings.warn(
                 f"Snowflake reported column type {composed!r} (DATA_TYPE "
-                f"{row.get('DATA_TYPE')!r}), which this backend's parse_type "
+                f"{row.get('DATA_TYPE')!r}), which this backend's type parser "
                 f"could not read ({type(exc).__name__}: {exc}). That column's "
                 f"parsed_data_type is left unset, so the schema differ will "
                 f"compare its data_type string rather than the type object. "

@@ -16,6 +16,10 @@ from rhosocial.activerecord.backend.errors import (
     QueryError,
     attach_diagnostics,
 )
+from rhosocial.activerecord.backend.suggestion.definitions import (
+    DataAdapterSuggestion,
+    ExtraDataAdapterSuggestion,
+)
 from rhosocial.activerecord.backend.type_adapter import SQLTypeAdapter
 
 from ..adapters import (
@@ -387,7 +391,7 @@ class SnowflakeBackendMixin:
         self.log(logging.DEBUG, f"Database error: {error_msg}")
         raise attach_diagnostics(DatabaseError(error_msg), **diagnostics) from error
 
-    def get_default_adapter_suggestions(self) -> Dict[Type, Tuple[SQLTypeAdapter, Type]]:
+    def suggest_data_adapters(self) -> DataAdapterSuggestion:
         """Provide default type adapter suggestions for Snowflake.
 
         Maps Python types to their Snowflake-compatible driver representations
@@ -424,7 +428,11 @@ class SnowflakeBackendMixin:
                     "Suggestion will not be provided for this type."
                 )
 
-        return suggestions
+        return DataAdapterSuggestion(table=suggestions)
+
+    def suggest_extra_data_adapters(self) -> ExtraDataAdapterSuggestion:
+        """No backend-owned extra adapter types."""
+        return ExtraDataAdapterSuggestion(table={})
 
     def get_type_adapters(self) -> List["SQLTypeAdapter"]:
         """Return the adapter instances this backend provides.
@@ -435,7 +443,7 @@ class SnowflakeBackendMixin:
         Two sources the backend already owns are combined: the adapter registry
         (every adapter registered for this backend, including ones that carry
         no default suggestion) and the adapters named by
-        :meth:`get_default_adapter_suggestions`. Instances are deduplicated by
+        :meth:`suggest_data_adapters`. Instances are deduplicated by
         class -- ``(module, qualname)`` -- and sorted by that pair, so the order
         is deterministic and a new list is returned on every call.
 
@@ -444,7 +452,7 @@ class SnowflakeBackendMixin:
         """
         adapters = list(self.adapter_registry.get_all_adapters().values())
         adapters.extend(
-            suggestion[0] for suggestion in self.get_default_adapter_suggestions().values()
+            suggestion[0] for suggestion in self.suggest_data_adapters().table.values()
         )
         unique: Dict[Tuple[str, str], SQLTypeAdapter] = {}
         for adapter in adapters:

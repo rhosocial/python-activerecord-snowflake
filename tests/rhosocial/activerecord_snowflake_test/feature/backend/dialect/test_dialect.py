@@ -287,12 +287,12 @@ class TestSnowflakeDataTypeFormatting:
         assert params == ()
 
     def test_varchar_type_default(self, dialect):
-        # An undeclared width is Snowflake's own default: "If no length is
-        # specified, the default is 16777216."  It used to render a bare
-        # ``VARCHAR``, which is the same column on this server.
+        # An undeclared width stays undeclared in the SQL; the server applies
+        # "If no length is specified, the default is 16777216." Core no longer
+        # resolves default parameters onto a type.
         t = SnowflakeVarcharType(dialect)
         sql, params = t.to_sql()
-        assert sql == "VARCHAR(16777216)"
+        assert sql == "VARCHAR"
         assert params == ()
 
     def test_number_type(self, dialect):
@@ -301,20 +301,18 @@ class TestSnowflakeDataTypeFormatting:
         assert sql == "NUMBER(38, 2)"
 
     def test_number_type_precision_only(self, dialect):
-        # A precision with no scale is still stored with scale 0 — the manual's
-        # default — and core resolves the declared pair onto the type, so the
-        # pair is what gets written.
+        # Only the declared precision is written; the server applies its
+        # documented default scale of 0.
         t = SnowflakeNumberType(dialect, precision=10)
         sql, params = t.to_sql()
-        assert sql == "NUMBER(10, 0)"
+        assert sql == "NUMBER(10)"
 
     def test_number_type_default(self, dialect):
-        # A bare ``NUMBER`` is ``NUMBER(38, 0)``: "By default, precision is 38,
-        # and scale is 0; that is, NUMBER(38, 0)".  The resolved pair is what
-        # the catalog reports for the column, so it is what the type renders.
+        # A bare ``NUMBER`` stays bare in the SQL; the server applies its
+        # documented default of NUMBER(38, 0).
         t = SnowflakeNumberType(dialect)
         sql, params = t.to_sql()
-        assert sql == "NUMBER(38, 0)"
+        assert sql == "NUMBER"
 
     def test_boolean_type(self, dialect):
         t = SnowflakeBooleanType(dialect)
@@ -391,24 +389,20 @@ class TestSnowflakeDataTypeFormatting:
         sql, params = t.to_sql()
         assert sql == "GEOMETRY"
 
-    def test_supports_data_types(self, dialect):
-        result = dialect.supports_data_types()
-        assert isinstance(result, dict)
-        assert len(result) >= 14
-        assert "snowflake_varchar" in result
-        assert "snowflake_number" in result
-        assert "snowflake_boolean" in result
-        assert "snowflake_timestamp_ltz" in result
-        assert "snowflake_timestamp_ntz" in result
-        assert "snowflake_timestamp_tz" in result
-        assert "snowflake_variant" in result
-        assert "snowflake_array" in result
-        assert "snowflake_object" in result
-        assert "snowflake_geography" in result
-        assert "snowflake_geometry" in result
-        assert "snowflake_date" in result
-        assert "snowflake_time" in result
-        assert "snowflake_blob" in result
+    def test_snowflake_type_family_formatters(self, dialect):
+        # The old registry is gone: support is now stated
+        # by the naming-convention formatters and the version-gated probes.
+        names = (
+            "snowflake_varchar", "snowflake_number", "snowflake_boolean",
+            "snowflake_timestamp_ltz", "snowflake_timestamp_ntz",
+            "snowflake_timestamp_tz", "snowflake_variant", "snowflake_array",
+            "snowflake_object", "snowflake_geography", "snowflake_geometry",
+            "snowflake_date", "snowflake_time", "snowflake_blob",
+        )
+        for name in names:
+            assert callable(getattr(dialect, f"format_data_type_{name}", None)), name
+        assert callable(dialect.supports_data_type_snowflake_uuid)
+        assert callable(dialect.supports_data_type_snowflake_user_defined)
 
 
 class TestSnowflakeDialectVersion:

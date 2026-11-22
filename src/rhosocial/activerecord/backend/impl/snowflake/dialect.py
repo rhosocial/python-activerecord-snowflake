@@ -26,7 +26,6 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     ArraySupport,
     AutoIncrementColumnSupport,
     CollationSupport,
-    ColumnTypeSupport,
     ConstraintSupport,
     CreateTypeSupport,
     CTESupport,
@@ -61,11 +60,16 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     WildcardSupport,
     WindowFunctionSupport,
 )
+from rhosocial.activerecord.backend.suggestion.protocols import (
+    ColumnTypeSuggestionSupport,
+    DataTypeSuggestionSupport,
+)
 from rhosocial.activerecord.backend.dialect.mixins import (
 
     ArrayMixin,
     AutoIncrementColumnMixin,
     CollationMixin,
+    ColumnAttributeMixin,
     LpadMixin,
     RepeatMixin,
     RpadMixin,
@@ -157,8 +161,8 @@ from .mixins import (
     SnowflakeDataTypeSuggestionsMixin,
     SnowflakeTypeSupportMixin,
     # Column types: which column class each common Python type means on this
-    # server. It subclasses core's ColumnTypeMixin, so the protocol's own
-    # plumbing comes with it and only the answer is Snowflake's.
+    # server. Core's ColumnTypeMixin was removed in the suggestion refactor, so
+    # this mixin is standalone and answers ColumnTypeSuggestionSupport itself.
     # Placed among the Snowflake-specific mixins because nothing generic can
     # answer for a VARIANT document or for Snowflake's ILIKE.
     SnowflakeColumnTypeMixin,
@@ -276,6 +280,9 @@ class SnowflakeDialect(
     DMLMixin,
     SnowflakeAlterColumnModifierMixin,  # Before DDLColumnMixin to override format_*_action
     DDLColumnMixin,
+    # Column-attribute dispatch moved out of DDLColumnMixin into its own mixin;
+    # SnowflakeCollationMixin (above) overrides its quoted-COLLATE spelling.
+    ColumnAttributeMixin,
     AutoIncrementColumnMixin,
     IdentityColumnMixin,
     SnowflakeTypeDDLMixin,
@@ -345,8 +352,9 @@ class SnowflakeDialect(
     CollationSupport,
     # Column classes: which operations a value carries, where DataTypeSupport
     # answers how it is stored. The mixin (above) supplies the table; the
-    # protocol records that this dialect answers the question at all.
-    ColumnTypeSupport,
+    # suggestion protocol records that this dialect answers the question at all.
+    ColumnTypeSuggestionSupport,
+    DataTypeSuggestionSupport,
     CTESupport,
     ConstraintSupport,
     DataTypeSupport,
@@ -542,8 +550,9 @@ class SnowflakeDialect(
         return True
 
     def supports_data_type_custom(self) -> bool:
-        # So that parse_type()'s honest-ignorance fallback can be written back
-        # out verbatim; the name is validated in CustomType's constructor.
+        # So that the introspection parser's honest-ignorance fallback can be
+        # written back out verbatim; the name is validated in CustomType's
+        # constructor.
         return True
 
     def supports_data_type_datetime(self) -> bool:

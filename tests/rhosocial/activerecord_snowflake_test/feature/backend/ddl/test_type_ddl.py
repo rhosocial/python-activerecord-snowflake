@@ -221,10 +221,9 @@ def test_create_options_are_rendered_in_snowflake_order():
     dialect = _dialect()
     definition = SnowflakeScalarTypeDefinition(
         dialect,
-        # A bare ``SnowflakeVarcharType`` carries Snowflake's documented default
-        # width of 16777216, so the type it renders as is ``VARCHAR(16777216)``.
-        # The options ordering is what this test is about; the width follows from
-        # ``type_parameter_defaults()``.
+        # A bare ``SnowflakeVarcharType`` renders as ``VARCHAR``; the server
+        # applies its documented default width of 16777216. The options
+        # ordering is what this test is about, not the width.
         SnowflakeVarcharType(dialect),
     )
 
@@ -242,11 +241,11 @@ def test_create_options_are_rendered_in_snowflake_order():
     )
 
     assert replace.to_sql() == (
-        'CREATE OR REPLACE TYPE "label" AS VARCHAR(16777216)',
+        'CREATE OR REPLACE TYPE "label" AS VARCHAR',
         (),
     )
     assert create_if_missing.to_sql() == (
-        'CREATE TYPE IF NOT EXISTS "label" AS VARCHAR(16777216)',
+        'CREATE TYPE IF NOT EXISTS "label" AS VARCHAR',
         (),
     )
     with pytest.raises(ValueError, match="mutually exclusive"):

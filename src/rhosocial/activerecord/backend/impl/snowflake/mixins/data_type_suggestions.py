@@ -63,6 +63,11 @@ from rhosocial.activerecord.backend.expression.types import (
     TimeType,
     VarCharType,
 )
+from rhosocial.activerecord.backend.suggestion.definitions import (
+    DataTypeSuggestion,
+    ExtraDataTypeSuggestion,
+    SubstituteAdviceSuggestion,
+)
 from ..expression.types import (
     SnowflakeArrayType,
     SnowflakeGeometryType,
@@ -122,8 +127,17 @@ SNOWFLAKE_DATA_TYPE_SUGGESTIONS: Dict[Any, Optional[Any]] = {
 class SnowflakeDataTypeSuggestionsMixin:
     """Snowflake's answer to "what declaration does a bare field get here"."""
 
-    def suggested_data_types(self) -> Dict[Any, Optional[Any]]:
-        return dict(SNOWFLAKE_DATA_TYPE_SUGGESTIONS)
+    def suggest_data_types(self) -> DataTypeSuggestion:
+        """Snowflake's declaration for each framework-modelled Python type."""
+        return DataTypeSuggestion(table=dict(SNOWFLAKE_DATA_TYPE_SUGGESTIONS))
+
+    def suggest_extra_data_types(self) -> ExtraDataTypeSuggestion:
+        """No backend-owned extra data types."""
+        return ExtraDataTypeSuggestion(table={})
+
+    def suggest_substitute_advice(self, name: str) -> SubstituteAdviceSuggestion:
+        """No additional caveat for a substituted concept."""
+        return SubstituteAdviceSuggestion(advice="")
 
 
 __all__ = [
