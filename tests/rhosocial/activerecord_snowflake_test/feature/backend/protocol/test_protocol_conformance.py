@@ -78,7 +78,6 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     NamespaceSupport,
     OrderedSetAggregationSupport,
     PartitionSupport,
-    PivotSupport,
     QualifyClauseSupport,
     ReturningSupport,
     SequenceObjectSupport,
@@ -183,7 +182,24 @@ SNOWFLAKE_PROTOCOLS = [
     DropViewSupport,
     FulltextIndexSupport,
     MaterializedViewSupport,
-    PivotSupport,
+    # Generic protocols Snowflake also satisfies. These are the capability
+    # interfaces whose methods the dialect already supplies through its mixins;
+    # leaving them unlisted made the partition test report them as unclassified.
+    dialect_protocols.AsyncIntrospectionSupport,
+    dialect_protocols.DDLColumnSupport,
+    dialect_protocols.DMLSupport,
+    dialect_protocols.DQLSupport,
+    dialect_protocols.DatabaseNameSupport,
+    dialect_protocols.DateTimeSupport,
+    dialect_protocols.ExpressionSupport,
+    dialect_protocols.FunctionCallSupport,
+    dialect_protocols.LpadSupport,
+    dialect_protocols.PredicateSupport,
+    dialect_protocols.RelationSourceSupport,
+    dialect_protocols.RepeatSupport,
+    dialect_protocols.RpadSupport,
+    dialect_protocols.SchemaNameSupport,
+    dialect_protocols.TrimSupport,
     # Snowflake-specific protocols
     SnowflakeTimeTravelSupport,
     SnowflakeVariantSupport,
@@ -262,8 +278,16 @@ SNOWFLAKE_NOT_IMPLEMENTED = [
     # --- Intentional non-support ---
     # Snowflake has no SQL/PGQ property-graph tables.
     dialect_protocols.GraphTableSupport,
+    # Core's generic PivotSupport now also names ``format_pivot`` /
+    # ``format_pivot_value`` / ``format_unpivot`` against the core Pivot and
+    # Unpivot expressions. Snowflake spells PIVOT through its own
+    # SnowflakePivotExpression / SnowflakePivotSupport, so the dialect does not
+    # declare those generic methods and does not satisfy this protocol.
+    dialect_protocols.PivotSupport,
     # Snowflake has no Cypher/property-graph query support.
     dialect_protocols.GraphSupport,
+    # No property-graph objects to name, for the same reason as GraphSupport.
+    dialect_protocols.PropertyGraphNameSupport,
     # Snowflake has no triggers, so it neither names one nor creates one.
     dialect_protocols.TriggerObjectSupport,
     dialect_protocols.CreateTriggerSupport,
@@ -362,6 +386,11 @@ class TestProtocolNonOverlap:
             # Snowflake's ARRAY protocol restates the generic ARRAY capability.
             ("ArraySupport", "SnowflakeArraySupport"),
             ("SnowflakeArraySupport", "ArraySupport"),
+            # Core declares the async introspection protocol as a mirror of the
+            # sync one: same probe names, both answered by this dialect. That is
+            # a deliberate sync/async pair, not two colliding interfaces.
+            ("IntrospectionSupport", "AsyncIntrospectionSupport"),
+            ("AsyncIntrospectionSupport", "IntrospectionSupport"),
         }
 
         from itertools import combinations

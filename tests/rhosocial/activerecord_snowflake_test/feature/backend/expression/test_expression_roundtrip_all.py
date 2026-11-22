@@ -88,8 +88,8 @@ from typing import Dict
 
 import pytest
 
-from rhosocial.activerecord.backend.dialect.exceptions import (UnsupportedDataTypeError, 
-    ProtocolNotImplementedError,
+from rhosocial.activerecord.backend.dialect.exceptions import (
+    UnsupportedDataTypeError,
     UnsupportedFeatureError,
 )
 from rhosocial.activerecord.backend.expression.objects import (
@@ -1044,6 +1044,20 @@ UNCONSTRUCTIBLE = (
     # be an ``UnsupportedFeatureError`` whatever it was built from. Building it
     # would buy no assertion.
     "rhosocial.activerecord.backend.expression.statements.ddl_domain.AddDomainCheckAction",
+    # Core's declarative PARTITION BY clauses arrived with the migration wave.
+    # The introspective constructor reads ``keys: Sequence[BaseExpression]`` by
+    # its ``Sequence`` alias and hands the parameter a catalogue ``Sequence``
+    # instead of a non-empty list of expressions, so all four refuse at
+    # construction -- the same harness limitation already recorded for
+    # XMLTableExpression above. Registering a constructor would buy no
+    # assertion: Snowflake has no declarative table partitioning (it uses
+    # automatic micro-partitioning, CLUSTER BY, or its own
+    # SnowflakeExternalPartitionClause), so each of these answers
+    # UnsupportedFeatureError once built.
+    "rhosocial.activerecord.backend.expression.statements.ddl_partition.PartitionByHashClause",
+    "rhosocial.activerecord.backend.expression.statements.ddl_partition.PartitionByListClause",
+    "rhosocial.activerecord.backend.expression.statements.ddl_partition.PartitionByRangeClause",
+    "rhosocial.activerecord.backend.expression.statements.ddl_partition.PartitionClause",
     # The three UUID nodes refuse in __init__, not in to_sql(): Snowflake
     # spells no UUID SQL, so the answer is the same for every argument and no
     # registered constructor can change it. Measured with valid arguments --
@@ -1250,35 +1264,14 @@ _NO_FORMAT_METHOD_NAME = "does not declare its dialect formatting method name"
 _NO_GENERIC_TYPE = "does not support the generic type"
 
 LEGITIMATE_NON_RENDERS = {
-    # ---- core data-profile families this dialect answers by aggregating ----
-    #  ``ColumnDataProfileQueryStatement``, ``ColumnValueSampleQueryStatement``
-    #  and ``JoinCoverageQueryStatement`` used to be pinned here: Snowflake has
-    #  no per-column statistics catalogue, and the probes answered False. They
-    #  render now, because the rows themselves answer -- one ``UNION ALL`` arm
-    #  per column, each a full scan of the table -- so the entries are gone and
-    #  the matrix asserts the rendered statements instead.
-    "rhosocial.activerecord.backend.expression.introspection.UnusedIndexesQueryStatement": (
-        ProtocolNotImplementedError, 'does not implement ',
-    ),
-    "rhosocial.activerecord.backend.expression.introspection.TableUsageStatsQueryStatement": (
-        ProtocolNotImplementedError, 'does not implement ',
-    ),
-    # ---- core operational families this dialect does not answer ----
-    #  Snowflake's use statistics live in ACCOUNT_USAGE views with latency
-    #  and retention semantics of their own, not a catalogue a schema name
-    #  addresses. The probes answer False.
-    "rhosocial.activerecord.backend.expression.introspection.RuntimeMetricsQueryStatement": (
-        ProtocolNotImplementedError, 'does not implement ',
-    ),
-    "rhosocial.activerecord.backend.expression.introspection.IndexUsageStatsQueryStatement": (
-        ProtocolNotImplementedError, 'does not implement ',
-    ),
-    "rhosocial.activerecord.backend.expression.introspection.ObjectDependencyQueryStatement": (
-        ProtocolNotImplementedError, 'does not implement ',
-    ),
-    "rhosocial.activerecord.backend.expression.introspection.DDLStatementQueryStatement": (
-        ProtocolNotImplementedError, 'does not implement ',
-    ),
+    # ---- introspection queries core now refuses with UnsupportedFeatureError ----
+    #  The six operational/data-profile query statements that used to be pinned
+    #  here (unused indexes, table usage stats, runtime metrics, index usage
+    #  stats, object dependencies, DDL statements) are no longer pins: core's
+    #  introspection mixin now answers each with UnsupportedFeatureError naming
+    #  its formatter, which is an always-allowed branch of the SQL classifier
+    #  and needs no entry in this table. Snowflake still has no such catalogue;
+    #  only the exception core raises to say so changed.
     # ---- roots that name an expression category, not a renderable thing ----
     # Each is a base class that deliberately declares no ``format_method``, so
     # ``to_sql()`` reports that there is nothing to dispatch. They are not
@@ -1348,30 +1341,10 @@ LEGITIMATE_NON_RENDERS = {
         NotImplementedError,
         "Subclass must implement format_table_info_query_statement",
     ),
-    # ---- a protocol answering where a formatter belongs -------------------
-    # The root of the type tree answers ``format_domain_object`` through the
-    # *protocol* ``TypeObjectSupport``, which is in this dialect's base list.
-    # A protocol's body is ``...``, so the lookup succeeds, the call returns
-    # ``None``, and ``Domain.to_sql()`` used to hand its caller ``None`` where a
-    # ``(sql, params)`` pair belongs.
-    #
-    # ``to_sql()`` now looks at what answered the lookup, so the answer is no
-    # longer silent: a ``None`` from a protocol is reported as a
-    # ``ProtocolNotImplementedError`` naming both the protocol and what required
-    # it. It stays pinned here rather than moved to
-    # :data:`UNMODELLED_FORMATTERS` because a formatter *was* found -- the table
-    # answers "this dialect declares no such formatter", which is a different
-    # answer.
-    #
-    # It is still pinned rather than fixed because there is no honest local fix:
-    # the dialect satisfies ``TypeObjectSupport`` structurally through
-    # ``TypeObjectMixin``, and Snowflake has no DOMAIN, so mixing in
-    # ``TypeObjectMixin`` would claim a feature that does not exist.
-    "rhosocial.activerecord.backend.expression.objects.type_.Domain": (
-        ProtocolNotImplementedError,
-        "does not implement format_domain_object protocol, "
-        "which is required by Domain",
-    ),
+    # The type-tree root ``Domain`` used to be pinned here: a protocol answered
+    # ``format_domain_object`` with ``None``, which ``to_sql()`` reported as a
+    # ``ProtocolNotImplementedError``. Core now answers it directly, so the
+    # class renders and the pin was deleted rather than left as a stale claim.
     # ---- the core routine statement under this dialect's override ---------
     # ``SnowflakeRoutineMixin`` overrides ``format_create_function_statement``
     # for ``SnowflakeCreateFunctionStatement``, which carries a bare ``name``.

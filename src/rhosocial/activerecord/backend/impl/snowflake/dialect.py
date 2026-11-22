@@ -63,6 +63,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
 from rhosocial.activerecord.backend.suggestion.protocols import (
     ColumnTypeSuggestionSupport,
     DataTypeSuggestionSupport,
+    StringConcatenationSuggestionSupport,
 )
 from rhosocial.activerecord.backend.dialect.mixins import (
 
@@ -188,12 +189,16 @@ from .mixins import (
     SnowflakeWildcardMixin,
     SnowflakeLiteralValueMixin,
     SnowflakeIntegerAutoIncrementColumnSuggestionMixin,
+    SnowflakeStringConcatenationSuggestionMixin,
 )
 
 
 class SnowflakeDialect(
     # Backend suggestion first: no core mixin may shadow its answer.
     SnowflakeIntegerAutoIncrementColumnSuggestionMixin,
+    # Core's concatenation formatter asks the dialect for its spelling; this
+    # answer must precede core's ExpressionMixin (below).
+    SnowflakeStringConcatenationSuggestionMixin,
     # The bases below come in bundles: a backend mixin, then the core bundle
     # it stands in for. The backend's answer has to come first -- a mixin
     # placed after the class it overrides never wins -- so a new mixin goes
@@ -291,7 +296,6 @@ class SnowflakeDialect(
     # NotImplementedError-raising default, so this dialect's answers win.
     SnowflakeDataTypeSuggestionsMixin,
     SnowflakeTypeSupportMixin,
-    TransactionControlMixin,
     SetOperationMixin,
     # Deliberate: Snowflake's own sequence grammar, placed immediately before
     # the core ``SequenceMixin`` so its three formatters win. Core's emits
@@ -328,6 +332,10 @@ class SnowflakeDialect(
     CommentMixin,
     # Snowflake-specific mixins (before generic IntrospectionMixin to override methods)
     SnowflakeTransactionMixin,
+    # Core's TransactionControlMixin supplies the transaction formatters and
+    # default probes. It must come *after* SnowflakeTransactionMixin so the
+    # backend's own supports_* answers win instead of being dead code.
+    TransactionControlMixin,
     SnowflakeTimeTravelMixin,
     SnowflakeVariantMixin,
     SnowflakeCloneMixin,
@@ -355,6 +363,7 @@ class SnowflakeDialect(
     # suggestion protocol records that this dialect answers the question at all.
     ColumnTypeSuggestionSupport,
     DataTypeSuggestionSupport,
+    StringConcatenationSuggestionSupport,
     CTESupport,
     ConstraintSupport,
     DataTypeSupport,
