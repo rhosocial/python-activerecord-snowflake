@@ -86,7 +86,7 @@ class SnowflakeTableModifierMixin:
 
         Snowflake natively supports ``COMMENT [IF EXISTS] ON <object> IS
         'text'`` for tables, columns, views, and other objects; the generic
-        :class:`CommentOnMixin` rendering is used as-is.
+        :class:`CommentMixin` rendering is used as-is.
         """
         return True
 

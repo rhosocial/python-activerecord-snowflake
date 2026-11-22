@@ -290,14 +290,14 @@ Every dialect inherits from:
 | `JoinSupport` | `JoinMixin` | JOIN operations |
 | `SetOperationSupport` | `SetOperationMixin` | UNION, INTERSECT, EXCEPT |
 | `ILIKESupport` | `ILIKEMixin` | Case-insensitive LIKE |
-| `TableObjectSupport` | `TableNameMixin` / `TableMixin` | Naming a table / CREATE-DROP-ALTER TABLE |
-| `ViewObjectSupport` | `ViewNameMixin` / `ViewMixin` | Naming a view / CREATE-DROP VIEW |
+| `TableObjectSupport` | `TableObjectMixin` / `TableMixin` | Naming a table / CREATE-DROP-ALTER TABLE |
+| `ViewObjectSupport` | `ViewObjectMixin` / `ViewMixin` | Naming a view / CREATE-DROP VIEW |
 | `TruncateSupport` | `TruncateMixin` | TRUNCATE TABLE |
 | `NamespaceSupport` | `NamespaceMixin` | Which namespace levels a name may carry |
-| `IndexObjectSupport` | `IndexNameMixin` / `IndexMixin` | Naming an index / CREATE-DROP INDEX |
-| `SequenceObjectSupport` | `SequenceNameMixin` / `SequenceMixin` | Naming a sequence / CREATE-DROP-ALTER SEQUENCE |
-| `TriggerObjectSupport` | `TriggerNameMixin` / `TriggerMixin` | Naming a trigger / CREATE-DROP TRIGGER (SQL:1999) |
-| `RoutineObjectSupport` | `FunctionNameMixin` / `FunctionMixin` | Naming a routine / CREATE-DROP FUNCTION (SQL/PSM) |
+| `IndexObjectSupport` | `IndexObjectMixin` / `IndexMixin` | Naming an index / CREATE-DROP INDEX |
+| `SequenceObjectSupport` | `SequenceObjectMixin` / `SequenceMixin` | Naming a sequence / CREATE-DROP-ALTER SEQUENCE |
+| `TriggerObjectSupport` | `TriggerObjectMixin` / `TriggerMixin` | Naming a trigger / CREATE-DROP TRIGGER (SQL:1999) |
+| `RoutineObjectSupport` | `RoutineObjectMixin` / `FunctionMixin` | Naming a routine / CREATE-DROP FUNCTION (SQL/PSM) |
 
 Naming an object and changing one are separate protocols: `TableObjectSupport`
 says how a table is spelled, `CreateTableSupport` says `CREATE TABLE` is

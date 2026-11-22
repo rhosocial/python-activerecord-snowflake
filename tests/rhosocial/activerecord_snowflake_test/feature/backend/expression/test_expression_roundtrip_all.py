@@ -1365,8 +1365,8 @@ LEGITIMATE_NON_RENDERS = {
     #
     # It is still pinned rather than fixed because there is no honest local fix:
     # the dialect satisfies ``TypeObjectSupport`` structurally through
-    # ``TypeNameMixin``, and Snowflake has no DOMAIN, so mixing in
-    # ``DomainNameMixin`` would claim a feature that does not exist.
+    # ``TypeObjectMixin``, and Snowflake has no DOMAIN, so mixing in
+    # ``TypeObjectMixin`` would claim a feature that does not exist.
     "rhosocial.activerecord.backend.expression.objects.type_.Domain": (
         ProtocolNotImplementedError,
         "does not implement format_domain_object protocol, "

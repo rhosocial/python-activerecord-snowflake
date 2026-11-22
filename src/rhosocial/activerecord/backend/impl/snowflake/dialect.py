@@ -30,7 +30,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     ConstraintSupport,
     CreateTypeSupport,
     CTESupport,
-    DDLTypeSupport,
+    DataTypeSupport,
     DropTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
@@ -64,12 +64,12 @@ from rhosocial.activerecord.backend.dialect.protocols import (
 from rhosocial.activerecord.backend.dialect.mixins import (
 
     ArrayMixin,
-    AutoIncrementMixin,
+    AutoIncrementColumnMixin,
     CollationMixin,
     LpadMixin,
     RepeatMixin,
     RpadMixin,
-    CommentOnMixin,
+    CommentMixin,
     ConstraintMixin,
     CTEMixin,
     DDLColumnMixin,
@@ -80,15 +80,15 @@ from rhosocial.activerecord.backend.dialect.mixins import (
     # through ``NamespaceMixin`` for the namespace levels. Snowflake overrides
     # none of them; ``db.schema.table`` falls out of the slots they are handed.
     DatabaseNameMixin,
-    IndexNameMixin,
-    MaterializedViewNameMixin,
+    IndexObjectMixin,
+    MaterializedViewObjectMixin,
     NamespaceMixin,
     RelationSourceMixin,
     SchemaNameMixin,
-    SequenceNameMixin,
-    TableNameMixin,
-    TypeNameMixin,
-    ViewNameMixin,
+    SequenceObjectMixin,
+    TableObjectMixin,
+    TypeObjectMixin,
+    ViewObjectMixin,
     ExplainMixin,
     ExpressionMixin,
     IdentityColumnMixin,
@@ -222,12 +222,12 @@ class SnowflakeDialect(
     # purpose: the engine either has none of them, or exposes them through a
     # statement of its own that carries a bare name. Naming one is not a
     # capability to claim where no statement asks for it.
-    TableNameMixin,
-    ViewNameMixin,
-    MaterializedViewNameMixin,
-    IndexNameMixin,
-    SequenceNameMixin,
-    TypeNameMixin,
+    TableObjectMixin,
+    ViewObjectMixin,
+    MaterializedViewObjectMixin,
+    IndexObjectMixin,
+    SequenceObjectMixin,
+    TypeObjectMixin,
     SchemaNameMixin,
     DatabaseNameMixin,
     NamespaceMixin,
@@ -276,7 +276,7 @@ class SnowflakeDialect(
     DMLMixin,
     SnowflakeAlterColumnModifierMixin,  # Before DDLColumnMixin to override format_*_action
     DDLColumnMixin,
-    AutoIncrementMixin,
+    AutoIncrementColumnMixin,
     IdentityColumnMixin,
     SnowflakeTypeDDLMixin,
     # Suggested data types: the DDL half of the type answer. Ahead of
@@ -318,7 +318,7 @@ class SnowflakeDialect(
     SnowflakeTableModifierMixin,  # Before TableMixin to override create-table capability flags
     TableMixin,
     ConstraintMixin,
-    CommentOnMixin,
+    CommentMixin,
     # Snowflake-specific mixins (before generic IntrospectionMixin to override methods)
     SnowflakeTransactionMixin,
     SnowflakeTimeTravelMixin,
@@ -343,13 +343,13 @@ class SnowflakeDialect(
     ArraySupport,
     AutoIncrementColumnSupport,
     CollationSupport,
-    # Column classes: which operations a value carries, where DDLTypeSupport
+    # Column classes: which operations a value carries, where DataTypeSupport
     # answers how it is stored. The mixin (above) supplies the table; the
     # protocol records that this dialect answers the question at all.
     ColumnTypeSupport,
     CTESupport,
     ConstraintSupport,
-    DDLTypeSupport,
+    DataTypeSupport,
     CreateTypeSupport,
     AlterTypeSupport,
     DropTypeSupport,
@@ -495,7 +495,7 @@ class SnowflakeDialect(
         self._refuse_transaction_wait(expr.get_params(), "SET TRANSACTION")
         return ("", ())
 
-    # ========== DDLType Support ==========
+    # ========== DataType Support ==========
 
     def supports_data_type_integer(self) -> bool:
         return True

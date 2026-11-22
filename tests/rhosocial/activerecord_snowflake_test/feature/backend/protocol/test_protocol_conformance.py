@@ -50,7 +50,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     CreateTypeSupport,
     CreateViewSupport,
     CTESupport,
-    DDLTypeSupport,
+    DataTypeSupport,
     DatabaseAssignedColumnSupport,
     TimestampSupport,
     DqlOrderSupport,
@@ -114,11 +114,11 @@ SNOWFLAKE_PROTOCOLS = [
     CollationSupport,
     CTESupport,
     ColumnAttributeSupport,
-    # Column classes: which operations a value carries, where DDLTypeSupport
+    # Column classes: which operations a value carries, where DataTypeSupport
     # answers how it is stored. SnowflakeColumnTypeMixin supplies the table.
     ColumnTypeSupport,
     CommentSupport,
-    DDLTypeSupport,
+    DataTypeSupport,
     ExplainSupport,
     FilterClauseSupport,
     GeneratedColumnSupport,

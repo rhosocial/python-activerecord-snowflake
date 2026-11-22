@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/mixins/types.py
 """Snowflake DataType formatting and parsing mixin.
 
-Uses DDLTypeMixin naming-convention dispatch for Snowflake-specific type SQL.
+Uses DataTypeMixin naming-convention dispatch for Snowflake-specific type SQL.
 """
 
 from __future__ import annotations
@@ -10,8 +10,8 @@ import re
 from typing import Dict, Optional, Tuple
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
-from rhosocial.activerecord.backend.dialect.mixins.ddl_type import DDLTypeMixin
-from rhosocial.activerecord.backend.dialect.protocols import DDLTypeSupport
+from rhosocial.activerecord.backend.dialect.mixins.ddl_type import DataTypeMixin
+from rhosocial.activerecord.backend.dialect.protocols import DataTypeSupport
 # Aliased because this module also uses ``Type[DataType]``-style annotations
 # from ``typing``; ``TypeObject`` names the schema object a UDT reference is.
 from rhosocial.activerecord.backend.expression.objects import Type as TypeObject
@@ -78,16 +78,16 @@ from .ddl_type import SNOWFLAKE_TYPE_DDL_MIN_VERSION
 SNOWFLAKE_UUID_TYPE_MIN_VERSION = (10, 2, 0)
 
 
-class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
+class SnowflakeTypeSupportMixin(DataTypeMixin, DataTypeSupport):
     """Snowflake DataType formatting and parsing.
 
-    Implements ``DDLTypeSupport`` so the dialect can render ``DataType``
+    Implements ``DataTypeSupport`` so the dialect can render ``DataType``
     expressions to SQL strings and parse raw SQL type strings back into
     ``DataType`` instances.
 
     Formatting dispatches by the type instance's ``name`` through the
     naming-convention ``format_data_type_<name>`` methods (see
-    ``DDLTypeMixin``). Snowflake-specific types carry ``snowflake_``-prefixed
+    ``DataTypeMixin``). Snowflake-specific types carry ``snowflake_``-prefixed
     names; core types render their real Snowflake SQL.
     """
 
@@ -322,7 +322,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
             )
 
     # ------------------------------------------------------------------
-    # DDLTypeSupport — formatting (core types)
+    # DataTypeSupport — formatting (core types)
     # ------------------------------------------------------------------
 
     def _refuse_unsigned_integer(
@@ -938,7 +938,7 @@ class SnowflakeTypeSupportMixin(DDLTypeMixin, DDLTypeSupport):
         return "GEOMETRY", ()
 
     # ------------------------------------------------------------------
-    # DDLTypeSupport — parsing
+    # DataTypeSupport — parsing
     # ------------------------------------------------------------------
 
     _SNOW_INTEGER_TYPES = re.compile(r"^(?:INT|INTEGER|BIGINT|SMALLINT|TINYINT|BYTEINT)\b", re.IGNORECASE)
