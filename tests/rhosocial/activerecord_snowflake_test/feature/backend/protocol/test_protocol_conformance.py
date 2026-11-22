@@ -240,8 +240,12 @@ def get_own_protocol_methods(proto: type) -> set:
         if name.startswith('_'):
             continue
         methods.add(name)
-    # Also check annotations for protocol method declarations
-    annotations = getattr(proto, '__annotations__', {})
+    # Also check annotations for protocol method declarations. Read the class's
+    # *own* dict: on some interpreters (notably 3.11) ``getattr`` falls back to
+    # a base protocol's ``__annotations__``, so an inherited attribute such as
+    # NamespaceSupport.separator would be misread as every named-object
+    # protocol's own member and make the overlap check fail for a shared base.
+    annotations = proto.__dict__.get('__annotations__', {})
     for name in annotations:
         if name.startswith('_'):
             continue

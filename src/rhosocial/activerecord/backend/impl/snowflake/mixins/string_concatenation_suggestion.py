@@ -9,13 +9,17 @@ name is ``None``.
 from rhosocial.activerecord.backend.suggestion.definitions import (
     ConcatenationFunctionSuggestion,
 )
-from rhosocial.activerecord.backend.suggestion.protocols import (
-    StringConcatenationSuggestionSupport,
-)
 
 
-class SnowflakeStringConcatenationSuggestionMixin(StringConcatenationSuggestionSupport):
-    """Snowflake concatenates strings with ``||`` (no function form)."""
+class SnowflakeStringConcatenationSuggestionMixin:
+    """Snowflake concatenates strings with ``||`` (no function form).
+
+    Deliberately a plain class rather than a subclass of the runtime-checkable
+    protocol: a protocol subclass placed ahead of ``SQLDialectBase`` can
+    intercept ``super().__init__()`` and lose the dialect's version and
+    validation state. The dialect still satisfies the protocol structurally,
+    by declaring ``StringConcatenationSuggestionSupport`` among its bases.
+    """
 
     def suggest_concatenation_function(self) -> ConcatenationFunctionSuggestion:
         return ConcatenationFunctionSuggestion(function=None)
