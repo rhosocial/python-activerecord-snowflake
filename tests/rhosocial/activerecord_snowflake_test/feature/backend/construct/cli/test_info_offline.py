@@ -231,6 +231,13 @@ class TestDisplayHelpers:
         mod._display_protocol_item(console, "P", stats, verbose=0)
         assert console.print.call_count == 1
 
+    def test_protocol_item_shows_the_origin_tag(self):
+        console = MagicMock()
+        stats = {"supported": 1, "total": 1, "percentage": 100, "origin": "override"}
+        mod._display_protocol_item(console, "P", stats, verbose=0)
+        text = console.print.call_args.args[0]
+        assert "P [dim]\\[override][/dim]" in text
+
     def test_protocol_group_marks_dialect_specific_groups(self):
         console = MagicMock()
         protocols = {"P": {"supported": 1, "total": 1, "percentage": 100}}
@@ -278,6 +285,21 @@ class TestDisplayHelpers:
         group.assert_called_once()
         assert group.call_args.args[1:] == ("JOIN Support", protocols["JOIN Support"], 0)
 
+    def test_info_rich_renders_the_suggestion_block(self):
+        info = {
+            "protocols": {},
+            "suggestions": {
+                "CTESuggestionSupport": {"supported": True},
+                "MergeSuggestionSupport": {"supported": False},
+            },
+        }
+        with fake_rich_console() as Console:
+            mod._display_info_rich(info, 0, "8.0.0")
+        text = "\n".join(Console.instances[-1].lines)
+        assert "Suggestion Support:" in text
+        assert "CTESuggestionSupport" in text
+        assert "MergeSuggestionSupport" in text
+
 
 # ================================================================== #
 # handle() routing
@@ -310,8 +332,19 @@ class TestHandleRouting:
             "version_tuple": [8, 0, 0],
             "connected": False,
         }
+        assert payload["server"] == {
+            "version": "8.0.0",
+            "variables": {},
+            "source": "this backend does not expose server variables",
+            "connected": False,
+        }
         assert payload["features"] == {}
-        assert set(payload["protocols"]) == set(mod.PROTOCOL_FAMILY_GROUPS)
+        assert set(payload["capabilities"]) == set(mod.PROTOCOL_FAMILY_GROUPS)
+        assert payload["protocols"] == payload["capabilities"]
+        assert payload["suggestions"]
+        for group in payload["capabilities"].values():
+            for entry in group.values():
+                assert entry["origin"] in {"reuse", "override", "proprietary"}
 
     def test_version_flag_sets_the_simulated_version(self):
         payload = self._run_json(("--version", "7.32.0"))
@@ -357,7 +390,7 @@ class TestHandleRouting:
             mod.handle(parse("-vv", "--rich-ascii"))
         provider.assert_called_once_with("table", ascii_borders=True)
         legacy, verbose, version, connected = render.call_args.args
-        assert set(legacy) == {"snowflake", "protocols"}
+        assert set(legacy) == {"snowflake", "protocols", "suggestions"}
         assert legacy["snowflake"]["type"] == "snowflake"
         assert verbose == 2
         assert version == "8.0.0"
