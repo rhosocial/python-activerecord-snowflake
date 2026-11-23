@@ -16,8 +16,10 @@ import uuid
 import pytest
 
 from rhosocial.activerecord.backend.adapters import (
+    AwareDatetime,
     BitString,
     Geometry,
+    IPAddress,
     MacAddress,
     Multirange,
     Range,
@@ -33,6 +35,7 @@ from rhosocial.activerecord.backend.expression.column_types import (
     GeometryColumn,
     IntegerColumn,
     IntervalColumn,
+    IPAddressColumn,
     JSONColumn,
     MacAddressColumn,
     MultirangeColumn,
@@ -108,7 +111,7 @@ def test_the_table_answers_every_entry_of_the_common_list(table):
     exactly, in neither direction.
     """
     assert set(table) == set(COMMON_TYPES)
-    assert len(COMMON_TYPES) == 24
+    assert len(COMMON_TYPES) == 26
 
 
 def test_no_entry_is_refused(dialect, table):
@@ -183,6 +186,7 @@ def test_the_backend_offers_no_extra_types(dialect):
         (bytearray, BinaryColumn),
         (datetime.date, TimestampColumn),
         (datetime.time, TimestampColumn),
+        (AwareDatetime, TimestampColumn),
         (datetime.datetime, TimestampColumn),
         (datetime.timedelta, IntervalColumn),
         (uuid.UUID, UUIDColumn),
@@ -198,6 +202,7 @@ def test_the_backend_offers_no_extra_types(dialect):
         (Range, RangeColumn),
         (Multirange, MultirangeColumn),
         (MacAddress, MacAddressColumn),
+        (IPAddress, IPAddressColumn),
     ],
     ids=lambda v: getattr(v, "__name__", str(v)),
 )

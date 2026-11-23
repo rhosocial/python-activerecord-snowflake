@@ -45,8 +45,10 @@ import uuid
 from typing import Any, Dict, Optional
 
 from rhosocial.activerecord.backend.adapters import (
+    AwareDatetime,
     BitString,
     Geometry,
+    IPAddress,
     MacAddress,
     Multirange,
     Range,
@@ -61,6 +63,7 @@ from rhosocial.activerecord.backend.expression.types import (
     IntegerType,
     TextType,
     TimeType,
+    TimestampTzType,
     VarCharType,
 )
 from rhosocial.activerecord.backend.suggestion.definitions import (
@@ -91,6 +94,10 @@ SNOWFLAKE_DATA_TYPE_SUGGESTIONS: Dict[Any, Optional[Any]] = {
     bytearray: BlobType(),
     datetime.date: DateType(),
     datetime.time: TimeType(),
+    # An instant: the offset travels with the value, so the TZ spelling is the
+    # one that keeps the instant across sessions. Millisecond precision matches
+    # the framework default and renders through format_data_type_timestamptz.
+    AwareDatetime: TimestampTzType(precision=3),
     # Millisecond precision is what the framework's datetime carries; Snowflake
     # accepts 0-9 fractional-second digits.
     datetime.datetime: SnowflakeTimestampNtzType(precision=3),
@@ -121,6 +128,9 @@ SNOWFLAKE_DATA_TYPE_SUGGESTIONS: Dict[Any, Optional[Any]] = {
     Multirange: TextType(),
     # The ISO textual spelling (aa:bb:cc:dd:ee:ff) is 17 characters wide.
     MacAddress: VarCharType(length=17),
+    # Canonical IPv4/IPv6 text is at most 45 characters (39 for IPv6 plus the
+    # IPv4-mapped prefix); Snowflake has no native IP type.
+    IPAddress: VarCharType(length=45),
 }
 
 

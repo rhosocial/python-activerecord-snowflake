@@ -13,6 +13,8 @@ from rhosocial.activerecord.backend.adapters import (
     Geometry,
     GeometryAdapterBase,
     GeometryCollection,
+    IPAddress,
+    IPAddressAdapterBase,
     LineString,
     MacAddress,
     MacAddressAdapterBase,
@@ -437,3 +439,21 @@ class SnowflakeMacAddressAdapter(MacAddressAdapterBase):
         if isinstance(value, (bytes, bytearray)):
             return MacAddress.parse(bytes(value))
         return MacAddress.parse(self._require_text(value))
+
+
+class SnowflakeIPAddressAdapter(IPAddressAdapterBase):
+    """Encodes neutral IP addresses as canonical text in a ``VARCHAR``.
+
+    Snowflake has no IP type; the wire value is the canonical compressed form
+    produced by ``str(IPAddress)``, at most 45 characters for an IPv6 address.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.register_type(IPAddress, str)
+
+    def _encode(self, ip_addr: IPAddress, target_type: Type, options: Dict[str, Any]) -> str:
+        return str(ip_addr)
+
+    def _decode(self, value: Any, options: Dict[str, Any]) -> IPAddress:
+        return IPAddress.parse(self._require_text(value))

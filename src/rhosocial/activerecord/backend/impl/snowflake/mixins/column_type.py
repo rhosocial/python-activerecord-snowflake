@@ -2,7 +2,7 @@
 """Snowflake's answer to "what column does this common Python type mean here".
 
 :class:`SnowflakeColumnTypeMixin` answers the column-type protocol for this
-server: for each of the framework's twenty-four Python types it states the
+server: for each framework-committed Python type it states the
 column class the type gets on Snowflake. There is no inherited table in core to
 override -- a table there would be a guess about a server core has never seen --
 so the whole answer lives here, and every entry is answered deliberately.
@@ -99,8 +99,10 @@ import uuid
 from typing import Any, Dict, Tuple, Type
 
 from rhosocial.activerecord.backend.adapters import (
+    AwareDatetime,
     BitString,
     Geometry,
+    IPAddress,
     MacAddress,
     Multirange,
     Range,
@@ -114,6 +116,7 @@ from rhosocial.activerecord.backend.expression.column_types import (
     GeometryColumn,
     IntegerColumn,
     IntervalColumn,
+    IPAddressColumn,
     JSONColumn,
     MacAddressColumn,
     MultirangeColumn,
@@ -192,6 +195,10 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     # 文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/data-types-datetime>
     datetime.date: TimestampColumn,
     datetime.time: TimestampColumn,
+    # An aware datetime is still an instant carried by one of the three
+    # TIMESTAMP_* variants; which variant the DataType layer spells is its
+    # decision, so the column answer is the same as for a naive datetime.
+    AwareDatetime: TimestampColumn,
     datetime.datetime: TimestampColumn,
     # **Group 5 -- duration.** ``IntervalColumn``, which names the value and
     # promises no arithmetic. Snowflake does have interval storage -- the
@@ -256,6 +263,7 @@ SNOWFLAKE_COLUMN_TYPES: Dict[Any, Type[ColumnBase]] = {
     Range: RangeColumn,
     Multirange: MultirangeColumn,
     MacAddress: MacAddressColumn,
+    IPAddress: IPAddressColumn,
 }
 
 
@@ -267,8 +275,8 @@ class SnowflakeColumnTypeMixin:
     contract itself. What differs from any other backend is the *answer*, not
     the question.
 
-    No entry is answered ``None``: every one of the twenty-four has a column class
-    here, including ``dict`` and the four sequence types. That is a real
+    No entry is answered ``None``: every framework-committed type has a column
+    class here, including ``dict`` and the four sequence types. That is a real
     difference from the backends with no JSON functions at all (Firebird),
     where an entry genuinely has nowhere to go and ``None`` -- with a reason --
     is the honest answer.

@@ -11,6 +11,7 @@ ones documented in ``rhosocial.activerecord.backend.impl.snowflake.adapters``:
     Range      -> VARCHAR (JSON text; Snowflake has no RANGE)
     Multirange -> VARCHAR (JSON array text)
     MacAddress -> VARCHAR (canonical colon text)
+    IPAddress  -> VARCHAR (canonical compressed text)
 """
 
 import json
@@ -20,6 +21,7 @@ import pytest
 from rhosocial.activerecord.backend.adapters import (
     BitString,
     Geometry,
+    IPAddress,
     MacAddress,
     Multirange,
     Point,
@@ -30,6 +32,7 @@ from rhosocial.activerecord.backend.errors import TypeConversionError
 from rhosocial.activerecord.backend.impl.snowflake.adapters import (
     SnowflakeBitStringAdapter,
     SnowflakeGeometryAdapter,
+    SnowflakeIPAddressAdapter,
     SnowflakeMacAddressAdapter,
     SnowflakeRangeAdapter,
     SnowflakeVectorAdapter,
@@ -45,6 +48,7 @@ from rhosocial.activerecord.backend.impl.snowflake.backend.backend import (
 NEUTRAL_ADAPTER_CLASSES = (
     SnowflakeBitStringAdapter,
     SnowflakeGeometryAdapter,
+    SnowflakeIPAddressAdapter,
     SnowflakeMacAddressAdapter,
     SnowflakeRangeAdapter,
     SnowflakeVectorAdapter,
@@ -181,6 +185,26 @@ class TestMacAddressAdapter:
         adapter = SnowflakeMacAddressAdapter()
         with pytest.raises(TypeConversionError):
             adapter.from_database("nope", MacAddress)
+
+
+class TestIPAddressAdapter:
+    def test_ipv6_canonical_text_round_trip(self):
+        adapter = SnowflakeIPAddressAdapter()
+        address = IPAddress.parse("2001:db8::1")
+
+        encoded = adapter.to_database(address, str)
+        assert encoded == "2001:db8::1"
+        assert adapter.from_database(encoded, IPAddress) == address
+
+    def test_ipv4_text_round_trip(self):
+        adapter = SnowflakeIPAddressAdapter()
+        address = IPAddress.parse("192.0.2.1")
+        assert adapter.from_database(adapter.to_database(address, str), IPAddress) == address
+
+    def test_bad_text_is_wrapped(self):
+        adapter = SnowflakeIPAddressAdapter()
+        with pytest.raises(TypeConversionError):
+            adapter.from_database("not-an-ip", IPAddress)
 
 
 @pytest.mark.parametrize(
