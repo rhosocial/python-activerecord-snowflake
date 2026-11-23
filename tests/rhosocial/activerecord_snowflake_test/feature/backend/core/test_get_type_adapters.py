@@ -10,8 +10,10 @@ from typing import Tuple
 
 import pytest
 
+from rhosocial.activerecord.backend.adapters import IPAddress
 from rhosocial.activerecord.backend.impl.snowflake.adapters import (
     SnowflakeArrayAdapter,
+    SnowflakeIPAddressAdapter,
     SnowflakeVariantAdapter,
 )
 from rhosocial.activerecord.backend.impl.snowflake.backend.async_backend import (
@@ -86,3 +88,17 @@ def test_default_adapter_suggestions_is_unchanged(backend):
     assert callable(backend.suggest_data_adapters)
     assert backend.suggest_data_adapters().table
     assert backend.suggest_extra_data_adapters().table == {}
+
+
+def test_suggest_data_adapters_maps_ipaddress_to_text(backend):
+    entry = backend.suggest_data_adapters().table.get(IPAddress)
+
+    assert entry is not None
+    adapter, target_type = entry
+    assert target_type is str
+    assert isinstance(adapter, SnowflakeIPAddressAdapter)
+
+    address = IPAddress.parse("2001:db8::1")
+    encoded = adapter.to_database(address, str)
+    assert encoded == "2001:db8::1"
+    assert adapter.from_database(encoded, IPAddress) == address

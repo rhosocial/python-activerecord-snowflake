@@ -405,6 +405,8 @@ class SnowflakeBackendMixin:
         from uuid import UUID
         from enum import Enum
 
+        from rhosocial.activerecord.backend.adapters.network import IPAddress
+
         suggestions: Dict[Type, Tuple[SQLTypeAdapter, Type]] = {}
 
         type_mappings = [
@@ -417,6 +419,7 @@ class SnowflakeBackendMixin:
             (dict, str),
             (list, str),
             (Enum, str),
+            (IPAddress, str),
         ]
 
         for py_type, db_type in type_mappings:
