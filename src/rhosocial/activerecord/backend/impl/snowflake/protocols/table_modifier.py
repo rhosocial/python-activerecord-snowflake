@@ -27,6 +27,10 @@ class SnowflakeTableModifierSupport(Protocol):
         """Format ``CLUSTER BY ( <expr> [, ...] )`` clustering keys."""
         ...
 
+    def format_alter_table_clustering_statement(self, expr) -> Tuple[str, tuple]:
+        """Format ``ALTER TABLE ... CLUSTER BY (...)`` / ``DROP CLUSTERING KEY``."""
+        ...
+
     def supports_transient_table(self) -> bool:
         """Whether TRANSIENT tables are supported."""
         ...

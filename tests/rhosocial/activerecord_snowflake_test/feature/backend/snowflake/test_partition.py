@@ -21,6 +21,7 @@ from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDiale
 from rhosocial.activerecord.backend.impl.snowflake.mixins import SnowflakePartitionMixin
 from rhosocial.activerecord.backend.impl.snowflake.protocols import SnowflakePartitionSupport
 from rhosocial.activerecord.backend.impl.snowflake.expression import (
+    SnowflakeAlterTableClusteringStatement,
     SnowflakeClusterByClause,
     SnowflakeExternalPartitionClause,
 )
@@ -134,7 +135,48 @@ class TestSnowflakeExternalPartitionClause:
         assert sql == ' PARTITION BY ("col1", "col2")'
 
     def test_external_partition_requires_columns(self, dialect):
-        # The node collects parameters only; the formatter refuses an empty list.
         clause = SnowflakeExternalPartitionClause(dialect, [])
         with pytest.raises(ValueError, match="at least one partition column"):
             clause.to_sql()
+
+
+class TestSnowflakeAlterTableClustering:
+    """ALTER TABLE ... CLUSTER BY (...) / DROP CLUSTERING KEY on an existing table."""
+
+    def _table(self, dialect):
+        from rhosocial.activerecord.backend.expression.objects import Table
+
+        return Table(dialect, "events")
+
+    def test_set_cluster_by(self, dialect):
+        clause = SnowflakeClusterByClause(dialect, [MockKey(dialect, "id")])
+        stmt = SnowflakeAlterTableClusteringStatement(
+            dialect, self._table(dialect), cluster_by=clause
+        )
+        sql, params = stmt.to_sql()
+        assert sql == 'ALTER TABLE "events" CLUSTER BY ("id")'
+        assert params == ()
+
+    def test_multiple_cluster_keys(self, dialect):
+        clause = SnowflakeClusterByClause(
+            dialect, [MockKey(dialect, "date"), MockKey(dialect, "id")]
+        )
+        stmt = SnowflakeAlterTableClusteringStatement(
+            dialect, self._table(dialect), cluster_by=clause
+        )
+        assert stmt.to_sql()[0] == 'ALTER TABLE "events" CLUSTER BY ("date", "id")'
+
+    def test_drop_clustering_key(self, dialect):
+        stmt = SnowflakeAlterTableClusteringStatement(dialect, self._table(dialect))
+        sql, params = stmt.to_sql()
+        assert sql == 'ALTER TABLE "events" DROP CLUSTERING KEY'
+        assert params == ()
+
+    def test_empty_cluster_keys_are_refused_at_render(self, dialect):
+        stmt = SnowflakeAlterTableClusteringStatement(
+            dialect,
+            self._table(dialect),
+            cluster_by=SnowflakeClusterByClause(dialect, []),
+        )
+        with pytest.raises(ValueError, match="at least one clustering key"):
+            stmt.to_sql()

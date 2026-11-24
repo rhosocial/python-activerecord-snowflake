@@ -27,6 +27,7 @@ from .wildcard import (
     SnowflakeRowCountWildcard,
 )
 from .partition import (
+    SnowflakeAlterTableClusteringStatement,
     SnowflakeClusterByClause,
     SnowflakeExternalPartitionClause,
 )
@@ -123,6 +124,7 @@ __all__ = [
     "SnowflakeInsertExpression",
     "SnowflakeAllColumnsWildcard",
     "SnowflakeRowCountWildcard",
+    "SnowflakeAlterTableClusteringStatement",
     "SnowflakeClusterByClause",
     "SnowflakeExternalPartitionClause",
     "SnowflakeIdentifierExpression",

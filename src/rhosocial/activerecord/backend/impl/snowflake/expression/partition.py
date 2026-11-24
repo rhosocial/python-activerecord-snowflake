@@ -24,7 +24,39 @@ if TYPE_CHECKING:  # pragma: no cover
 __all__ = [
     "SnowflakeClusterByClause",
     "SnowflakeExternalPartitionClause",
+    "SnowflakeAlterTableClusteringStatement",
 ]
+
+
+class SnowflakeAlterTableClusteringStatement(BaseExpression):
+    """Snowflake ``ALTER TABLE`` clustering-key maintenance.
+
+    Two GoogleSQL spellings share one statement node:
+
+    * ``ALTER TABLE <name> CLUSTER BY ( <expr> [, ...] )`` sets or replaces the
+      clustering key — carry a :class:`SnowflakeClusterByClause`.
+    * ``ALTER TABLE <name> DROP CLUSTERING KEY`` removes it — carry none.
+
+    ``CREATE TABLE ... CLUSTER BY`` is the separate create path; this node is
+    only for an existing table. SQL generation is delegated to
+    ``dialect.format_alter_table_clustering_statement``.
+    """
+
+    def __init__(
+        self,
+        dialect: "SQLDialectBase",
+        table,
+        *,
+        cluster_by: "SnowflakeClusterByClause | None" = None,
+    ):
+        super().__init__(dialect)
+        self.table = table
+        self.cluster_by = cluster_by
+
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this statement."""
+        return "format_alter_table_clustering_statement"
 
 
 class SnowflakeClusterByClause(BaseExpression):

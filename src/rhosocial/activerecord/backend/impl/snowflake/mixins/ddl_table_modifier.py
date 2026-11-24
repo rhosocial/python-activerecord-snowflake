@@ -14,7 +14,10 @@ These formatters are independently callable; the generic core
 from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
-    from ..expression.partition import SnowflakeClusterByClause
+    from ..expression.partition import (
+        SnowflakeAlterTableClusteringStatement,
+        SnowflakeClusterByClause,
+    )
 
 
 class SnowflakeTableModifierMixin:
@@ -53,6 +56,26 @@ class SnowflakeTableModifierMixin:
             parts.append(key_sql)
             params.extend(key_params)
         return f" CLUSTER BY ({', '.join(parts)})", tuple(params)
+
+    def format_alter_table_clustering_statement(
+        self, expr: "SnowflakeAlterTableClusteringStatement"
+    ) -> Tuple[str, tuple]:
+        """Format ``ALTER TABLE ... CLUSTER BY (...)`` / ``DROP CLUSTERING KEY``.
+
+        Args:
+            expr: the statement carrying the table and an optional
+                ``SnowflakeClusterByClause``.
+
+        Returns:
+            Tuple of (SQL string, parameters tuple).
+        """
+        table_sql, table_params = expr.table.to_sql()
+        params = list(table_params)
+        if expr.cluster_by is None:
+            return f"ALTER TABLE {table_sql} DROP CLUSTERING KEY", tuple(params)
+        clause_sql, clause_params = expr.cluster_by.to_sql()
+        params.extend(clause_params)
+        return f"ALTER TABLE {table_sql}{clause_sql}", tuple(params)
 
     def supports_transient_table(self) -> bool:
         """Snowflake supports TRANSIENT tables."""
