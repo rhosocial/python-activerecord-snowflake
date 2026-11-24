@@ -11,6 +11,9 @@ action needed".
 
 import pytest
 
+from rhosocial.activerecord.backend.dialect.partition_capability import (
+    PartitionCapability,
+)
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.suggestion.protocols import (
     PartitionAddSuggestionSupport,
@@ -55,3 +58,16 @@ def test_nothing_is_silently_no_action(dialect):
     """Silence (None) would hide the capability gap; False names it."""
     for _intent, method, _protocol in INTENTS:
         assert getattr(dialect, method)(None, None).operations is not None
+
+
+def test_automatic_partitioning_does_not_turn_a_suggestion_into_an_action(dialect):
+    """The capability is AUTOMATIC, yet there is no partition DDL to suggest.
+
+    Micro-partitions exist without user control, so no build/add/drop/... intent
+    has an addressable object to operate on. The suggestions stay the explicit
+    ``False`` state; a capability value never substitutes for a DDL spelling.
+    """
+    assert dialect.partition_capability() is PartitionCapability.AUTOMATIC
+    assert dialect.supports_table_partitioning() is False
+    for _intent, method, _protocol in INTENTS:
+        assert getattr(dialect, method)(None, None).operations is False

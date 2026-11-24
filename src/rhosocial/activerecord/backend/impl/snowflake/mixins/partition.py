@@ -12,12 +12,19 @@ Accordingly this mixin reports the generic declarative-partitioning
 capability bits as ``False`` and rejects the generic ``PartitionClause``
 (the RANGE/LIST/HASH form) as unsupported Snowflake syntax, while providing
 the external-table ``PARTITION BY`` formatter.
+
+The partition *capability* is nevertheless ``AUTOMATIC``, not ``UNSUPPORTED``:
+the engine partitions every table into micro-partitions itself, but there is no
+partition DDL for a caller to address by name or id.
 """
 
 from typing import Tuple, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.dialect.mixins.partition import PartitionMixin
+from rhosocial.activerecord.backend.dialect.partition_capability import (
+    PartitionCapability,
+)
 
 if TYPE_CHECKING:
     from ..expression.partition import SnowflakeExternalPartitionClause
@@ -34,6 +41,26 @@ class SnowflakePartitionMixin(PartitionMixin):
     def supports_table_partitioning(self) -> bool:
         """Snowflake has no user-defined declarative table partitioning."""
         return False
+
+    def partition_capability(self) -> PartitionCapability:
+        """Snowflake partitions automatically; there is no partition DDL.
+
+        ``AUTOMATIC``, not ``UNSUPPORTED``: the engine divides every table into
+        micro-partitions on its own, so the table *is* partitioned. What it does
+        not offer is a partition DDL statement the caller can address by name or
+        id -- no ``PARTITION BY`` boundaries, no partition names, no add/drop/
+        truncate actions. ``CLUSTER BY`` controls data clustering (which
+        micro-partitions hold which values); it does not create partitions.
+
+        :meth:`supports_table_partitioning` stays ``False`` because it answers
+        the narrower question -- whether addressable partition DDL exists -- and
+        that is exactly the case Snowflake lacks. Core derives ``NATIVE`` /
+        ``UNSUPPORTED`` from that boolean, so this dialect states the third case
+        explicitly.
+
+        https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions
+        """
+        return PartitionCapability.AUTOMATIC
 
     def supports_partitioned_table_creation(self) -> bool:
         """Snowflake standard CREATE TABLE does not take a PARTITION BY clause."""

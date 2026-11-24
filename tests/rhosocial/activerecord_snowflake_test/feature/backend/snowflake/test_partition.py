@@ -5,6 +5,11 @@ Snowflake has no declarative (RANGE/LIST/HASH) partitioning: standard tables
 are micro-partitioned automatically with optional CLUSTER BY, and external
 tables use PARTITION BY (cols). These tests assert the honest capability bits
 and the two valid clause forms.
+
+The capability is ``AUTOMATIC`` rather than ``UNSUPPORTED``: the engine
+partitions every table itself, so there is partitioning, but no addressable
+partition DDL. ``supports_table_partitioning()`` stays ``False`` because it
+answers only whether such DDL exists.
 """
 
 from typing import Set
@@ -13,6 +18,9 @@ import pytest
 
 from rhosocial.activerecord.backend.dialect import PartitionSupport
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
+from rhosocial.activerecord.backend.dialect.partition_capability import (
+    PartitionCapability,
+)
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 from rhosocial.activerecord.backend.expression.statements import (
     PartitionByRangeClause,
@@ -62,9 +70,30 @@ class TestSnowflakePartitionProtocolConformance:
 
 
 class TestSnowflakePartitionCapabilities:
-    """Snowflake has no declarative table partitioning; capabilities are False."""
+    """Automatic engine partitioning, but no addressable partition DDL."""
+
+    def test_capability_is_automatic(self, dialect):
+        """Micro-partitioning happens without user DDL, so this is not UNSUPPORTED.
+
+        Source: https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions
+        ("Micro-partitioning is automatically performed on all Snowflake
+        tables.")
+        """
+        assert dialect.partition_capability() is PartitionCapability.AUTOMATIC
+        assert str(dialect.partition_capability()) == "automatic"
+
+    def test_the_answer_is_declared_here(self, dialect):
+        """The backend owns the third case; core's derivation cannot produce it."""
+        declaring = next(
+            cls
+            for cls in type(dialect).__mro__
+            if "partition_capability" in cls.__dict__
+        )
+        assert declaring is SnowflakePartitionMixin
+        assert dialect.partition_capability() is PartitionCapability.AUTOMATIC
 
     def test_no_declarative_table_partitioning(self, dialect):
+        """The boolean answers whether addressable partition DDL exists."""
         assert dialect.supports_table_partitioning() is False
         assert dialect.supports_partitioned_table_creation() is False
         assert dialect.supports_range_table_partitioning() is False
