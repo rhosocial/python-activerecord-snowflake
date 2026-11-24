@@ -192,6 +192,14 @@ from .mixins import (
     SnowflakeGeneratedValueSuggestionMixin,
     SnowflakeStringConcatenationSuggestionMixin,
     SnowflakeCreateTableLayoutSuggestionMixin,
+    SnowflakePartitionBuildSuggestionMixin,
+    SnowflakePartitionAddSuggestionMixin,
+    SnowflakePartitionDropSuggestionMixin,
+    SnowflakePartitionRetentionSuggestionMixin,
+    SnowflakePartitionTableDropSuggestionMixin,
+    SnowflakePartitionTableAlterSuggestionMixin,
+    SnowflakePartitionSplitSuggestionMixin,
+    SnowflakePartitionMergeSuggestionMixin,
 )
 
 
@@ -200,6 +208,16 @@ class SnowflakeDialect(
     # answer is assembled from this dialect's own capability probes below.
     SnowflakeCreateTableLayoutSuggestionMixin,
     SnowflakeGeneratedValueSuggestionMixin,
+    # Snowflake has no declarative partitioning; these answer the eight
+    # partition suggestion protocols with an explicit "unsupported" state.
+    SnowflakePartitionBuildSuggestionMixin,
+    SnowflakePartitionAddSuggestionMixin,
+    SnowflakePartitionDropSuggestionMixin,
+    SnowflakePartitionRetentionSuggestionMixin,
+    SnowflakePartitionTableDropSuggestionMixin,
+    SnowflakePartitionTableAlterSuggestionMixin,
+    SnowflakePartitionSplitSuggestionMixin,
+    SnowflakePartitionMergeSuggestionMixin,
     # Core's concatenation formatter asks the dialect for its spelling; this
     # answer must precede core's ExpressionMixin (below).
     SnowflakeStringConcatenationSuggestionMixin,

@@ -11,6 +11,14 @@ undrop, materialized view, table modifiers support.
 from .create_table_layout_suggestion import SnowflakeCreateTableLayoutSuggestionMixin
 from .generated_value_suggestion import SnowflakeGeneratedValueSuggestionMixin
 from .string_concatenation_suggestion import SnowflakeStringConcatenationSuggestionMixin
+from .partition_build_suggestion import SnowflakePartitionBuildSuggestionMixin
+from .partition_add_suggestion import SnowflakePartitionAddSuggestionMixin
+from .partition_drop_suggestion import SnowflakePartitionDropSuggestionMixin
+from .partition_retention_suggestion import SnowflakePartitionRetentionSuggestionMixin
+from .partition_table_drop_suggestion import SnowflakePartitionTableDropSuggestionMixin
+from .partition_table_alter_suggestion import SnowflakePartitionTableAlterSuggestionMixin
+from .partition_split_suggestion import SnowflakePartitionSplitSuggestionMixin
+from .partition_merge_suggestion import SnowflakePartitionMergeSuggestionMixin
 from .array import SnowflakeArrayMixin
 from .backend import SnowflakeBackendMixin
 from .clone import SnowflakeCloneMixin
@@ -64,6 +72,14 @@ from .sequence import SnowflakeSequenceMixin
 __all__ = [
     'SnowflakeCreateTableLayoutSuggestionMixin',
     'SnowflakeGeneratedValueSuggestionMixin',
+    'SnowflakePartitionBuildSuggestionMixin',
+    'SnowflakePartitionAddSuggestionMixin',
+    'SnowflakePartitionDropSuggestionMixin',
+    'SnowflakePartitionRetentionSuggestionMixin',
+    'SnowflakePartitionTableDropSuggestionMixin',
+    'SnowflakePartitionTableAlterSuggestionMixin',
+    'SnowflakePartitionSplitSuggestionMixin',
+    'SnowflakePartitionMergeSuggestionMixin',
     'SnowflakeStringConcatenationSuggestionMixin',
     "SnowflakeArrayMixin",
     "SnowflakeBackendMixin",
