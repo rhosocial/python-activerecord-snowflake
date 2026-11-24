@@ -236,7 +236,18 @@ class SnowflakeIntrospectionMixin:
         return True
 
     def supports_index_introspection(self) -> bool:
-        """Snowflake does not have traditional indexes; uses constraints instead."""
+        """The INDEX introspection scope is answered from constraint metadata.
+
+        ``True`` is about the *scope*, not about physical indexes: an ordinary
+        Snowflake table has no index catalogue because it has no indexes (see
+        ``SnowflakeIndexMixin``). ``format_index_info_query_statement``
+        therefore reads ``TABLE_CONSTRAINTS`` + ``KEY_COLUMN_USAGE`` and
+        reports PRIMARY KEY / UNIQUE constraints as the closest index analog.
+        Hybrid-table secondary indexes are not modelled, so ``SHOW INDEXES`` is
+        not what this scope reads.
+
+        https://docs.snowflake.com/en/sql-reference/info-schema/table_constraints
+        """
         return True
 
     def supports_foreign_key_introspection(self) -> bool:

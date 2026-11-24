@@ -51,6 +51,7 @@ from .data_type_suggestions import SnowflakeDataTypeSuggestionsMixin
 from .warehouse import SnowflakeWarehouseMixin
 from .ddl import SnowflakeAlterColumnModifierMixin
 from .ddl_type import SnowflakeTypeDDLMixin
+from .index import SnowflakeIndexMixin
 # New mixins from dialect.py split
 from .datetime import SnowflakeDateTimeMixin
 from .collation import SnowflakeCollationMixin
@@ -110,6 +111,7 @@ __all__ = [
     "SnowflakeWarehouseMixin",
     "SnowflakeAlterColumnModifierMixin",
     "SnowflakeTypeDDLMixin",
+    "SnowflakeIndexMixin",
     "SnowflakeDataTypeSuggestionsMixin",
     "SnowflakeDateTimeMixin",
     "SnowflakeCollationMixin",

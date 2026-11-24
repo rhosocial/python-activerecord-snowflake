@@ -125,7 +125,13 @@ class TestSnowflakeDialectCapabilities:
         assert dialect.supports_filter_clause() is True
 
     def test_supports_indexes(self, dialect):
-        assert dialect.supports_indexes() is True
+        """Ordinary tables have no indexes; clustering keys are not indexes.
+
+        ``CREATE INDEX`` is hybrid-table only and this backend models no hybrid
+        table, so the honest answer is False. See
+        ``ddl.test_snowflake_index_capabilities`` for the full probe set.
+        """
+        assert dialect.supports_indexes() is False
 
     def test_supports_constraints(self, dialect):
         assert dialect.supports_constraints() is True

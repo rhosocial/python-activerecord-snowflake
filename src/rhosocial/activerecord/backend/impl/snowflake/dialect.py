@@ -171,6 +171,7 @@ from .mixins import (
     SnowflakeUndropMixin,
     SnowflakeVariantMixin,
     SnowflakeAlterColumnModifierMixin,
+    SnowflakeIndexMixin,
     SnowflakeWarehouseMixin,
     SnowflakeSchemaMixin,
     SnowflakeDatabaseMixin,
@@ -229,6 +230,13 @@ class SnowflakeDialect(
     # where they occur: a mixin that overrides a method ``SQLDialectBase``
     # defines has to precede the base, and a mixin that subclasses a core
     # mixin has to precede it too (C3: a subclass precedes its base).
+    # Plain index DDL: Snowflake has none for ordinary tables. Every index
+    # probe answers False and both statement formatters refuse by name; the
+    # hybrid-table index family is a different table kind and is not modelled.
+    # Before SQLDialectBase so core's CreateIndexMixin / DropIndexMixin /
+    # CreateTableMixin answers cannot win (the core mixins are inherited
+    # through that base, so their MRO slots land before a later direct base).
+    SnowflakeIndexMixin,
     # Ahead of ``SQLDialectBase``, unlike every other mixin here. Those add
     # methods the base does not have, so their position is a readability
     # choice; this one overrides ``format_literal``, and a mixin placed after

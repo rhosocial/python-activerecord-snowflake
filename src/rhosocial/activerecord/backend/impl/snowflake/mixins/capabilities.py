@@ -116,47 +116,6 @@ class SnowflakeCapabilityMixin:
         """Snowflake supports FILTER clause."""
         return True
 
-    def supports_indexes(self) -> bool:
-        """Snowflake supports indexes (clustering keys and search optimization)."""
-        return True
-
-    def supports_index_if_not_exists(self) -> bool:
-        """Snowflake's ``CREATE INDEX IF NOT EXISTS`` is hybrid-table only.
-
-        The reference grammar does carry the clause --
-        ``CREATE [ OR REPLACE ] INDEX [ IF NOT EXISTS ] <index_name> ON
-        <table_name> (...)`` -- but the statement applies *only* to
-        secondary indexes on hybrid tables; an ordinary Snowflake table
-        has no ``CREATE INDEX`` at all. This dialect models no hybrid table
-        (``CREATE HYBRID TABLE`` is not among its statements), so there is
-        no index this backend can render on which the qualifier would be
-        accepted. Answering ``False`` keeps the shared formatter from
-        emitting a clause for an object kind this dialect cannot name;
-        the clause itself is not in doubt.
-
-        https://docs.snowflake.com/en/sql-reference/sql/create-index
-        """
-        return False
-
-    def supports_index_if_exists(self) -> bool:
-        """Snowflake's ``DROP INDEX IF EXISTS`` is hybrid-table only.
-
-        The reference grammar is ``DROP INDEX [ IF EXISTS ]
-        <table_name>.<index_name>`` -- again restricted to secondary indexes
-        on hybrid tables, and the name is *table-qualified*, which the shared
-        ``DROP INDEX`` formatter does not spell (this dialect answers
-        :meth:`supports_drop_index_on_table` ``False``). Claiming the
-        qualifier would only decorate a statement that is already not
-        Snowflake's grammar, so the fail-closed answer stays ``False``.
-
-        https://docs.snowflake.com/en/sql-reference/sql/drop-index
-        """
-        return False
-
-    def supports_drop_index_on_table(self) -> bool:
-        """Snowflake drops indexes/search-optimization by name (no ON <table>)."""
-        return False
-
     def supports_constraints(self) -> bool:
         """Snowflake supports constraints (PK, FK, UNIQUE, NOT NULL, CHECK)."""
         return True
@@ -500,10 +459,6 @@ class SnowflakeCapabilityMixin:
         https://docs.snowflake.com/en/sql-reference/sql/alter-table-column
         """
         return True
-
-    def supports_alter_table_index_actions(self) -> bool:
-        """Snowflake has no traditional indexes."""
-        return False
 
     def supports_json_type(self) -> bool:
         """Snowflake stores semi-structured values in VARIANT.
