@@ -231,6 +231,7 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.dml import (
     SnowflakeInsertExpression,
 )
 from rhosocial.activerecord.backend.impl.snowflake.expression.partition import (
+    SnowflakeAlterTableClusteringStatement,
     SnowflakeClusterByClause,
     SnowflakeExternalPartitionClause,
 )
@@ -880,6 +881,13 @@ def register_specials():
     register_special_constructor(
         "partition.SnowflakeExternalPartitionClause",
         lambda d: SnowflakeExternalPartitionClause(d, [Column(d, "c1")]),
+    )
+    # The clustering-maintenance statement names a table by object, not a
+    # string; the generic constructor supplies a bare string, so register a real
+    # one. No clause -> DROP CLUSTERING KEY, a valid render.
+    register_special_constructor(
+        "partition.SnowflakeAlterTableClusteringStatement",
+        lambda d: SnowflakeAlterTableClusteringStatement(d, _table_obj(d, "t")),
     )
     register_special_constructor(
         "ddl.pipe.SnowflakeCreatePipeStatement",
