@@ -33,6 +33,9 @@ class SnowflakeClusterByClause(BaseExpression):
     Applies to standard (and materialized-view) DDL, not to declarative
     partitioning. Carries the clustering key expressions; SQL generation is
     delegated to ``dialect.format_cluster_by_clause``.
+
+    The node only collects parameters. Whether the collected keys are usable
+    (non-empty, expression instances) is decided by the formatter, not here.
     """
 
     def __init__(
@@ -41,14 +44,6 @@ class SnowflakeClusterByClause(BaseExpression):
         keys: Sequence[BaseExpression],
     ):
         super().__init__(dialect)
-        if not keys:
-            raise ValueError("CLUSTER BY requires at least one clustering key")
-        for key in keys:
-            if not isinstance(key, BaseExpression):
-                raise TypeError(
-                    "clustering keys must be BaseExpression instances, "
-                    f"got {type(key).__name__}"
-                )
         self.keys = list(keys)
 
     @property
@@ -66,6 +61,9 @@ class SnowflakeExternalPartitionClause(BaseExpression):
     the bare list; it is deliberately **not** a generic ``PartitionClause``,
     because its shape (no method) differs from declarative partitioning.
     SQL generation is delegated to ``dialect.format_external_partition_clause``.
+
+    The node only collects parameters; the formatter decides whether the
+    collected columns are usable.
     """
 
     def __init__(
@@ -74,14 +72,6 @@ class SnowflakeExternalPartitionClause(BaseExpression):
         columns: Sequence[BaseExpression],
     ):
         super().__init__(dialect)
-        if not columns:
-            raise ValueError("PARTITION BY requires at least one partition column")
-        for column in columns:
-            if not isinstance(column, BaseExpression):
-                raise TypeError(
-                    "partition columns must be BaseExpression instances, "
-                    f"got {type(column).__name__}"
-                )
         self.columns = list(columns)
 
     @property

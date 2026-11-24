@@ -104,10 +104,23 @@ class SnowflakePartitionMixin(PartitionMixin):
 
         Returns:
             Tuple of (SQL string, parameters tuple).
+
+        Raises:
+            ValueError: if no partition column was collected, or a column is not
+                an expression instance. Validation lives here, not in the node.
         """
+        from rhosocial.activerecord.backend.expression.bases import BaseExpression
+
+        if not expr.columns:
+            raise ValueError("PARTITION BY requires at least one partition column")
         parts = []
         params = []
         for column in expr.columns:
+            if not isinstance(column, BaseExpression):
+                raise TypeError(
+                    "partition columns must be BaseExpression instances, "
+                    f"got {type(column).__name__}"
+                )
             column_sql, column_params = column.to_sql()
             parts.append(column_sql)
             params.extend(column_params)

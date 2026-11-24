@@ -32,10 +32,23 @@ class SnowflakeTableModifierMixin:
 
         Returns:
             Tuple of (SQL string, parameters tuple).
+
+        Raises:
+            ValueError: if no clustering key was collected, or a key is not an
+                expression instance. Validation lives here, not in the node.
         """
+        from rhosocial.activerecord.backend.expression.bases import BaseExpression
+
+        if not expr.keys:
+            raise ValueError("CLUSTER BY requires at least one clustering key")
         parts = []
         params = []
         for key in expr.keys:
+            if not isinstance(key, BaseExpression):
+                raise TypeError(
+                    "clustering keys must be BaseExpression instances, "
+                    f"got {type(key).__name__}"
+                )
             key_sql, key_params = key.to_sql()
             parts.append(key_sql)
             params.extend(key_params)

@@ -15,7 +15,7 @@ from rhosocial.activerecord.backend.dialect import PartitionSupport
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 from rhosocial.activerecord.backend.expression.statements import (
-    PartitionByRangeClause, PartitionClause,
+    PartitionByRangeClause,
 )
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.mixins import SnowflakePartitionMixin
@@ -111,8 +111,10 @@ class TestSnowflakeClusterByClause:
         assert sql == ' CLUSTER BY ("date", "id")'
 
     def test_cluster_by_requires_keys(self, dialect):
+        # The node collects parameters only; the formatter refuses an empty list.
+        clause = SnowflakeClusterByClause(dialect, [])
         with pytest.raises(ValueError, match="at least one clustering key"):
-            SnowflakeClusterByClause(dialect, [])
+            clause.to_sql()
 
 
 class TestSnowflakeExternalPartitionClause:
@@ -132,5 +134,7 @@ class TestSnowflakeExternalPartitionClause:
         assert sql == ' PARTITION BY ("col1", "col2")'
 
     def test_external_partition_requires_columns(self, dialect):
+        # The node collects parameters only; the formatter refuses an empty list.
+        clause = SnowflakeExternalPartitionClause(dialect, [])
         with pytest.raises(ValueError, match="at least one partition column"):
-            SnowflakeExternalPartitionClause(dialect, [])
+            clause.to_sql()
