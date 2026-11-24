@@ -33,9 +33,6 @@ class SnowflakeClusterByClause(BaseExpression):
     Applies to standard (and materialized-view) DDL, not to declarative
     partitioning. Carries the clustering key expressions; SQL generation is
     delegated to ``dialect.format_cluster_by_clause``.
-
-    The node only collects parameters. Whether the collected keys are usable
-    (non-empty, expression instances) is decided by the formatter, not here.
     """
 
     def __init__(
@@ -61,9 +58,6 @@ class SnowflakeExternalPartitionClause(BaseExpression):
     the bare list; it is deliberately **not** a generic ``PartitionClause``,
     because its shape (no method) differs from declarative partitioning.
     SQL generation is delegated to ``dialect.format_external_partition_clause``.
-
-    The node only collects parameters; the formatter decides whether the
-    collected columns are usable.
     """
 
     def __init__(

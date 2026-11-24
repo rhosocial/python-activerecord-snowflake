@@ -107,7 +107,7 @@ class SnowflakePartitionMixin(PartitionMixin):
 
         Raises:
             ValueError: if no partition column was collected, or a column is not
-                an expression instance. Validation lives here, not in the node.
+                an expression instance.
         """
         from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
