@@ -402,8 +402,12 @@ class SnowflakeCapabilityMixin:
         spec = " ".join(parts)
         return f"MODIFY COLUMN {self.format_identifier(col.name)} {spec}", ()
 
-    def supports_alter_column_properties(self) -> bool:
+    def supports_alter_column_default(self) -> bool:
         """Snowflake has no independent ALTER COLUMN SET DEFAULT clause."""
+        return False
+
+    def supports_alter_column_nullability(self) -> bool:
+        """Snowflake re-spells column changes through MODIFY COLUMN."""
         return False
 
     def supports_alter_table_index_actions(self) -> bool:
