@@ -641,6 +641,19 @@ def register_specials():
         "statements.ddl_alter.AddColumnAction",
         lambda d: ddl_alter.AddColumnAction(d, _integer_column(d)),
     )
+    # ALTER COLUMN carries ``operation`` as the enum *or* its raw spelling, and
+    # the generic constructor reads that annotation as free text and fills it
+    # with "x" -- a word no grammar defines. The formatter refuses such a word
+    # by name, so the row would only pin the refusal; a real operation makes it
+    # exercise the newly renderable action instead. The spelling (not the enum
+    # member) is deliberate: the three artifact channels write a ``(str, Enum)``
+    # member as its value and read it back as a plain string, and that type
+    # difference is core's recorded serialization gap for other enums. A raw
+    # spelling keeps the row out of that gap table while rendering identically.
+    register_special_constructor(
+        "statements.ddl_alter.AlterColumnAction",
+        lambda d: ddl_alter.AlterColumnAction(d, "c", "DROP NOT NULL"),
+    )
     register_special_constructor(
         "statements.ddl_alter.ModifyColumnAction",
         lambda d: ddl_alter.ModifyColumnAction(d, _integer_column(d)),

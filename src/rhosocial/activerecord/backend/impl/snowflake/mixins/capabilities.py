@@ -449,18 +449,57 @@ class SnowflakeCapabilityMixin:
             elif isinstance(branch, ColumnDefaultConstraint) and branch.value is not None:
                 from rhosocial.activerecord.backend.expression.core import Literal
 
-                lit_sql, lit_params = Literal(self, branch.value).to_sql()
+                # A DDL position accepts no bind parameters: the value has to
+                # be written into the statement text, escaped and quoted the
+                # way ``DEFAULT`` does everywhere else. Without ``inline=True``
+                # this renders ``DEFAULT %s`` and discards the parameters,
+                # which is an unexecutable column re-specification.
+                lit_sql, _ = Literal(self, branch.value, inline=True).to_sql()
                 parts.append(f"DEFAULT {lit_sql}")
         spec = " ".join(parts)
         return f"MODIFY COLUMN {self.format_identifier(col.name)} {spec}", ()
 
     def supports_alter_column_default(self) -> bool:
-        """Snowflake has no independent ALTER COLUMN SET DEFAULT clause."""
-        return False
+        """Snowflake spells DROP DEFAULT and a sequence-only SET DEFAULT.
+
+        The reference grammar for ``ALTER TABLE ... ALTER COLUMN`` carries both
+        as native column actions::
+
+            [ COLUMN ] <col1_name> DROP DEFAULT
+            [ COLUMN ] <col1_name> SET DEFAULT <seq_name>.NEXTVAL
+
+        so the clause exists and the probe answers ``True``. ``SET DEFAULT`` is
+        narrower than core's action, though: the same reference lists "Change
+        the default for a column, unless the default is a sequence" and "Add a
+        default for a column" as unsupported, and the usage notes say the column
+        must already have a sequence default. Adding a default, or replacing a
+        non-sequence one, needs the full column re-specification ``MODIFY
+        COLUMN <col> <type> [ DEFAULT <value> ] ...``, which carries the type an
+        ``ALTER COLUMN`` action does not. The formatter refuses that request by
+        name instead of rendering a ``SET DEFAULT`` the server rejects.
+
+        https://docs.snowflake.com/en/sql-reference/sql/alter-table-column
+        """
+        return True
 
     def supports_alter_column_nullability(self) -> bool:
-        """Snowflake re-spells column changes through MODIFY COLUMN."""
-        return False
+        """Snowflake changes nullability on the column itself.
+
+        The reference grammar carries it as one ``ALTER COLUMN`` action --
+        ``[ COLUMN ] <col1_name> { [ SET ] NOT NULL | DROP NOT NULL }`` -- and
+        the action table lists "Change the nullability of a column (i.e. ``SET
+        NOT NULL`` or ``DROP NOT NULL``)" as supported. Core renders exactly
+        those two spellings, so the probe answers ``True``.
+
+        Runtime data state can still make a valid request fail: setting
+        ``NOT NULL`` errors when the column holds NULLs, and ARRAY, OBJECT and
+        VARIANT columns cannot be set ``NOT NULL`` unless the table is empty.
+        Those are the server's evaluation of an existing clause, not an absent
+        spelling.
+
+        https://docs.snowflake.com/en/sql-reference/sql/alter-table-column
+        """
+        return True
 
     def supports_alter_table_index_actions(self) -> bool:
         """Snowflake has no traditional indexes."""
