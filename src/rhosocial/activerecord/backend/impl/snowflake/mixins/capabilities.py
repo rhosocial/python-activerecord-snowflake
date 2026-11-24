@@ -76,11 +76,24 @@ class SnowflakeCapabilityMixin:
         return True
 
     def supports_if_not_exists_view(self) -> bool:
-        """Snowflake supports CREATE VIEW IF NOT EXISTS."""
+        """Snowflake supports CREATE VIEW IF NOT EXISTS.
+
+        The reference grammar carries ``[ IF NOT EXISTS ]`` after ``VIEW``.
+        ``OR REPLACE`` and ``IF NOT EXISTS`` are mutually exclusive, which
+        core's create-view formatter does not pair; this dialect advertises
+        both clauses individually.
+
+        https://docs.snowflake.com/en/sql-reference/sql/create-view
+        """
         return True
 
     def supports_if_exists_view(self) -> bool:
-        """Snowflake supports DROP VIEW IF EXISTS."""
+        """Snowflake supports DROP VIEW IF EXISTS.
+
+        The reference grammar is ``DROP VIEW [ IF EXISTS ] <name>``.
+
+        https://docs.snowflake.com/en/sql-reference/sql/drop-view
+        """
         return True
 
     def supports_introspection(self) -> bool:
@@ -106,6 +119,39 @@ class SnowflakeCapabilityMixin:
     def supports_indexes(self) -> bool:
         """Snowflake supports indexes (clustering keys and search optimization)."""
         return True
+
+    def supports_index_if_not_exists(self) -> bool:
+        """Snowflake's ``CREATE INDEX IF NOT EXISTS`` is hybrid-table only.
+
+        The reference grammar does carry the clause --
+        ``CREATE [ OR REPLACE ] INDEX [ IF NOT EXISTS ] <index_name> ON
+        <table_name> (...)`` -- but the statement applies *only* to
+        secondary indexes on hybrid tables; an ordinary Snowflake table
+        has no ``CREATE INDEX`` at all. This dialect models no hybrid table
+        (``CREATE HYBRID TABLE`` is not among its statements), so there is
+        no index this backend can render on which the qualifier would be
+        accepted. Answering ``False`` keeps the shared formatter from
+        emitting a clause for an object kind this dialect cannot name;
+        the clause itself is not in doubt.
+
+        https://docs.snowflake.com/en/sql-reference/sql/create-index
+        """
+        return False
+
+    def supports_index_if_exists(self) -> bool:
+        """Snowflake's ``DROP INDEX IF EXISTS`` is hybrid-table only.
+
+        The reference grammar is ``DROP INDEX [ IF EXISTS ]
+        <table_name>.<index_name>`` -- again restricted to secondary indexes
+        on hybrid tables, and the name is *table-qualified*, which the shared
+        ``DROP INDEX`` formatter does not spell (this dialect answers
+        :meth:`supports_drop_index_on_table` ``False``). Claiming the
+        qualifier would only decorate a statement that is already not
+        Snowflake's grammar, so the fail-closed answer stays ``False``.
+
+        https://docs.snowflake.com/en/sql-reference/sql/drop-index
+        """
+        return False
 
     def supports_drop_index_on_table(self) -> bool:
         """Snowflake drops indexes/search-optimization by name (no ON <table>)."""
@@ -337,7 +383,13 @@ class SnowflakeCapabilityMixin:
         return True
 
     def supports_if_exists_table(self) -> bool:
-        """Snowflake supports DROP TABLE IF EXISTS."""
+        """Snowflake supports DROP TABLE IF EXISTS.
+
+        The reference grammar is ``DROP TABLE [ IF EXISTS ] <name>
+        [ CASCADE | RESTRICT ]``.
+
+        https://docs.snowflake.com/en/sql-reference/sql/drop-table
+        """
         return True
 
     def supports_drop_table_cascade(self) -> bool:

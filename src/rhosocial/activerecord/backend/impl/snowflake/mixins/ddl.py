@@ -5,10 +5,12 @@ from typing import Tuple
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression.statements import (
+    AutoIncrementClause,
     ColumnDefaultConstraint,
     ColumnForeignKeyConstraint,
     ColumnPrimaryKeyConstraint,
     ColumnUniqueConstraint,
+    IdentityClause,
 )
 
 
@@ -21,8 +23,12 @@ class SnowflakeAlterColumnModifierMixin:
     Restriction: ``ADD COLUMN IF NOT EXISTS`` cannot be combined with
     DEFAULT/AUTOINCREMENT/IDENTITY/UNIQUE/PRIMARY KEY/FOREIGN KEY on the
     same column (per Snowflake documentation). When ``if_not_exists`` is
-    requested together with one of those constraints,
-    ``UnsupportedFeatureError`` is raised.
+    requested together with one of those, ``UnsupportedFeatureError`` is
+    raised. IDENTITY and AUTOINCREMENT are column *clauses* carried in
+    ``ColumnDefinition.attributes``, not constraints, so they are checked
+    separately.
+
+    https://docs.snowflake.com/en/sql-reference/sql/alter-table
     """
 
     def supports_add_column_if_not_exists(self) -> bool:
@@ -34,7 +40,16 @@ class SnowflakeAlterColumnModifierMixin:
         return True
 
     def supports_drop_constraint_if_exists(self) -> bool:
-        """Snowflake does **not** support ``DROP CONSTRAINT IF EXISTS``."""
+        """Snowflake does **not** support ``DROP CONSTRAINT IF EXISTS``.
+
+        The ``constraintAction`` grammar is ``DROP { CONSTRAINT
+        <constraint_name> | PRIMARY KEY | UNIQUE | FOREIGN KEY ( <col_name>
+        ... ) } [ CASCADE | RESTRICT ]`` -- there is no ``IF EXISTS``
+        qualifier on any branch, so the formatter refuses the request by
+        name instead of dropping it.
+
+        https://docs.snowflake.com/en/sql-reference/sql/alter-table
+        """
         return False
 
     def supports_column_comment(self) -> bool:
@@ -52,16 +67,23 @@ class SnowflakeAlterColumnModifierMixin:
         if getattr(expr, "if_not_exists", None) is True:
             # The kinds Snowflake's documented restriction names: DEFAULT,
             # IDENTITY (which ``AUTO_INCREMENT`` is a spelling of here), PRIMARY
-            # KEY, FOREIGN KEY and UNIQUE.  The kind is the *branch class* now --
-            # ``ColumnConstraintType`` is gone -- so the set is a set of classes.
+            # KEY, FOREIGN KEY and UNIQUE.  The constraint kinds are the
+            # *branch classes* now -- ``ColumnConstraintType`` is gone -- so the
+            # set is a set of classes.  IDENTITY/AUTOINCREMENT are column
+            # clauses in ``ColumnDefinition.attributes``, not constraints, so
+            # they are tested separately.
             forbidden = {
                 ColumnDefaultConstraint,
                 ColumnPrimaryKeyConstraint,
                 ColumnForeignKeyConstraint,
                 ColumnUniqueConstraint,
             }
+            identity_clauses = (IdentityClause, AutoIncrementClause)
             if any(
                 type(c.branch) in forbidden for c in expr.column.constraints
+            ) or any(
+                isinstance(attribute, identity_clauses)
+                for attribute in expr.column.attributes
             ):
                 raise UnsupportedFeatureError(
                     self.name,

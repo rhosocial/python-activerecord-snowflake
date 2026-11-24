@@ -4,8 +4,12 @@ import pytest
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression import CreateTableStatement
-from rhosocial.activerecord.backend.expression.objects import Table
+from rhosocial.activerecord.backend.expression.objects import Table, View
 from rhosocial.activerecord.backend.expression.statements import ColumnDefinition
+from rhosocial.activerecord.backend.expression.statements import (
+    CreateTableOptions,
+    DropViewStatement,
+)
 from rhosocial.activerecord.backend.expression.types import IntegerType
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 
@@ -27,6 +31,14 @@ class TestSnowflakeViewCapabilityGating:
         """Snowflake supports DROP VIEW IF EXISTS."""
         dialect = SnowflakeDialect()
         assert dialect.supports_if_exists_view() is True
+
+    def test_drop_view_if_exists_renders_qualifier(self):
+        """The shared DROP VIEW renderer emits the documented clause."""
+        dialect = SnowflakeDialect(version=(8, 0, 0))
+        statement = DropViewStatement(dialect, View(dialect, "v"), if_exists=True)
+        sql, params = statement.to_sql()
+        assert sql == 'DROP VIEW IF EXISTS "v"'
+        assert params == ()
 
     def test_materialized_view_supported(self):
         """Snowflake supports native materialized views."""
@@ -97,4 +109,43 @@ class TestSnowflakeTableDeclarationGating:
         )
         assert expression.tablespace == "ts_data"
         with pytest.raises(UnsupportedFeatureError, match="TABLESPACE"):
+            expression.to_sql()
+
+
+class TestSnowflakeCreateTableIfNotExists:
+    """Snowflake accepts ``CREATE TABLE IF NOT EXISTS``.
+
+    The reference grammar carries the clause with no version floor, and
+    ``OR REPLACE`` / ``IF NOT EXISTS`` are mutually exclusive.
+    https://docs.snowflake.com/en/sql-reference/sql/create-table
+    """
+
+    def test_probe_is_true(self):
+        dialect = SnowflakeDialect(version=(8, 0, 0))
+        assert dialect.supports_if_not_exists_table() is True
+
+    def test_if_not_exists_renders_qualifier(self):
+        dialect = SnowflakeDialect(version=(8, 0, 0))
+        expression = CreateTableStatement(
+            dialect,
+            Table(dialect, "t"),
+            [ColumnDefinition(dialect, "id", IntegerType(dialect))],
+            if_not_exists=True,
+        )
+        sql, params = expression.to_sql()
+        assert sql == 'CREATE TABLE IF NOT EXISTS "t" ("id" INTEGER)'
+        assert params == ()
+
+    def test_or_replace_with_if_not_exists_is_refused_by_name(self):
+        dialect = SnowflakeDialect(version=(8, 0, 0))
+        expression = CreateTableStatement(
+            dialect,
+            Table(dialect, "t"),
+            [ColumnDefinition(dialect, "id", IntegerType(dialect))],
+            if_not_exists=True,
+            table_options=CreateTableOptions(dialect, or_replace=True),
+        )
+        with pytest.raises(
+            UnsupportedFeatureError, match="CREATE OR REPLACE TABLE IF NOT EXISTS"
+        ):
             expression.to_sql()

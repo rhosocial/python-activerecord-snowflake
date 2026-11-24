@@ -10,17 +10,19 @@ import pytest
 
 from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression.statements import (
+    AutoIncrementClause,
     ColumnConstraint,
     ColumnDefaultConstraint,
     ColumnDefinition,
     ColumnNotNullConstraint,
+    IdentityClause,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_alter import (
     AddColumnAction,
     DropColumnAction,
     DropTableConstraintAction,
 )
-from rhosocial.activerecord.backend.expression.types import TextType, VarCharType
+from rhosocial.activerecord.backend.expression.types import IntegerType, TextType, VarCharType
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 
 
@@ -83,6 +85,49 @@ class TestSnowflakeAddColumnIfNotExists:
         )
         with pytest.raises(UnsupportedFeatureError):
             action.to_sql()
+
+    def test_if_not_exists_with_identity_raises(self, dialect):
+        """The reference also forbids IDENTITY/AUTOINCREMENT with the clause."""
+        action = AddColumnAction(
+            dialect,
+            ColumnDefinition(
+                dialect,
+                "id",
+                IntegerType(dialect),
+                attributes=[IdentityClause(dialect, start=1, increment=1)],
+            ),
+            if_not_exists=True,
+        )
+        with pytest.raises(UnsupportedFeatureError):
+            action.to_sql()
+
+    def test_if_not_exists_with_autoincrement_raises(self, dialect):
+        action = AddColumnAction(
+            dialect,
+            ColumnDefinition(
+                dialect,
+                "id",
+                IntegerType(dialect),
+                attributes=[AutoIncrementClause(dialect)],
+            ),
+            if_not_exists=True,
+        )
+        with pytest.raises(UnsupportedFeatureError):
+            action.to_sql()
+
+    def test_identity_without_if_not_exists_renders(self, dialect):
+        """The restriction belongs to the qualifier, not to IDENTITY itself."""
+        action = AddColumnAction(
+            dialect,
+            ColumnDefinition(
+                dialect,
+                "id",
+                IntegerType(dialect),
+                attributes=[IdentityClause(dialect, start=1, increment=1)],
+            ),
+        )
+        sql, _ = action.to_sql()
+        assert sql == 'ADD COLUMN "id" INTEGER IDENTITY(1, 1)'
 
     def test_none_renders_plain_form(self, dialect):
         action = AddColumnAction(dialect, ColumnDefinition(dialect, "content", TextType(dialect)))

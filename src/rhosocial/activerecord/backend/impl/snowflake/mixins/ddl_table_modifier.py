@@ -27,6 +27,49 @@ class SnowflakeTableModifierMixin:
         """Snowflake supports CREATE OR REPLACE TABLE."""
         return True
 
+    def supports_if_not_exists_table(self) -> bool:
+        """Snowflake accepts ``CREATE TABLE IF NOT EXISTS``.
+
+        The reference grammar is ``CREATE [ OR REPLACE ] [ ... ] TABLE
+        [ IF NOT EXISTS ] <name>``. There is no version floor: the clause is
+        part of the statement on every server this dialect targets. It is
+        declared here rather than left to core's ``CreateTableMixin``, whose
+        default answers ``False``.
+
+        ``OR REPLACE`` and ``IF NOT EXISTS`` are mutually exclusive -- the
+        reference's usage notes say they "can't both be used in the same
+        statement" -- so the formatter refuses the pair by name rather than
+        emitting SQL the server rejects.
+
+        https://docs.snowflake.com/en/sql-reference/sql/create-table
+        """
+        return True
+
+    def format_create_table_statement(self, expr) -> Tuple[str, tuple]:
+        """Refuse ``CREATE OR REPLACE TABLE IF NOT EXISTS`` by name.
+
+        Snowflake accepts either header qualifier alone and never both; see
+        :meth:`supports_if_not_exists_table`. Only the pairing is checked here,
+        so every other CREATE TABLE form keeps the shared rendering.
+        """
+        from rhosocial.activerecord.backend.dialect.exceptions import (
+            UnsupportedFeatureError,
+        )
+
+        options = getattr(expr, "table_options", None)
+        if getattr(expr, "if_not_exists", False) and getattr(
+            options, "or_replace", False
+        ):
+            raise UnsupportedFeatureError(
+                self.name,
+                "CREATE OR REPLACE TABLE IF NOT EXISTS",
+                suggestion=(
+                    "Snowflake's OR REPLACE and IF NOT EXISTS clauses are "
+                    "mutually exclusive; request one of them, not both."
+                ),
+            )
+        return super().format_create_table_statement(expr)
+
     def format_cluster_by_clause(self, expr: "SnowflakeClusterByClause") -> Tuple[str, tuple]:
         """Format ``CLUSTER BY ( <expr> [, ...] )`` clustering keys.
 
