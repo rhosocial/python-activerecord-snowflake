@@ -3,12 +3,15 @@
 
 The shared ALTER TABLE formatter comma-joins actions when the dialect's
 ``supports_multi_action_alter_table()`` probe is True. Snowflake's grammar has
-no such comma-separated action list, so the dialect answers False and core
-emits one statement per action instead.
+no such comma-separated action list, so the dialect answers False. Rendering a
+multi-action statement on such a dialect now fails fast with
+``UnsupportedFeatureError`` rather than semicolon-joining several statements
+into one unexecutable string. A single-action statement still renders normally.
 """
 
 import pytest
 
+from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression.objects import Table
 from rhosocial.activerecord.backend.expression.statements import (
     AlterTableStatement,
@@ -27,6 +30,14 @@ def dialect():
     return SnowflakeDialect(version=(8, 0, 0))
 
 
+def _single_action_statement(dialect):
+    return AlterTableStatement(
+        dialect,
+        Table(dialect, "t"),
+        [AddColumnAction(dialect, ColumnDefinition(dialect, "c1", IntegerType(dialect)))],
+    )
+
+
 def _two_action_statement(dialect):
     return AlterTableStatement(
         dialect,
@@ -42,13 +53,13 @@ class TestSnowflakeMultiActionAlterTable:
     def test_probe_is_false(self, dialect):
         assert dialect.supports_multi_action_alter_table() is False
 
-    def test_two_actions_are_not_comma_joined(self, dialect):
-        sql, params = _two_action_statement(dialect).to_sql()
+    def test_two_actions_are_refused(self, dialect):
+        with pytest.raises(UnsupportedFeatureError, match="multiple actions"):
+            _two_action_statement(dialect).to_sql()
 
-        assert (
-            sql
-            == 'ALTER TABLE "t" ADD COLUMN "c1" INTEGER; ALTER TABLE "t" DROP COLUMN "c2"'
-        )
-        assert sql.count("ALTER TABLE") == 2
-        assert ", DROP COLUMN" not in sql
+    def test_single_action_renders_normally(self, dialect):
+        sql, params = _single_action_statement(dialect).to_sql()
+
+        assert sql == 'ALTER TABLE "t" ADD COLUMN "c1" INTEGER'
+        assert sql.count("ALTER TABLE") == 1
         assert params == ()
