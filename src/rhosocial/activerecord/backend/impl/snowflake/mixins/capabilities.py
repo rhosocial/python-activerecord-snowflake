@@ -348,6 +348,21 @@ class SnowflakeCapabilityMixin:
         """Snowflake changes a column type in place via MODIFY COLUMN."""
         return True
 
+    def supports_multi_action_alter_table(self) -> bool:
+        """Snowflake accepts exactly one action per ALTER TABLE statement.
+
+        The reference grammar for ``ALTER TABLE`` is one ``tableAction`` (or
+        one ``tableColumnAction``) per command; there is no comma-separated
+        list of actions as some other engines allow. Core's shared ALTER TABLE
+        formatter reads this probe: with the inherited ``True`` it comma-joins
+        two or more actions into a single statement the server rejects.
+        Answering ``False`` makes core emit one statement per action instead,
+        which is the shape Snowflake's grammar accepts.
+
+        https://docs.snowflake.com/en/sql-reference/sql/alter-table
+        """
+        return False
+
     def alter_column_type_action(self, old_col, new_col):
         """Build the in-place type-change action (MODIFY COLUMN)."""
         from rhosocial.activerecord.backend.expression.statements.ddl_alter import ModifyColumnAction
