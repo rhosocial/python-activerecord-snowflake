@@ -62,6 +62,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
 )
 from rhosocial.activerecord.backend.suggestion.protocols import (
     ColumnTypeSuggestionSupport,
+    CreateTableLayoutSuggestionSupport,
     DataTypeSuggestionSupport,
     StringConcatenationSuggestionSupport,
 )
@@ -190,11 +191,14 @@ from .mixins import (
     SnowflakeLiteralValueMixin,
     SnowflakeIntegerAutoIncrementColumnSuggestionMixin,
     SnowflakeStringConcatenationSuggestionMixin,
+    SnowflakeCreateTableLayoutSuggestionMixin,
 )
 
 
 class SnowflakeDialect(
-    # Backend suggestion first: no core mixin may shadow its answer.
+    # Backend suggestion first: no core mixin may shadow its answer. The layout
+    # answer is assembled from this dialect's own capability probes below.
+    SnowflakeCreateTableLayoutSuggestionMixin,
     SnowflakeIntegerAutoIncrementColumnSuggestionMixin,
     # Core's concatenation formatter asks the dialect for its spelling; this
     # answer must precede core's ExpressionMixin (below).
@@ -362,6 +366,7 @@ class SnowflakeDialect(
     # answers how it is stored. The mixin (above) supplies the table; the
     # suggestion protocol records that this dialect answers the question at all.
     ColumnTypeSuggestionSupport,
+    CreateTableLayoutSuggestionSupport,
     DataTypeSuggestionSupport,
     StringConcatenationSuggestionSupport,
     CTESupport,
