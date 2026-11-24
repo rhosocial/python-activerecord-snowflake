@@ -45,7 +45,6 @@ from rhosocial.activerecord.backend.expression.statements import (
 )
 from rhosocial.activerecord.backend.expression.types import IntegerType
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
-from rhosocial.activerecord.base import IdentityAttribute
 
 
 @pytest.fixture
@@ -109,11 +108,11 @@ class TestIdentityRendering:
         assert sql == " IDENTITY(1, 1)"
 
     def test_rendered_in_a_column_definition(self, dialect):
-        col = _column(dialect, [IdentityAttribute(start=5, increment=2)])
+        col = _column(dialect, [_identity(dialect, start=5, increment=2)])
         assert col.to_sql() == ('"id" INTEGER IDENTITY(5, 2)', ())
 
     def test_column_attribute_defaults(self, dialect):
-        col = _column(dialect, [IdentityAttribute()])
+        col = _column(dialect, [_identity(dialect)])
         assert col.to_sql() == ('"id" INTEGER IDENTITY(1, 1)', ())
 
 
@@ -173,7 +172,7 @@ class TestRefusedOptions:
     def test_column_attribute_always_is_refused(self, dialect):
         col = _column(
             dialect,
-            [IdentityAttribute(generation="ALWAYS", start=10, increment=2)],
+            [_identity(dialect, generation="ALWAYS", start=10, increment=2)],
         )
         with pytest.raises(UnsupportedFeatureError) as exc_info:
             col.to_sql()
