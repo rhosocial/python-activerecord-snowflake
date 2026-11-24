@@ -94,7 +94,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
 )
 from rhosocial.activerecord.backend.suggestion.protocols import (
     ColumnTypeSuggestionSupport,
-    IntegerAutoIncrementColumnSuggestionSupport,
+    GeneratedValueSuggestionSupport,
 )
 
 
@@ -110,7 +110,7 @@ SNOWFLAKE_PROTOCOLS = [
     # the dialect can answer the question, not that every answer is "yes".
     AutoIncrementColumnSupport,
     IdentityColumnSupport,
-    IntegerAutoIncrementColumnSuggestionSupport,
+    GeneratedValueSuggestionSupport,
     DatabaseAssignedColumnSupport,
     CollationSupport,
     CTESupport,

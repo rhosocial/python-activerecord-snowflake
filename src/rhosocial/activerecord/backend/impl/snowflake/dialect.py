@@ -189,7 +189,7 @@ from .mixins import (
     SnowflakeTruncateMixin,
     SnowflakeWildcardMixin,
     SnowflakeLiteralValueMixin,
-    SnowflakeIntegerAutoIncrementColumnSuggestionMixin,
+    SnowflakeGeneratedValueSuggestionMixin,
     SnowflakeStringConcatenationSuggestionMixin,
     SnowflakeCreateTableLayoutSuggestionMixin,
 )
@@ -199,7 +199,7 @@ class SnowflakeDialect(
     # Backend suggestion first: no core mixin may shadow its answer. The layout
     # answer is assembled from this dialect's own capability probes below.
     SnowflakeCreateTableLayoutSuggestionMixin,
-    SnowflakeIntegerAutoIncrementColumnSuggestionMixin,
+    SnowflakeGeneratedValueSuggestionMixin,
     # Core's concatenation formatter asks the dialect for its spelling; this
     # answer must precede core's ExpressionMixin (below).
     SnowflakeStringConcatenationSuggestionMixin,

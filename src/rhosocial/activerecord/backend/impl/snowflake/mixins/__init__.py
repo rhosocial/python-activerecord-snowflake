@@ -9,7 +9,7 @@ undrop, materialized view, table modifiers support.
 """
 
 from .create_table_layout_suggestion import SnowflakeCreateTableLayoutSuggestionMixin
-from .integer_auto_increment_column_suggestion import SnowflakeIntegerAutoIncrementColumnSuggestionMixin
+from .generated_value_suggestion import SnowflakeGeneratedValueSuggestionMixin
 from .string_concatenation_suggestion import SnowflakeStringConcatenationSuggestionMixin
 from .array import SnowflakeArrayMixin
 from .backend import SnowflakeBackendMixin
@@ -63,7 +63,7 @@ from .sequence import SnowflakeSequenceMixin
 
 __all__ = [
     'SnowflakeCreateTableLayoutSuggestionMixin',
-    'SnowflakeIntegerAutoIncrementColumnSuggestionMixin',
+    'SnowflakeGeneratedValueSuggestionMixin',
     'SnowflakeStringConcatenationSuggestionMixin',
     "SnowflakeArrayMixin",
     "SnowflakeBackendMixin",
