@@ -6,8 +6,9 @@ declaration. Snowflake can express none of them with the expression nodes this
 backend actually owns:
 
 * column reorder -- no column-position clause in ``ALTER TABLE``;
-* constraint change -- no reconstructible node from the frozen projections and
-  no ``DROP CONSTRAINT IF EXISTS``;
+* constraint change -- the enriched declarations can build ``ADD CONSTRAINT``,
+  but there is no two-anchor IF EXISTS / IF NOT EXISTS gate, no drop-by-kind
+  node, and CHECK must be named;
 * index change -- plain index DDL is hybrid-table-only and unmodelled;
 * partition scheme change -- partitioning is AUTOMATIC (micro-partitions),
   and ``CLUSTER BY`` is clustering, not partition DDL.
@@ -15,17 +16,43 @@ backend actually owns:
 Each answer is therefore the tri-state ``False`` (unaddressable), never ``None``
 (absent) and never a guessed chain. The tests pin the value, the protocol
 registration, the MRO ownership of each method, and the evidence behind the
-refusal; no SQL is fabricated for any of the four.
+refusal; no SQL is fabricated for any of the four. Core's enriched declaration
+fields are checked explicitly: for the constraint point they remove the old
+"no node can be built" objection, so the remaining reason must be capability.
 """
 
 import inspect
 import sys
+from types import MappingProxyType
 
 import pytest
 
 from rhosocial.activerecord.backend.dialect.partition_capability import (
     PartitionCapability,
 )
+from rhosocial.activerecord.backend.expression import (
+    Column,
+    ComparisonPredicate,
+    IndexDefinition,
+    Literal,
+    TableCheckConstraint,
+    TableConstraint,
+    TablePrimaryKeyConstraint,
+    TableUniqueConstraint,
+)
+from rhosocial.activerecord.backend.expression.objects import Table
+from rhosocial.activerecord.backend.expression.statements.ddl_alter import (
+    AddTableConstraintAction,
+    AlterTableStatement,
+    DropTableConstraintAction,
+)
+from rhosocial.activerecord.backend.expression.statements.ddl_partition import (
+    PartitionClause,
+)
+from rhosocial.activerecord.backend.expression.statements.ddl_table import (
+    ColumnDefinition,
+)
+from rhosocial.activerecord.backend.expression.types import DataType
 from rhosocial.activerecord.backend.impl.snowflake.dialect import SnowflakeDialect
 from rhosocial.activerecord.backend.impl.snowflake.mixins import (
     SnowflakeColumnReorderSuggestionMixin,
@@ -182,25 +209,118 @@ def test_column_reorder_evidence(dialect):
 
 
 def test_constraint_change_evidence(dialect):
-    """ADD/DROP exist, but the frozen projections yield no constructible node."""
+    """ADD is renderable from live declarations; the blockers are capability."""
     assert dialect.supports_add_constraint() is True
     assert dialect.supports_drop_constraint() is True
     assert dialect.supports_drop_constraint_if_exists() is False
     assert dialect.supports_add_constraint_if_not_exists() is False
-    from rhosocial.activerecord.backend.expression.statements.ddl_alter import (
-        AddTableConstraintAction,
-        DropTableConstraintAction,
-    )
+    assert dialect.supports_drop_constraint_by_kind() is True
 
-    # The two existing nodes are by-value constraint / by-name drop; neither
-    # consumes a frozen ("params", ...) projection, so no chain can be built.
+    # The two existing nodes are by-value constraint / by-name drop. The first
+    # is fed by the enriched declarations; the second has no kind/columns field
+    # for the Snowflake-only drop-by-kind grammar.
     assert "constraint" in AddTableConstraintAction.__name__.lower()
     assert "constraint" in DropTableConstraintAction.__name__.lower()
+    params = inspect.signature(DropTableConstraintAction.__init__).parameters
+    assert "constraint_name" in params
+    assert not {"kind", "branch", "columns"} & set(params)
+    by_kind_doc = inspect.getdoc(dialect.supports_drop_constraint_by_kind)
+    assert "CHECK" in by_kind_doc and "constraint_name is required" in by_kind_doc
+
     doc = _module_doc(SnowflakeTableConstraintChangeSuggestionMixin)
     assert "sql/alter-table" in doc
     assert "create-table-constraint" in doc
     assert "IF EXISTS" in doc
-    assert "projections" in doc
+    assert "old_constraint_declarations" in doc
+    assert "new_constraint_declarations" in doc
+    assert "DropTableConstraintAction" in doc
+    assert "projection" not in doc.lower()
+
+
+def test_enriched_constraint_declarations_change_the_reason_not_the_answer(dialect):
+    """Live branches are present and ADD-able; the answer stays False on capability."""
+    check = ComparisonPredicate(dialect, "=", Column(dialect, "age"), Literal(dialect, 0))
+    old = (
+        TableConstraint(dialect, branch=TablePrimaryKeyConstraint(dialect, ["id"]), name="pk_t"),
+        TableConstraint(dialect, branch=TableCheckConstraint(dialect, check), name="ck_age"),
+    )
+    new = (
+        TableConstraint(dialect, branch=TableUniqueConstraint(dialect, ["email"]), name="uq_email"),
+    )
+    point = TableConstraintChangeSuggestion(
+        table_name="db.public.t",
+        old_constraints=(("params", {"name": "pk_t"}), ("params", {"name": "ck_age"})),
+        new_constraints=(("params", {"name": "uq_email"}),),
+        old_constraint_declarations=old,
+        new_constraint_declarations=new,
+    )
+
+    assert point.old_constraint_declarations == old
+    assert point.new_constraint_declarations == new
+    assert isinstance(old[0].branch, TablePrimaryKeyConstraint)
+    assert isinstance(old[1].branch, TableCheckConstraint)
+    assert isinstance(new[0].branch, TableUniqueConstraint)
+
+    # The enriched node is enough for a real ADD chain: no kind is lost any more.
+    statement = AlterTableStatement(
+        dialect,
+        Table(dialect, point.table_name),
+        [AddTableConstraintAction(dialect, new[0])],
+    )
+    assert statement.to_sql()[0] == (
+        'ALTER TABLE "db.public.t" ADD CONSTRAINT "uq_email" UNIQUE ("email")'
+    )
+    assert isinstance(statement.actions[0].constraint.branch, TableUniqueConstraint)
+
+    answer = dialect.suggest_table_constraint_change(point)
+    assert answer.operations is False
+    assert answer.state == "unaddressable"
+    assert answer.old_constraint_declarations == old
+    assert answer.new_constraint_declarations == new
+    # Capability, not the shape of the point, is the remaining blocker.
+    assert dialect.supports_add_constraint() is True
+    assert dialect.supports_drop_constraint_if_exists() is False
+    assert dialect.supports_add_constraint_if_not_exists() is False
+
+
+def test_enriched_fields_leave_the_other_three_answers_unchanged(dialect):
+    """The new declaration fields are carried through, never turned into actions."""
+    column = ColumnDefinition(dialect, "name", DataType.as_type(dialect, "VARCHAR(64)"))
+    fields = MappingProxyType({"name": column})
+    index = IndexDefinition(dialect, "ix_name", ["name"])
+    partition = PartitionClause(dialect, "HASH", [Column(dialect, "name")])
+    cases = (
+        (
+            ColumnReorderSuggestion,
+            "suggest_column_reorder",
+            {
+                "old_fields": fields,
+                "new_fields": fields,
+            },
+        ),
+        (
+            TableIndexChangeSuggestion,
+            "suggest_table_index_change",
+            {
+                "old_index_declarations": (index,),
+                "new_index_declarations": (),
+            },
+        ),
+        (
+            PartitionSchemeChangeSuggestion,
+            "suggest_partition_scheme_change",
+            {
+                "old_partition_declaration": None,
+                "new_partition_declaration": partition,
+            },
+        ),
+    )
+    for value_class, method, enriched in cases:
+        point = value_class(table_name="db.public.t", **POINTS[value_class], **enriched)
+        answer = getattr(dialect, method)(point)
+        assert answer.operations is False, method
+        for field_name, value in enriched.items():
+            assert getattr(answer, field_name) is value
 
 
 def test_index_change_evidence(dialect):
