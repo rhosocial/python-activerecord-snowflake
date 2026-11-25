@@ -16,6 +16,13 @@ Neither override changes the plain forms: a bare ``*`` and a bare ``COUNT(*)``
 render exactly as core renders them, and the qualifier/alias rule is core's (the
 name the query itself uses), so it is delegated rather than restated.
 
+Each position has one formatter and one formatter only: the two methods below
+share no private renderer, because the defect this file was split from was
+exactly a shared body reaching two independent spellings.  The grammar overlap
+(``*`` / ``rel.*``) is delegated to core's all-columns renderer inside each
+method; the Snowflake-only filter is written once per method, so a change to one
+position cannot move the other.
+
 **No capability probe sits behind the filter, and that is deliberate.**  The
 nodes that carry it (``impl/snowflake/expression/wildcard.py``) exist only in
 this backend, so there is no dialect that has the node and lacks the spelling --
@@ -30,7 +37,9 @@ https://docs.snowflake.com/en/sql-reference/sql/select ; nothing here was
 measured.
 """
 
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
+
+from rhosocial.activerecord.backend.expression.core import AllColumnsWildcard
 
 from ..expression.wildcard import (
     SnowflakeAllColumnsWildcard,
@@ -51,14 +60,15 @@ class SnowflakeWildcardMixin:
     keeps core's bare ``*`` and ``rel.*`` paths byte-identical.
     """
 
-    def format_all_columns_wildcard(
-        self, expr: "BaseExpression"
-    ) -> Tuple[str, tuple]:
+    def format_all_columns_wildcard(self, expr: "BaseExpression") -> Tuple[str, tuple]:
         """Render ``*`` / ``rel.*``, optionally followed by ``ILIKE`` / ``EXCLUDE``.
 
-        The asterisk half is core's, including the rule that the qualifier is the
-        spelling the query uses (the alias when aliased); this method only appends
-        the filter, so the two spellings cannot drift apart.
+        Self-contained: the asterisk half and the filter are both spelled here,
+        because this is the select-list position's own grammar.  The asterisk
+        half is delegated to core's all-columns renderer (through a core node
+        carrying the same relation) so the qualifier rule -- alias when aliased,
+        the qualified name otherwise -- is not restated; the filter is
+        Snowflake's, and this method is its only writer for this position.
 
         Args:
             expr: The wildcard being rendered.
@@ -69,15 +79,33 @@ class SnowflakeWildcardMixin:
         """
         if not isinstance(expr, SnowflakeAllColumnsWildcard):
             return super().format_all_columns_wildcard(expr)
-        return self._render_snowflake_wildcard(expr)
+
+        view = AllColumnsWildcard(self, relation=expr.relation)
+        sql, params = super().format_all_columns_wildcard(view)
+        params = tuple(params)
+
+        if expr.ilike is not None:
+            return f"{sql} ILIKE {self.inline_sql_literal(expr.ilike)}", params
+        if expr.exclude is not None:
+            if isinstance(expr.exclude, str):
+                suffix = f" EXCLUDE {self.format_identifier(expr.exclude)}"
+            else:
+                rendered = ", ".join(self.format_identifier(name) for name in expr.exclude)
+                suffix = f" EXCLUDE ({rendered})"
+            return f"{sql}{suffix}", params
+        return sql, params
 
     def format_row_count_wildcard(self, expr: "BaseExpression") -> Tuple[str, tuple]:
         """Render ``COUNT``'s argument: the bare ``*``, or Snowflake's qualified form.
 
         Core's node renders ``*`` and carries no relation; the Snowflake node adds
-        one, and the reference defines the result as a different number.  Both
-        forms go through the same body renderer, so the qualifier and the filter
-        are spelled once for the two positions.
+        one, and the reference defines the result as a different number.  The
+        body is spelled here rather than borrowed from the select-list position:
+        this formatter owns the row-count spelling outright, including the
+        ``*`` / ``rel.*`` body, so the two positions cannot drift together.  The
+        relation spelling itself is still delegated to core's all-columns
+        renderer, which is the single owner of "which name does this query call
+        the relation".
 
         Args:
             expr: The wildcard being rendered.
@@ -87,54 +115,21 @@ class SnowflakeWildcardMixin:
         """
         if not isinstance(expr, SnowflakeRowCountWildcard):
             return super().format_row_count_wildcard(expr)
-        return self._render_snowflake_wildcard(expr)
-
-    # ------------------------------------------------------------------
-    # The two pieces both positions share.
-    # ------------------------------------------------------------------
-
-    def _render_snowflake_wildcard(self, expr) -> Tuple[str, tuple]:
-        """The ``*`` / ``rel.*`` body plus whichever filter the node carries.
-
-        The node refuses ``ilike`` and ``exclude`` together at construction (the
-        reference says they cannot be combined), so this reads at most one.
-        """
-        sql, params = self._render_asterisk_body(expr)
-        if expr.ilike is not None:
-            pattern = self.inline_sql_literal(expr.ilike)
-            return f"{sql} ILIKE {pattern}", params
-        if expr.exclude is not None:
-            return f"{sql}{self._render_exclude_suffix(expr.exclude)}", params
-        return sql, params
-
-    def _render_asterisk_body(self, expr) -> Tuple[str, tuple]:
-        """The ``*`` or ``rel.*`` half.
-
-        Delegated to core's all-columns renderer, because "which name does this
-        query call the relation" is the same question in both positions and core
-        already answers it (alias when aliased, otherwise the qualified name).
-        The node is handed over as an ``AllColumnsWildcard``, so the rule is not
-        restated here where it could drift.
-        """
-        from rhosocial.activerecord.backend.expression.core import (
-            AllColumnsWildcard,
-        )
 
         view = AllColumnsWildcard(self, relation=expr.relation)
         sql, params = super().format_all_columns_wildcard(view)
-        return sql, tuple(params)
+        params = tuple(params)
 
-    def _render_exclude_suffix(self, exclude) -> str:
-        """`` EXCLUDE <col>`` or `` EXCLUDE (<c1>, <c2>)``.
-
-        The reference shows both shapes -- ``* EXCLUDE col`` and ``* EXCLUDE
-        (col1, col2)`` -- and writes a single name without parentheses.  Names
-        are identifier-quoted, because that is what they are.
-        """
-        if isinstance(exclude, str):
-            return f" EXCLUDE {self.format_identifier(exclude)}"
-        rendered = ", ".join(self.format_identifier(name) for name in exclude)
-        return f" EXCLUDE ({rendered})"
+        if expr.ilike is not None:
+            return f"{sql} ILIKE {self.inline_sql_literal(expr.ilike)}", params
+        if expr.exclude is not None:
+            if isinstance(expr.exclude, str):
+                suffix = f" EXCLUDE {self.format_identifier(expr.exclude)}"
+            else:
+                rendered = ", ".join(self.format_identifier(name) for name in expr.exclude)
+                suffix = f" EXCLUDE ({rendered})"
+            return f"{sql}{suffix}", params
+        return sql, params
 
 
 __all__ = ["SnowflakeWildcardMixin"]
