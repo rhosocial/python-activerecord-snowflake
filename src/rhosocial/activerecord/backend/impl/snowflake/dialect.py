@@ -479,6 +479,18 @@ class SnowflakeDialect(
         self._reserved_words = SNOWFLAKE_RESERVED_WORDS
         self.version = version
 
+    def artifact_registry(self):
+        """The kinds this backend can read: core's kinds plus Snowflake's own.
+
+        Snowflake owns its expression package, so the composition lives here
+        rather than in core: ``backend_registry()`` is
+        ``registry_for_packages("...impl.snowflake.expression", base=core_registry())``,
+        frozen and cached. No other backend's kinds are part of it.
+        """
+        from .registry import backend_registry
+
+        return backend_registry()
+
     def get_parameter_placeholder(self, index: int = 0) -> str:
         """Get the parameter placeholder for Snowflake.
 

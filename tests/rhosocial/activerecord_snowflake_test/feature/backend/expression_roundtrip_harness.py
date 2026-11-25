@@ -833,7 +833,7 @@ def _join_expr(dialect):
 def _partition_clause(dialect):
     from rhosocial.activerecord.backend.expression.core import Column
     from rhosocial.activerecord.backend.expression.statements.ddl_partition import (
-        PartitionClause,
+        PartitionByRangeClause,
     )
 
     return PartitionByRangeClause(dialect, [Column(dialect, "created_at")])
@@ -1004,22 +1004,29 @@ def collect_expression_classes(package_path: str) -> Dict[str, Type[BaseExpressi
     return classes
 
 
-def register_all(classes: Dict[str, Type[BaseExpression]]) -> None:
-    """Hand the collected classes to the deserialization kind whitelist.
+def build_read_registry(
+    classes: Dict[str, Type[BaseExpression]],
+) -> Any:
+    """The read table this matrix round-trips through, as a private copy.
 
-    Core split the class index out of the serialization module into a
-    registry: deserialization resolves a node to its class through the
-    framework's default registry, not through the ``(dialect, kind)`` render
-    registry -- the two are separate mechanisms and only the former names
-    expression classes. Core and the built-in backends populate that registry
-    on first use; registering one of those classes again is a no-op, and the
-    backend classes collected by the matrix are what this call adds.
+    Deserialization resolves a kind through a registry, and the one that
+    answers by default is the dialect's ``artifact_registry()``: Snowflake's
+    own frozen table (core's kinds plus Snowflake's), no other backend's. A
+    matrix that also round-trips core's trusted opt-ins starts from
+    :meth:`ExpressionRegistry.twin` and adds them to that copy — ``RawSQL`` and
+    ``RawSQLPredicate`` opt out of the default table because their rendered SQL
+    is caller-vouched text, so a reader that trusts its artifacts registers
+    them itself. Nothing here mutates a shared table: the twin is this caller's
+    workspace, and it is frozen so the matrix reads one published view.
     """
-    from rhosocial.activerecord.backend.expression.serialization import default_registry
+    from rhosocial.activerecord.backend.impl.snowflake.registry import (
+        backend_registry,
+    )
 
-    registry = default_registry()
+    view = backend_registry().twin()
     for cls in classes.values():
-        registry.register_node(cls)
+        view.register_node(cls)
+    return view.freeze()
 
 
 def assert_params_equal(a: Any, b: Any, path: str = "params") -> None:
@@ -1054,42 +1061,46 @@ def assert_params_equal(a: Any, b: Any, path: str = "params") -> None:
     assert a == b, f"{path}: {a!r} != {b!r}"
 
 
-def roundtrip_expression(fqn: str, instance: BaseExpression, dialect: Any) -> None:
+def roundtrip_expression(fqn: str, instance: BaseExpression, dialect: Any, registry: Any = None) -> None:
     """Assert an instance round-trips losslessly through dict / JSON / XML."""
     original = instance.get_params()
     for restored in (
-        _rt_dict(instance, dialect),
-        _rt_json(instance, dialect),
-        _rt_xml(instance, dialect),
+        _rt_dict(instance, dialect, registry),
+        _rt_json(instance, dialect, registry),
+        _rt_xml(instance, dialect, registry),
     ):
         assert_params_equal(restored.get_params(), original, fqn)
 
 
-def _rt_dict(instance, dialect):
+def _rt_dict(instance, dialect, registry=None):
     from rhosocial.activerecord.backend.expression.serialization import deserialize, serialize
 
-    return deserialize(serialize(instance), dialect)
+    return deserialize(serialize(instance), dialect, registry=registry)
 
 
-def _rt_json(instance, dialect):
+def _rt_json(instance, dialect, registry=None):
     from rhosocial.activerecord.backend.expression.serialization import deserialize_json, serialize_json
 
-    return deserialize_json(serialize_json(instance), dialect)
+    return deserialize_json(serialize_json(instance), dialect, registry=registry)
 
 
-def _rt_xml(instance, dialect):
+def _rt_xml(instance, dialect, registry=None):
     from rhosocial.activerecord.backend.expression.serialization import deserialize_xml, serialize_xml
 
-    return deserialize_xml(serialize_xml(instance), dialect)
+    return deserialize_xml(serialize_xml(instance), dialect, registry=registry)
 
 
-def sql_consistent(fqn: str, instance: BaseExpression, dialect: Any) -> None:
+def sql_consistent(fqn: str, instance: BaseExpression, dialect: Any, registry: Any = None) -> None:
     """Assert to_sql is identical after round-trip, when the dialect supports it."""
     try:
         expected = instance.to_sql()
     except Exception:
         return
-    for restored in (_rt_dict(instance, dialect), _rt_json(instance, dialect), _rt_xml(instance, dialect)):
+    for restored in (
+        _rt_dict(instance, dialect, registry),
+        _rt_json(instance, dialect, registry),
+        _rt_xml(instance, dialect, registry),
+    ):
         assert restored.to_sql() == expected, fqn
 
 
@@ -1231,9 +1242,9 @@ def parse_roundtrip_failures(
 
 __all__ = [
     "assert_params_equal",
+    "build_read_registry",
     "collect_expression_classes",
     "make_instance",
-    "register_all",
     "register_special_constructor",
     "roundtrip_expression",
     "sql_consistent",

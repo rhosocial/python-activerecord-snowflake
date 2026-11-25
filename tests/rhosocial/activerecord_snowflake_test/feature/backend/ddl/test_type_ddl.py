@@ -11,7 +11,6 @@ from rhosocial.activerecord.backend.dialect.protocols import (
 )
 from rhosocial.activerecord.backend.expression.objects import Type
 from rhosocial.activerecord.backend.expression.serialization import (
-    default_registry,
     deserialize,
     deserialize_json,
     deserialize_xml,
@@ -63,11 +62,10 @@ def _dialect(version=(10, 8, 0)):
 
 
 #: Every expression class this backend's type DDL defines. Deserialising one
-#: of these kinds needs it in the registry the read goes through, and the
-#: framework's default registry holds only the packages the framework itself
-#: ships -- nothing registers this backend's classes on import any more. This
-#: file is the reader, so it assembles the classes it round-trips into that
-#: registry once; the resolution test below then pins the assembly.
+#: of these kinds needs it in the registry the read goes through, and that
+#: registry is the dialect's own: ``SnowflakeDialect.artifact_registry()`` is
+#: core's kinds composed with this backend's expression package, frozen and
+#: cached. The resolution test below pulls every class back out of it by kind.
 _SNOWFLAKE_TYPE_EXPRESSIONS = (
     SnowflakeVarcharType,
     SnowflakeNumberType,
@@ -94,9 +92,6 @@ _SNOWFLAKE_TYPE_EXPRESSIONS = (
     SnowflakeAlterTypeExpression,
     SnowflakeDropTypeExpression,
 )
-
-for _cls in _SNOWFLAKE_TYPE_EXPRESSIONS:
-    default_registry().register_node(_cls)
 
 
 def _snowflake_data_types(dialect):
@@ -429,15 +424,15 @@ def test_drop_type_has_no_if_exists_cascade_or_restrict():
 
 
 def test_udt_expressions_resolve_through_the_readers_registry():
-    """Every type-DDL class answers to its kind in the assembled registry.
+    """Every type-DDL class answers to its kind in the dialect's own registry.
 
     Deserialisation resolves a kind, never a dotted name, so what a reader
     gets back is decided by ``kind()`` -- derived from the class name -- and
-    by the assembly at module import. A kind two classes claim would have
-    raised there; this pins that each class's own kind resolves to the class
-    itself.
+    by the dialect's composed table, ``artifact_registry()``. A kind two
+    classes claim would have raised while the table was assembled; this pins
+    that each class's own kind resolves to the class itself.
     """
-    registry = default_registry()
+    registry = _dialect().artifact_registry()
     for expression_type in _SNOWFLAKE_TYPE_EXPRESSIONS:
         assert registry.resolve_node(expression_type.kind()) is expression_type
 

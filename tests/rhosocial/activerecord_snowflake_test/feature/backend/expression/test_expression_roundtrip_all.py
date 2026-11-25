@@ -56,11 +56,12 @@ process-global class index: that dict grows as sibling test modules import their
 own backends, so a matrix built from it would cover a different set of classes
 depending on which files pytest happened to import first.
 Reading is a separate concern from deciding what to test: deserialising a
-Snowflake kind needs it in the registry the read goes through, and the
-framework's default registry holds only the packages the framework itself
-ships -- nothing registers this backend's classes on import. What the walk
-collected is therefore assembled into that registry at module level, so a
-Snowflake expression can be found again on the way back.
+Snowflake kind needs it in the registry the read goes through, and the table
+that answers by default is the dialect's ``artifact_registry()`` — Snowflake's
+own frozen composition of core's kinds plus its own. What the walk collected is
+therefore copied into a private read view at module level, and every
+``deserialize`` below is handed that view explicitly. Core's trusted opt-ins
+(``RawSQL`` / ``RawSQLPredicate``) are added to that copy, never to a global.
 
 And when a class cannot be constructed
 =====================================
@@ -139,7 +140,6 @@ from rhosocial.activerecord.backend.expression.query_parts import JoinClause
 from rhosocial.activerecord.backend.expression.operators import ArithmeticOperation
 from rhosocial.activerecord.backend.expression.query_sources import SetOperation
 from rhosocial.activerecord.backend.expression.serialization import (
-    default_registry,
     deserialize,
     deserialize_json,
     deserialize_xml,
@@ -245,9 +245,9 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.show import (
 )
 from expression_roundtrip_harness import (
     assert_params_equal,
+    build_read_registry,
     collect_expression_classes,
     make_instance,
-    register_all,
     register_special_constructor,
 )
 
@@ -290,16 +290,13 @@ def _collect_matrix_classes():
 
 
 REGISTERED = _collect_matrix_classes()
-# Deserialising a Snowflake expression needs its kind in the registry the read
-# goes through, and the framework's default registry holds only the packages
-# the framework itself ships -- nothing registers this backend's classes on
-# import. This file is the reader, so it assembles what it collected into that
-# default: every deserialize below then resolves every kind the matrix names.
-# A kind two classes claim raises here, at assembly time, rather than
-# resolving to the wrong class somewhere inside a round-trip. The package's
-# enums ride inside artifacts under their short class names, which the
-# whitelist resolves separately, so they are registered beside the classes.
-register_all(REGISTERED)
+# The read table this file round-trips through: Snowflake's published registry
+# (core's kinds plus this backend's, frozen) copied into a private view, with
+# the opt-in kinds the matrix also covers added to that copy. ``RawSQL`` and
+# ``RawSQLPredicate`` render caller-vouched text and therefore opt out of any
+# default table; a reader that trusts its artifacts registers them itself. The
+# process-global table is never mutated: the twin belongs to this file.
+READ_REGISTRY = build_read_registry(REGISTERED)
 
 
 # ---------------------------------------------------------------------------
@@ -1584,13 +1581,13 @@ SERIALIZATION_GAP = {
 _CHANNELS = ("dict", "json", "xml")
 
 
-def _restore_channel(channel, instance, dialect):
+def _restore_channel(channel, instance, dialect, registry):
     """Serialize *instance* and read it back through one channel."""
     if channel == "dict":
-        return deserialize(serialize(instance), dialect)
+        return deserialize(serialize(instance), dialect, registry=registry)
     if channel == "json":
-        return deserialize_json(serialize_json(instance), dialect)
-    return deserialize_xml(serialize_xml(instance), dialect)
+        return deserialize_json(serialize_json(instance), dialect, registry=registry)
+    return deserialize_xml(serialize_xml(instance), dialect, registry=registry)
 
 
 def _run_channel(fqn, channel, instance, dialect):
@@ -1603,7 +1600,7 @@ def _run_channel(fqn, channel, instance, dialect):
     and what it must look like.
     """
     try:
-        restored = _restore_channel(channel, instance, dialect)
+        restored = _restore_channel(channel, instance, dialect, READ_REGISTRY)
     except Exception as exc:  # noqa: BLE001 -- classified by the caller
         return "raises", exc
     try:
@@ -1764,7 +1761,7 @@ def assert_sql_roundtrip_classified(fqn, instance, dialect):
     for channel in _CHANNELS:
         if channel not in whole:
             continue
-        decoded = _restore_channel(channel, instance, dialect)
+        decoded = _restore_channel(channel, instance, dialect, READ_REGISTRY)
         decoded_sql, decoded_params = decoded.to_sql()
         assert decoded_sql == expected_sql, (
             f"{fqn}: {channel} round-trip changed the SQL.\n"
@@ -2142,13 +2139,13 @@ class TestMatrixIntegrity:
     def test_every_covered_class_is_registered_for_deserialization(self):
         """A class in the matrix can be found again when deserializing.
 
-        Deserialisation resolves a kind through the registry this file
-        assembled at import, so a class the matrix renders but that registry
-        cannot resolve would round-trip into nothing at all. Assembly would
-        already have raised on a kind two classes claim; this pins that every
-        collected class's own kind is in the registry at all.
+        Deserialisation resolves a kind through the read view this file built
+        from the backend's published registry, so a class the matrix renders
+        but that view cannot resolve would round-trip into nothing at all. The
+        published registry is frozen and complete for this backend's kinds;
+        this pins that every collected class's own kind is in the view at all.
         """
-        kinds = set(default_registry().node_kinds())
+        kinds = set(READ_REGISTRY.node_kinds())
         unresolved = sorted(
             fqn for fqn, cls in REGISTERED.items() if cls.kind() not in kinds
         )
