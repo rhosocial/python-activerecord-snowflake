@@ -25,7 +25,7 @@ Feature Source: Snowflake native (not SQL standard)
 Official Documentation:
 - CREATE MATERIALIZED VIEW: https://docs.snowflake.com/en/sql-reference/sql/create-materialized-view
 """
-from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.objects import MaterializedView
 from rhosocial.activerecord.backend.expression.statements.ddl_view import (
@@ -165,10 +165,7 @@ class SnowflakeCreateMaterializedViewStatement(CreateMaterializedViewStatement):
             "if_not_exists": self.if_not_exists,
         }
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate CREATE MATERIALIZED VIEW SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-        """
-        return self.dialect.format_create_materialized_view_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_create_materialized_view_statement"

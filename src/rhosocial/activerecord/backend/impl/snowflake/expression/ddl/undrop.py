@@ -11,7 +11,7 @@ Official Documentation:
 - UNDROP: https://docs.snowflake.com/en/sql-reference/sql/undrop
 """
 from enum import Enum
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
@@ -61,11 +61,7 @@ class SnowflakeUndropStatement(BaseExpression):
         self.name = name
         self.object_type = as_member(SnowflakeUndropObjectType, object_type, parameter="object_type")
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate UNDROP SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_undrop_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_undrop_statement"

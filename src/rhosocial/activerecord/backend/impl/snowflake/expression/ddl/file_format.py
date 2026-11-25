@@ -14,7 +14,7 @@ Official Documentation:
 - DROP FILE FORMAT:   https://docs.snowflake.com/en/sql-reference/sql/drop-file-format
 """
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
@@ -80,14 +80,10 @@ class SnowflakeCreateFileFormatStatement(BaseExpression):
         self.options = options or {}
         self.comment = comment
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate CREATE FILE FORMAT SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_create_file_format_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_create_file_format_statement"
 
 
 class SnowflakeAlterFileFormatStatement(BaseExpression):
@@ -118,14 +114,10 @@ class SnowflakeAlterFileFormatStatement(BaseExpression):
         self.options = options or {}
         self.comment = comment
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate ALTER FILE FORMAT SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_alter_file_format_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_alter_file_format_statement"
 
 
 class SnowflakeDropFileFormatStatement(BaseExpression):
@@ -147,11 +139,7 @@ class SnowflakeDropFileFormatStatement(BaseExpression):
         self.name = name
         self.if_exists = if_exists
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate DROP FILE FORMAT SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_drop_file_format_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_drop_file_format_statement"

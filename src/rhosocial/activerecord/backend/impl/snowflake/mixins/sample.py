@@ -53,6 +53,10 @@ class SnowflakeSampleMixin:
 
         Emits ``{keyword} [method] ({count} ROWS | {percentage})
         [REPEATABLE ({seed})]``.
+
+        This is the single entry the expression dispatches to: both
+        ``SAMPLE`` and ``TABLESAMPLE`` are the same clause with a different
+        keyword, and the keyword is read off ``expr.form``.
         """
         keyword = expr.form.value
         parts = [keyword]

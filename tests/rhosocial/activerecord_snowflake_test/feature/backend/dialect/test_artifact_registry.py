@@ -14,8 +14,13 @@ per owner:
   stays out of the published table and is opted in by a private twin.
 """
 
+import importlib
+import inspect
+import pkgutil
+
 import pytest
 
+from rhosocial.activerecord.backend.expression.bases import BaseExpression
 from rhosocial.activerecord.backend.expression.core import Column
 from rhosocial.activerecord.backend.expression.operators import RawSQL, RawSQLPredicate
 from rhosocial.activerecord.backend.expression.registry import (
@@ -43,6 +48,41 @@ def _dialect():
     return SnowflakeDialect(version=(8, 0, 0))
 
 
+SNOWFLAKE_EXPR_PKG = "rhosocial.activerecord.backend.impl.snowflake.expression"
+
+
+def _snowflake_nodes():
+    """Every concrete expression class this backend's package defines."""
+    pkg = importlib.import_module(SNOWFLAKE_EXPR_PKG)
+    found = {}
+    for _, modname, _ in pkgutil.walk_packages(
+        pkg.__path__, pkg.__name__ + ".", onerror=lambda x: None
+    ):
+        try:
+            module = importlib.import_module(modname)
+        except Exception:  # noqa: BLE001 -- an unimportable module defines nothing
+            continue
+        for name in dir(module):
+            obj = getattr(module, name, None)
+            if (
+                isinstance(obj, type)
+                and obj.__module__ == modname
+                and issubclass(obj, BaseExpression)
+                and obj is not BaseExpression
+                and not inspect.isabstract(obj)
+            ):
+                found.setdefault(obj, f"{modname}.{name}")
+    return found
+
+
+def _declares_a_formatter(cls):
+    """Whether *cls* resolves a formatter that is not the base's sentinel."""
+    for klass in cls.__mro__:
+        if "format_method" in vars(klass):
+            return klass is not BaseExpression
+    return False
+
+
 def test_the_dialect_answers_with_the_backends_own_registry():
     """``artifact_registry()`` is Snowflake's published table, cached and frozen."""
     dialect = _dialect()
@@ -65,6 +105,31 @@ def test_backend_proprietary_kind_resolves_and_core_kinds_are_the_overlap():
     # No other backend's kinds: composition with core is the only overlap.
     assert "sqlite_vacuum_statement" not in kinds
     assert "_dummy_type_definition" not in kinds
+
+
+def test_every_formatter_declaring_node_is_discovered_by_the_walk():
+    """Declaration is registration: no class needs adding by hand.
+
+    ``registry_for_packages`` walks this package and registers each concrete
+    node that resolves a ``format_method``. The statements, clauses and DDL
+    nodes that used to render themselves declared none, so they were absent
+    from the published table; now each declares one and the walk finds it.
+    """
+    registry = backend_registry()
+    undiscovered = []
+    for cls, fqn in _snowflake_nodes().items():
+        if not _declares_a_formatter(cls):
+            continue
+        try:
+            found = registry.resolve_node(cls.kind())
+        except RegistryError:
+            found = None
+        if found is not cls:
+            undiscovered.append((fqn, cls.kind()))
+    assert not undiscovered, (
+        "these nodes declare a format_method but the package walk did not "
+        f"register them: {sorted(undiscovered)}"
+    )
 
 
 def test_a_foreign_backends_kind_is_refused_by_name():

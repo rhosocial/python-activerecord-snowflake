@@ -16,7 +16,7 @@ Official Documentation:
 - DROP TASK:     https://docs.snowflake.com/en/sql-reference/sql/drop-task
 """
 from enum import Enum
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
@@ -113,14 +113,10 @@ class SnowflakeCreateTaskStatement(BaseExpression):
         self.when = when
         self.sql = sql
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate CREATE TASK SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_create_task_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_create_task_statement"
 
 
 class SnowflakeAlterTaskStatement(BaseExpression):
@@ -166,14 +162,10 @@ class SnowflakeAlterTaskStatement(BaseExpression):
         self.using_cron = using_cron
         self.timezone = timezone
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate ALTER TASK SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_alter_task_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_alter_task_statement"
 
 
 class SnowflakeExecuteTaskStatement(BaseExpression):
@@ -195,14 +187,10 @@ class SnowflakeExecuteTaskStatement(BaseExpression):
         self.name = name
         self.retry_last = retry_last
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate EXECUTE TASK SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_execute_task_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_execute_task_statement"
 
 
 class SnowflakeDropTaskStatement(BaseExpression):
@@ -224,11 +212,7 @@ class SnowflakeDropTaskStatement(BaseExpression):
         self.name = name
         self.if_exists = if_exists
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate DROP TASK SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_drop_task_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_drop_task_statement"

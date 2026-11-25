@@ -18,6 +18,7 @@ if TYPE_CHECKING:
         BeginTransactionStatement,
         SetTransactionStatement,
     )
+    from .expression.identifier import SnowflakeIdentifierExpression
 
 from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
 from rhosocial.activerecord.backend.dialect.protocols import (
@@ -506,6 +507,24 @@ class SnowflakeDialect(
         """Format an IDENTIFIER(placeholder) dynamic object reference."""
         placeholder = self.get_parameter_placeholder()
         return f"IDENTIFIER({placeholder})"
+
+    def format_dynamic_identifier_expression(
+        self, expr: "SnowflakeIdentifierExpression"
+    ) -> Tuple[str, tuple]:
+        """Format an ``IDENTIFIER(placeholder)`` dynamic identifier node.
+
+        The object name is handed back as a bind parameter rather than
+        interpolated into the SQL, so no caller can smuggle an identifier
+        through string concatenation.
+
+        Args:
+            expr: :class:`SnowflakeIdentifierExpression`.
+
+        Returns:
+            Tuple of (SQL string, identifier parameter tuple).
+        """
+        sql = self.format_snowflake_identifier_expression(expr.identifier)
+        return sql, (expr.identifier,)
 
     def format_begin_transaction_statement(self, expr: "BeginTransactionStatement") -> Tuple[str, tuple]:
         """Format BEGIN TRANSACTION for Snowflake, consuming its mode pairs.

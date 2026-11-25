@@ -1018,6 +1018,11 @@ def build_read_registry(
     is caller-vouched text, so a reader that trusts its artifacts registers
     them itself. Nothing here mutates a shared table: the twin is this caller's
     workspace, and it is frozen so the matrix reads one published view.
+
+    Most of the loop below is a no-op: a node that declares ``format_method``
+    is discovered by the package walk and already sits in the published table,
+    and registering the same class twice changes nothing. The loop still runs
+    for the classes the walk deliberately leaves out.
     """
     from rhosocial.activerecord.backend.impl.snowflake.registry import (
         backend_registry,

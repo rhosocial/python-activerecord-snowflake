@@ -11,7 +11,7 @@ Feature Source: Snowflake native (not SQL standard)
 Official Documentation:
 - https://docs.snowflake.com/en/sql-reference/data-types-semistructured
 """
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
@@ -46,15 +46,10 @@ class SnowflakeVariantPathAccessExpression(BaseExpression):
         self.column = column
         self.path = path
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate VARIANT path access SQL.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        sql, params = self.dialect.format_variant_path_access_expression(self)
-        return sql, ()
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_variant_path_access_expression"
 
 
 class SnowflakeVariantCastExpression(BaseExpression):
@@ -81,12 +76,7 @@ class SnowflakeVariantCastExpression(BaseExpression):
         self.path = path
         self.target_type = target_type
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate VARIANT cast SQL.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        sql, params = self.dialect.format_variant_cast_expression(self)
-        return sql, ()
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_variant_cast_expression"

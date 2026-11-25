@@ -12,7 +12,7 @@ Official Documentation:
 - SHOW: https://docs.snowflake.com/en/sql-reference/sql/show
 """
 from enum import Enum
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
@@ -98,11 +98,7 @@ class SnowflakeShowStatement(BaseExpression):
         self.like = like
         self.limit = limit
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate the SHOW statement SQL.
-
-        Returns:
-            Tuple of (statement SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_show_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_show_statement"

@@ -10,7 +10,7 @@ Feature Source: Snowflake native (not SQL standard)
 Official Documentation:
 - PIVOT / UNPIVOT: https://docs.snowflake.com/en/sql-reference/constructs/pivot
 """
-from typing import List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import List, Optional, Union, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
@@ -56,14 +56,10 @@ class SnowflakePivotExpression(BaseExpression):
         self.values = values or []
         self.alias = alias
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate the PIVOT clause SQL.
-
-        Returns:
-            Tuple of (clause SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_pivot_expression(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_pivot_expression"
 
 
 class SnowflakeUnpivotExpression(BaseExpression):
@@ -109,11 +105,7 @@ class SnowflakeUnpivotExpression(BaseExpression):
         self.exclude_nulls = exclude_nulls
         self.alias = alias
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate the UNPIVOT clause SQL.
-
-        Returns:
-            Tuple of (clause SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_unpivot_expression(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_unpivot_expression"

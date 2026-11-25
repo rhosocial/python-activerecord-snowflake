@@ -17,16 +17,16 @@ The measured inventory this file pins, read off the running code rather than
 maintained by hand:
 
 =========================  =====
-core kinds                 357
+core kinds                 397
 snowflake override           0
-snowflake custom            33
+snowflake custom            78
 =========================  =====
 
-The 33 are the nodes that declare a ``format_method``; the rest of
-``impl.snowflake.expression`` renders through its own ``to_sql()`` and so has no
-kind to register yet. That split is recorded here rather than changed: it is
-the same shape MariaDB's audit recorded for its SHOW family, and converting
-those nodes is a rename of their dialect entries, not an audit finding.
+The 78 are every concrete expression class ``impl.snowflake.expression``
+defines. Each resolves a ``format_method`` -- its own, or one inherited from
+the node it specialises -- so each is a kind the package walk registers and an
+artifact can name. No node overrides ``to_sql`` / ``_render``: rendering is the
+dialect's job, which is what lets a probe or a refusal govern every node.
 
 Generated with the core script on a temporary copy whose ``BACKENDS`` names this
 package and ``SnowflakeDialect`` -- registering a backend in
@@ -74,8 +74,11 @@ def _classes(package_path):
 
 
 def _declares_format_method(cls):
-    """Whether *cls* itself (not a base) declares the formatter name."""
-    return any("format_method" in vars(klass) for klass in cls.__mro__[:-1])
+    """Whether *cls* resolves a formatter other than the base's sentinel."""
+    for klass in cls.__mro__:
+        if "format_method" in vars(klass):
+            return klass is not BaseExpression
+    return False
 
 
 def _format_method_name(cls):
@@ -174,7 +177,7 @@ def test_a_backends_kind_carries_the_backend_name_first(backend_classes):
     """§3: the backend name goes first -- never last, never in the middle.
 
     Every custom kind here is spelled ``snowflake_<concept>``, and the check is
-    on the prefix rather than on a list of the 33, so a node added later is
+    on the prefix rather than on a list of the 78, so a node added later is
     covered without a second edit.
     """
     misfiled = sorted(

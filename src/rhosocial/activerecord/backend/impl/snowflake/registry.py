@@ -9,6 +9,11 @@ cross-backend merge anywhere.
 The registry is built on first use, cached, and frozen. Freezing is what lets
 the dialect hand the same table to every reader without one caller's
 registration changing what another caller resolves.
+
+Kinds are discovered, not listed. ``registry_for_packages`` walks the package
+and registers every concrete node that resolves a ``format_method``; a node
+that renders itself declares none and is therefore absent. There is no
+hand-maintained list here to drift out of step with the classes.
 """
 
 from rhosocial.activerecord.backend.expression.registry import ExpressionRegistry

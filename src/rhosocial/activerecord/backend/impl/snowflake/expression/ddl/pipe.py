@@ -13,7 +13,7 @@ Official Documentation:
 - DROP PIPE:   https://docs.snowflake.com/en/sql-reference/sql/drop-pipe
 """
 from enum import Enum
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
@@ -92,14 +92,10 @@ class SnowflakeCreatePipeStatement(BaseExpression):
         self.comment = comment
         self.copy_sql = copy_sql
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate CREATE PIPE SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_create_pipe_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_create_pipe_statement"
 
 
 class SnowflakeAlterPipeStatement(BaseExpression):
@@ -139,14 +135,10 @@ class SnowflakeAlterPipeStatement(BaseExpression):
         self.pipe_execution_paused = pipe_execution_paused
         self.comment = comment
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate ALTER PIPE SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_alter_pipe_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_alter_pipe_statement"
 
 
 class SnowflakeDropPipeStatement(BaseExpression):
@@ -168,11 +160,7 @@ class SnowflakeDropPipeStatement(BaseExpression):
         self.name = name
         self.if_exists = if_exists
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate DROP PIPE SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_drop_pipe_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_drop_pipe_statement"

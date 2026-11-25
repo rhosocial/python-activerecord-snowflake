@@ -115,14 +115,10 @@ class SnowflakeCreateProcedureStatement(BaseExpression):
         self.body = body
         self.comment = comment
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate CREATE PROCEDURE SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_create_procedure_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_create_procedure_statement"
 
 
 class SnowflakeCreateFunctionStatement(BaseExpression):
@@ -178,14 +174,10 @@ class SnowflakeCreateFunctionStatement(BaseExpression):
         self.body = body
         self.comment = comment
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate CREATE FUNCTION SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_create_function_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_create_function_statement"
 
 
 class SnowflakeDropRoutineStatement(BaseExpression):
@@ -210,11 +202,7 @@ class SnowflakeDropRoutineStatement(BaseExpression):
         self.routine_type = as_member(SnowflakeRoutineType, routine_type, parameter="routine_type")
         self.if_exists = if_exists
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate DROP PROCEDURE / FUNCTION SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_drop_routine_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_drop_routine_statement"

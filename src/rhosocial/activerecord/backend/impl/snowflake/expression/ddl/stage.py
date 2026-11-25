@@ -15,7 +15,7 @@ Official Documentation:
 - COPY INTO (table): https://docs.snowflake.com/en/sql-reference/sql/copy-into-table
 """
 from enum import Enum
-from typing import Any, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, List, Optional, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
@@ -89,14 +89,10 @@ class SnowflakeCreateStageStatement(BaseExpression):
         self.encryption = encryption
         self.directory = directory
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate CREATE STAGE SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_create_stage_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_create_stage_statement"
 
 
 class SnowflakeAlterStageStatement(BaseExpression):
@@ -133,14 +129,10 @@ class SnowflakeAlterStageStatement(BaseExpression):
         self.storage_integration = storage_integration
         self.comment = comment
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate ALTER STAGE SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_alter_stage_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_alter_stage_statement"
 
 
 class SnowflakeDropStageStatement(BaseExpression):
@@ -162,14 +154,10 @@ class SnowflakeDropStageStatement(BaseExpression):
         self.name = name
         self.if_exists = if_exists
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate DROP STAGE SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_drop_stage_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_drop_stage_statement"
 
 
 class SnowflakeCopyIntoStatement(BaseExpression):
@@ -238,11 +226,7 @@ class SnowflakeCopyIntoStatement(BaseExpression):
         self.overwrite = overwrite
         self.single = single
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate COPY INTO SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_copy_into_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_copy_into_statement"

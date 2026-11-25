@@ -12,7 +12,7 @@ Feature Source: Snowflake native (not SQL standard)
 Official Documentation:
 - IDENTIFIER: https://docs.snowflake.com/en/sql-reference/identifier-literal
 """
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
@@ -40,15 +40,7 @@ class SnowflakeIdentifierExpression(BaseExpression):
         super().__init__(dialect)
         self.identifier = identifier
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate an ``IDENTIFIER(placeholder)`` reference.
-
-        The identifier value is returned as a parameter to be bound at
-        execution time.
-
-        Returns:
-            Tuple of (SQL string, identifier parameter tuple).
-
-        """
-        sql = self.dialect.format_snowflake_identifier_expression(self.identifier)
-        return sql, (self.identifier,)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_dynamic_identifier_expression"

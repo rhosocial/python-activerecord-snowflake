@@ -11,7 +11,7 @@ Official Documentation:
 - SAMPLE / TABLESAMPLE: https://docs.snowflake.com/en/sql-reference/constructs/sample
 """
 from enum import Enum
-from typing import Optional, Tuple, Union, TYPE_CHECKING
+from typing import Optional, Union, TYPE_CHECKING
 
 from rhosocial.activerecord.backend.expression.bases import BaseExpression
 
@@ -90,13 +90,7 @@ class SnowflakeSampleExpression(BaseExpression):
         self.sampling_method = as_member(SnowflakeSamplingMethod, sampling_method, parameter="sampling_method")
         self.seed = seed
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate the SAMPLE / TABLESAMPLE clause SQL.
-
-        Returns:
-            Tuple of (clause SQL string, empty params tuple).
-
-        """
-        if self.form is SnowflakeSampleForm.TABLESAMPLE:
-            return self.dialect.format_tablesample_clause(self)
-        return self.dialect.format_sample_expression(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_sampling_clause"

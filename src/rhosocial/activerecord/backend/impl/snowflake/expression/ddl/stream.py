@@ -101,14 +101,10 @@ class SnowflakeCreateStreamStatement(BaseExpression):
         self.copy_grants = copy_grants
         self.comment = comment
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate CREATE STREAM SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_create_stream_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_create_stream_statement"
 
 
 class SnowflakeDropStreamStatement(BaseExpression):
@@ -130,11 +126,7 @@ class SnowflakeDropStreamStatement(BaseExpression):
         self.name = name
         self.if_exists = if_exists
 
-    def to_sql(self) -> "Tuple[str, tuple]":
-        """Generate DROP STREAM SQL statement.
-
-        Returns:
-            Tuple of (SQL string, empty params tuple).
-
-        """
-        return self.dialect.format_drop_stream_statement(self)
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_drop_stream_statement"
