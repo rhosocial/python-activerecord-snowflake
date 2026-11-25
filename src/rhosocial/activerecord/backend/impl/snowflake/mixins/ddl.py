@@ -204,17 +204,25 @@ class SnowflakeAlterColumnModifierMixin:
                    | UNIQUE | FOREIGN KEY ( <col_name> [ , ... ] ) }
                  [ CASCADE | RESTRICT ]
 
-        **By name** -- ``constraint_name`` -- renders ``DROP CONSTRAINT <name>``.
-        It is the only address a CHECK can use: the reference states *"For CHECK
-        constraints, the constraint_name is required"*, and CHECK is not one of
-        the kind alternatives.  When both an address and a name are present,
-        the name wins; this is the same preference the shared formatter states.
+        **Which address applies** is not decided here: core's
+        :meth:`_resolve_drop_constraint_address` makes the one decision and
+        returns ``"name"`` or ``"kind"``.  A name alone resolves to ``"name"``;
+        a declaration alone resolves to ``"kind"`` because this dialect
+        advertises it; both resolve to ``"name"`` only when the declaration's
+        name equals ``constraint_name``, and any other combination of the two
+        is an **ambiguous address** refused by core.  This formatter only
+        branches on that answer.
 
-        **By kind** -- only a declaration and no name -- renders ``DROP PRIMARY
-        KEY`` / ``DROP UNIQUE (<cols>)`` / ``DROP FOREIGN KEY (<cols>)``.  The
-        declaration is a :class:`TableConstraint`; its branch says which kind
-        it is.  ``PRIMARY KEY`` is the table's one primary key and needs no
-        column list; ``UNIQUE`` and ``FOREIGN KEY`` name the local columns the
+        **By name** -- ``DROP CONSTRAINT <name>``.  It is the only address a
+        CHECK can use: the reference states *"For CHECK constraints, the
+        constraint_name is required"*, and CHECK is not one of the kind
+        alternatives.
+
+        **By kind** -- ``DROP PRIMARY KEY`` / ``DROP UNIQUE (<cols>)`` /
+        ``DROP FOREIGN KEY (<cols>)``.  The declaration is a
+        :class:`TableConstraint`; its branch says which kind it is.
+        ``PRIMARY KEY`` is the table's one primary key and needs no column
+        list; ``UNIQUE`` and ``FOREIGN KEY`` name the local columns the
         production requires.  A declaration-only CHECK is refused by name,
         since it has no kind branch and no name here.
 
@@ -231,20 +239,19 @@ class SnowflakeAlterColumnModifierMixin:
             A ``(sql, params)`` tuple with empty parameters.
 
         Raises:
-            ValueError: Neither ``constraint_name`` nor ``constraint`` is given,
-                or a kind form names a kind whose column list the grammar
-                requires but the declaration does not carry.
-            TypeError: ``constraint`` is not a :class:`TableConstraint`.
-            UnsupportedFeatureError: ``IF EXISTS`` was requested, or the
-                declaration's branch has no kind alternative in this grammar
-                (CHECK included).
+            ValueError: Neither ``constraint_name`` nor ``constraint`` is given
+                (raised by core's resolver), or a kind form names a kind whose
+                column list the grammar requires but the declaration does not
+                carry.
+            TypeError: ``constraint`` is not a :class:`TableConstraint` (raised
+                by core's resolver).
+            UnsupportedFeatureError: ``IF EXISTS`` was requested, the two
+                addresses are ambiguous, or the declaration's branch has no
+                kind alternative in this grammar (CHECK included).
 
         https://docs.snowflake.com/en/sql-reference/sql/alter-table
         """
-        if expr.constraint_name is None and expr.constraint is None:
-            raise ValueError(
-                "DropTableConstraintAction requires constraint_name or constraint"
-            )
+        address = self._resolve_drop_constraint_address(expr)
         if getattr(expr, "if_exists", None) is True:
             raise UnsupportedFeatureError(
                 self.name,
@@ -252,7 +259,7 @@ class SnowflakeAlterColumnModifierMixin:
                 suggestion="Snowflake does not support IF EXISTS on DROP CONSTRAINT. "
                            "Pre-check information_schema.TABLE_CONSTRAINTS.",
             )
-        if expr.constraint_name is not None:
+        if address == "name":
             result = f"DROP CONSTRAINT {self.format_identifier(expr.constraint_name)}"
         else:
             result = self._format_drop_constraint_by_kind(expr.constraint)
@@ -261,7 +268,12 @@ class SnowflakeAlterColumnModifierMixin:
         return result, ()
 
     def _format_drop_constraint_by_kind(self, declaration) -> str:
-        """Render the declaration-only ``DROP`` branch, or refuse it by name."""
+        """Render the by-kind ``DROP`` branch, or refuse it by name.
+
+        Called only after core's resolver answered ``"kind"``, so this method
+        holds no addressing rule of its own -- only the kind rendering and the
+        validation of what the kind branch requires.
+        """
         if not isinstance(declaration, TableConstraint):
             raise TypeError(
                 "DropTableConstraintAction.constraint must be a TableConstraint, "

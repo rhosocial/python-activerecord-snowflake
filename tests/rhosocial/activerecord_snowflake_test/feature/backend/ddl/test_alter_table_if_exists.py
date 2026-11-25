@@ -5,9 +5,12 @@ Snowflake supports ``ADD COLUMN IF NOT EXISTS`` and ``DROP COLUMN
 IF EXISTS``, but **not** ``DROP CONSTRAINT IF EXISTS``. ``ADD COLUMN
 IF NOT EXISTS`` cannot be combined with DEFAULT/IDENTITY/UNIQUE/PK/FK.
 
-``DROP CONSTRAINT`` itself has two addresses: by name and by kind plus the
+``DROP CONSTRAINT`` itself has two addresses -- by name and by kind plus the
 local column list (``PRIMARY KEY`` alone, ``UNIQUE`` / ``FOREIGN KEY`` with
-columns). A CHECK has no kind branch and must be named.
+columns). A CHECK has no kind branch and must be named. Which address applies
+is core's call: both given is renderable only when the declaration's name
+equals ``constraint_name``; any other pairing is an ambiguous address and is
+refused rather than silently preferring the name.
 """
 
 import pytest
@@ -183,7 +186,7 @@ class TestSnowflakeDropConstraint:
         assert "IF EXISTS" not in sql
         assert params == ()
 
-    def test_name_wins_when_both_addresses_are_given(self, dialect):
+    def test_both_addresses_with_equal_name_render_by_name(self, dialect):
         declaration = TableConstraint(
             dialect, branch=TableUniqueConstraint(dialect, ["a", "b"]), name="uq_ab"
         )
@@ -191,6 +194,33 @@ class TestSnowflakeDropConstraint:
             dialect, constraint_name="uq_ab", constraint=declaration
         )
         assert action.to_sql() == ('DROP CONSTRAINT "uq_ab"', ())
+
+    def test_both_addresses_with_different_names_are_refused(self, dialect):
+        declaration = TableConstraint(
+            dialect, branch=TableUniqueConstraint(dialect, ["a", "b"]), name="uq_ab"
+        )
+        action = DropTableConstraintAction(
+            dialect, constraint_name="uq_a", constraint=declaration
+        )
+        with pytest.raises(UnsupportedFeatureError) as excinfo:
+            action.to_sql()
+        assert excinfo.value.feature_name == "DROP CONSTRAINT address"
+        message = str(excinfo.value)
+        assert "'uq_a'" in message
+        assert "'uq_ab'" in message
+        assert "ambiguous address is refused" in message
+
+    def test_both_addresses_with_an_unnamed_declaration_are_refused(self, dialect):
+        declaration = TableConstraint(
+            dialect, branch=TableUniqueConstraint(dialect, ["a", "b"])
+        )
+        action = DropTableConstraintAction(
+            dialect, constraint_name="uq_ab", constraint=declaration
+        )
+        with pytest.raises(UnsupportedFeatureError) as excinfo:
+            action.to_sql()
+        assert excinfo.value.feature_name == "DROP CONSTRAINT address"
+        assert "ambiguous address is refused" in str(excinfo.value)
 
 
 class TestSnowflakeDropConstraintByKind:
@@ -249,7 +279,7 @@ class TestSnowflakeDropConstraintByKind:
         assert action.to_sql() == ('DROP CONSTRAINT "ck_age"', ())
         assert declaration.name == "ck_age"
 
-    def test_two_addresses_is_a_malformed_action(self, dialect):
+    def test_no_address_is_a_malformed_action(self, dialect):
         action = DropTableConstraintAction(dialect)
         with pytest.raises(ValueError, match="requires constraint_name or constraint"):
             action.to_sql()
