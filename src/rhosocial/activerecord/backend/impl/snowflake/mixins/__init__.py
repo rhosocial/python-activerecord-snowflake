@@ -11,6 +11,10 @@ undrop, materialized view, table modifiers support.
 from .create_table_layout_suggestion import SnowflakeCreateTableLayoutSuggestionMixin
 from .generated_value_suggestion import SnowflakeGeneratedValueSuggestionMixin
 from .string_concatenation_suggestion import SnowflakeStringConcatenationSuggestionMixin
+from .column_reorder_suggestion import SnowflakeColumnReorderSuggestionMixin
+from .table_constraint_change_suggestion import SnowflakeTableConstraintChangeSuggestionMixin
+from .table_index_change_suggestion import SnowflakeTableIndexChangeSuggestionMixin
+from .partition_scheme_change_suggestion import SnowflakePartitionSchemeChangeSuggestionMixin
 from .partition_build_suggestion import SnowflakePartitionBuildSuggestionMixin
 from .partition_add_suggestion import SnowflakePartitionAddSuggestionMixin
 from .partition_drop_suggestion import SnowflakePartitionDropSuggestionMixin
@@ -82,6 +86,10 @@ __all__ = [
     'SnowflakePartitionSplitSuggestionMixin',
     'SnowflakePartitionMergeSuggestionMixin',
     'SnowflakeStringConcatenationSuggestionMixin',
+    'SnowflakeColumnReorderSuggestionMixin',
+    'SnowflakeTableConstraintChangeSuggestionMixin',
+    'SnowflakeTableIndexChangeSuggestionMixin',
+    'SnowflakePartitionSchemeChangeSuggestionMixin',
     "SnowflakeArrayMixin",
     "SnowflakeBackendMixin",
     "SnowflakeCloneMixin",

@@ -62,10 +62,14 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     WindowFunctionSupport,
 )
 from rhosocial.activerecord.backend.suggestion.protocols import (
+    ColumnReorderSuggestionSupport,
     ColumnTypeSuggestionSupport,
     CreateTableLayoutSuggestionSupport,
     DataTypeSuggestionSupport,
+    PartitionSchemeChangeSuggestionSupport,
     StringConcatenationSuggestionSupport,
+    TableConstraintChangeSuggestionSupport,
+    TableIndexChangeSuggestionSupport,
 )
 from rhosocial.activerecord.backend.dialect.mixins import (
 
@@ -194,6 +198,10 @@ from .mixins import (
     SnowflakeGeneratedValueSuggestionMixin,
     SnowflakeStringConcatenationSuggestionMixin,
     SnowflakeCreateTableLayoutSuggestionMixin,
+    SnowflakeColumnReorderSuggestionMixin,
+    SnowflakeTableConstraintChangeSuggestionMixin,
+    SnowflakeTableIndexChangeSuggestionMixin,
+    SnowflakePartitionSchemeChangeSuggestionMixin,
     SnowflakePartitionBuildSuggestionMixin,
     SnowflakePartitionAddSuggestionMixin,
     SnowflakePartitionDropSuggestionMixin,
@@ -210,6 +218,14 @@ class SnowflakeDialect(
     # answer is assembled from this dialect's own capability probes below.
     SnowflakeCreateTableLayoutSuggestionMixin,
     SnowflakeGeneratedValueSuggestionMixin,
+    # The four multi-step change points. No column-position action exists;
+    # the frozen constraint/index projections carry no expression instances
+    # to build a real DDL chain from; and there is no addressable partition
+    # DDL. Each answer is the explicit unsupported state with its evidence.
+    SnowflakeColumnReorderSuggestionMixin,
+    SnowflakeTableConstraintChangeSuggestionMixin,
+    SnowflakeTableIndexChangeSuggestionMixin,
+    SnowflakePartitionSchemeChangeSuggestionMixin,
     # Snowflake has no declarative partitioning; these answer the eight
     # partition suggestion protocols with an explicit "unsupported" state.
     SnowflakePartitionBuildSuggestionMixin,
@@ -396,6 +412,10 @@ class SnowflakeDialect(
     CreateTableLayoutSuggestionSupport,
     DataTypeSuggestionSupport,
     StringConcatenationSuggestionSupport,
+    ColumnReorderSuggestionSupport,
+    TableConstraintChangeSuggestionSupport,
+    TableIndexChangeSuggestionSupport,
+    PartitionSchemeChangeSuggestionSupport,
     CTESupport,
     ConstraintSupport,
     DataTypeSupport,
