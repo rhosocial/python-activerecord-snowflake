@@ -1,24 +1,27 @@
 # tests/rhosocial/activerecord_snowflake_test/feature/backend/snowflake/test_change_suggestion_contract.py
-"""Snowflake's four multi-step change suggestions answer explicit "unsupported".
+"""Snowflake's multi-step change suggestions: three unsupported, one real.
 
 The decision points are frozen, dialect-neutral projections of an old -> new
-declaration. Snowflake can express none of them with the expression nodes this
-backend actually owns:
+declaration.  Snowflake can express none of these with the expression nodes
+this backend owns:
 
 * column reorder -- no column-position clause in ``ALTER TABLE``;
-* constraint change -- the enriched declarations can build ``ADD CONSTRAINT``,
-  but there is no two-anchor IF EXISTS / IF NOT EXISTS gate, no drop-by-kind
-  node, and CHECK must be named;
 * index change -- plain index DDL is hybrid-table-only and unmodelled;
 * partition scheme change -- partitioning is AUTOMATIC (micro-partitions),
   and ``CLUSTER BY`` is clustering, not partition DDL.
 
-Each answer is therefore the tri-state ``False`` (unaddressable), never ``None``
-(absent) and never a guessed chain. The tests pin the value, the protocol
-registration, the MRO ownership of each method, and the evidence behind the
-refusal; no SQL is fabricated for any of the four. Core's enriched declaration
-fields are checked explicitly: for the constraint point they remove the old
-"no node can be built" objection, so the remaining reason must be capability.
+Each of those answers is the tri-state ``False`` (unaddressable), never ``None``
+(absent) and never a guessed chain.
+
+The table-constraint point is different: core's enriched declarations carry the
+live ``TableConstraint`` nodes, and core now lets ``DropTableConstraintAction``
+carry a declaration.  Snowflake's own ``DROP PRIMARY KEY | UNIQUE | FOREIGN KEY
+(cols)`` grammar therefore becomes reachable, so removals and redefinitions of
+the key kinds produce real single-action ``AlterTableStatement`` chains.  The
+remaining refusals are grammar/capability gaps: an unnamed CHECK has no drop
+address, a CHECK cannot be added by ``ALTER TABLE`` without ``ENABLE
+NOVALIDATE``, and the enforcement/deferral/validation traits are declined by
+this dialect's probes.
 """
 
 import inspect
@@ -37,6 +40,7 @@ from rhosocial.activerecord.backend.expression import (
     Literal,
     TableCheckConstraint,
     TableConstraint,
+    TableForeignKeyConstraint,
     TablePrimaryKeyConstraint,
     TableUniqueConstraint,
 )
@@ -72,8 +76,10 @@ from rhosocial.activerecord.backend.suggestion.protocols import (
     TableConstraintChangeSuggestionSupport,
     TableIndexChangeSuggestionSupport,
 )
+from rhosocial.activerecord.migration import resolve_point
 
-#: label, method, value class, protocol, owning mixin
+#: label, method, value class, protocol, owning mixin -- for the three points
+#: whose answer is still the explicit unsupported state.
 CASES = [
     (
         "column_reorder",
@@ -81,13 +87,6 @@ CASES = [
         ColumnReorderSuggestion,
         ColumnReorderSuggestionSupport,
         SnowflakeColumnReorderSuggestionMixin,
-    ),
-    (
-        "table_constraint_change",
-        "suggest_table_constraint_change",
-        TableConstraintChangeSuggestion,
-        TableConstraintChangeSuggestionSupport,
-        SnowflakeTableConstraintChangeSuggestionMixin,
     ),
     (
         "table_index_change",
@@ -105,6 +104,14 @@ CASES = [
     ),
 ]
 IDS = [case[0] for case in CASES]
+
+CONSTRAINT_CASE = (
+    "table_constraint_change",
+    "suggest_table_constraint_change",
+    TableConstraintChangeSuggestion,
+    TableConstraintChangeSuggestionSupport,
+    SnowflakeTableConstraintChangeSuggestionMixin,
+)
 
 #: Realistic frozen projections, in the shape core's ``_freeze`` produces.
 POINTS = {
@@ -141,9 +148,61 @@ def _module_doc(mixin):
     return inspect.getdoc(sys.modules[mixin.__module__]) or ""
 
 
+def _check(dialect, name=None):
+    return TableConstraint(
+        dialect,
+        branch=TableCheckConstraint(
+            dialect,
+            ComparisonPredicate(
+                dialect, "=", Column(dialect, "age"), Literal(dialect, 0, inline=True)
+            ),
+        ),
+        name=name,
+    )
+
+
+def _primary_key(dialect, columns, name=None):
+    return TableConstraint(
+        dialect, branch=TablePrimaryKeyConstraint(dialect, columns), name=name
+    )
+
+
+def _unique(dialect, columns, name=None):
+    return TableConstraint(
+        dialect, branch=TableUniqueConstraint(dialect, columns), name=name
+    )
+
+
+def _foreign_key(dialect, columns, name=None):
+    return TableConstraint(
+        dialect,
+        branch=TableForeignKeyConstraint(
+            dialect, columns, (Table(dialect, "parent"), ["id"])
+        ),
+        name=name,
+    )
+
+
+def _constraint_answer(dialect, old=(), new=(), table="t"):
+    point = TableConstraintChangeSuggestion(
+        table_name=table,
+        old_constraint_declarations=tuple(old),
+        new_constraint_declarations=tuple(new),
+    )
+    return dialect.suggest_table_constraint_change(point)
+
+
+def _sql(answer):
+    return [statement.to_sql()[0] for statement in answer.operations]
+
+
 @pytest.mark.parametrize("label,method,value_class,protocol,mixin", CASES, ids=IDS)
 def test_protocol_is_registered(dialect, label, method, value_class, protocol, mixin):
     assert isinstance(dialect, protocol)
+
+
+def test_constraint_protocol_is_registered(dialect):
+    assert isinstance(dialect, TableConstraintChangeSuggestionSupport)
 
 
 @pytest.mark.parametrize("label,method,value_class,protocol,mixin", CASES, ids=IDS)
@@ -179,6 +238,12 @@ def test_method_is_owned_by_the_backend_mixin_not_the_protocol_stub(
     assert declaring is mixin, f"{method} is resolved on {declaring!r}"
 
 
+def test_constraint_method_is_owned_by_the_backend_mixin(dialect):
+    method = CONSTRAINT_CASE[1]
+    declaring = next(cls for cls in type(dialect).__mro__ if method in cls.__dict__)
+    assert declaring is SnowflakeTableConstraintChangeSuggestionMixin
+
+
 @pytest.mark.parametrize("label,method,value_class,protocol,mixin", CASES, ids=IDS)
 def test_no_supported_chain_and_no_sql_is_fabricated(
     dialect, label, method, value_class, protocol, mixin
@@ -196,36 +261,159 @@ def test_no_supported_chain_and_no_sql_is_fabricated(
     assert not any(hasattr(value, "to_sql") for value in vars(answer).values())
 
 
-def test_column_reorder_evidence(dialect):
-    """ALTER TABLE has no column-position clause and core has no reorder node."""
-    assert dialect.supports_multi_action_alter_table() is False
-    from rhosocial.activerecord.backend.expression.statements import ddl_alter
+def test_constraint_point_without_declarations_is_unaddressable(dialect):
+    """The frozen projections alone cannot rebuild an action."""
+    point = _point(TableConstraintChangeSuggestion)
+    answer = dialect.suggest_table_constraint_change(point)
+    assert answer.operations is False
+    assert answer.state == "unaddressable"
 
-    assert not any("reorder" in name.lower() for name in dir(ddl_alter))
-    doc = _module_doc(SnowflakeColumnReorderSuggestionMixin)
-    assert "sql/alter-table" in doc
-    assert "column-position" in doc
-    assert "FIRST" in doc and "AFTER" in doc
+
+# ---------------------------------------------------------------------------
+# The supported half: real chains from the live declarations
+# ---------------------------------------------------------------------------
+
+
+def test_unnamed_primary_key_removal_is_a_real_drop_by_kind(dialect):
+    primary_key = _primary_key(dialect, ["id"])
+    answer = _constraint_answer(dialect, old=(primary_key,))
+
+    assert answer.state == "actions"
+    assert _sql(answer) == ['ALTER TABLE "t" DROP PRIMARY KEY']
+    statement = answer.operations[0]
+    assert isinstance(statement, AlterTableStatement)
+    action = statement.actions[0]
+    assert isinstance(action, DropTableConstraintAction)
+    assert action.constraint is primary_key
+    assert action.constraint_name is None
+
+
+def test_unnamed_unique_removal_renders_its_columns(dialect):
+    unique = _unique(dialect, ["a", "b"])
+    answer = _constraint_answer(dialect, old=(unique,))
+
+    assert _sql(answer) == ['ALTER TABLE "t" DROP UNIQUE ("a", "b")']
+    assert answer.operations[0].actions[0].constraint is unique
+
+
+def test_unnamed_foreign_key_removal_renders_its_local_columns(dialect):
+    foreign_key = _foreign_key(dialect, ["a"])
+    answer = _constraint_answer(dialect, old=(foreign_key,))
+
+    assert _sql(answer) == ['ALTER TABLE "t" DROP FOREIGN KEY ("a")']
+    assert answer.operations[0].actions[0].constraint is foreign_key
+
+
+def test_named_check_removal_uses_the_name_form(dialect):
+    check = _check(dialect, name="ck_age")
+    answer = _constraint_answer(dialect, old=(check,))
+
+    assert _sql(answer) == ['ALTER TABLE "t" DROP CONSTRAINT "ck_age"']
+    action = answer.operations[0].actions[0]
+    assert action.constraint_name == "ck_age"
+    assert action.constraint is None
+
+
+def test_unnamed_check_removal_is_refused_because_check_needs_a_name(dialect):
+    answer = _constraint_answer(dialect, old=(_check(dialect),))
+    assert answer.operations is False
+    assert answer.state == "unaddressable"
+
+
+def test_adding_a_check_is_refused_for_the_missing_enable_novalidate(dialect):
+    answer = _constraint_answer(dialect, new=(_check(dialect, name="ck_age"),))
+    assert answer.operations is False
+    assert answer.state == "unaddressable"
+
+
+def test_same_name_primary_key_redefinition_drops_then_adds(dialect):
+    old = _primary_key(dialect, ["a"], name="pk_t")
+    new = _primary_key(dialect, ["a", "b"], name="pk_t")
+    answer = _constraint_answer(dialect, old=(old,), new=(new,))
+
+    assert answer.state == "actions"
+    assert _sql(answer) == [
+        'ALTER TABLE "t" DROP PRIMARY KEY',
+        'ALTER TABLE "t" ADD CONSTRAINT "pk_t" PRIMARY KEY ("a", "b")',
+    ]
+    drop_action, add_action = (
+        answer.operations[0].actions[0],
+        answer.operations[1].actions[0],
+    )
+    assert isinstance(drop_action, DropTableConstraintAction)
+    assert drop_action.constraint is old
+    assert isinstance(add_action, AddTableConstraintAction)
+    assert add_action.constraint is new
+
+
+def test_adding_a_key_is_a_real_add_statement(dialect):
+    unique = _unique(dialect, ["email"], name="uq_email")
+    answer = _constraint_answer(dialect, new=(unique,))
+
+    assert _sql(answer) == [
+        'ALTER TABLE "t" ADD CONSTRAINT "uq_email" UNIQUE ("email")'
+    ]
+    assert answer.operations[0].actions[0].constraint is unique
+
+
+def test_unchanged_declarations_need_no_action(dialect):
+    unique = _unique(dialect, ["a"])
+    answer = _constraint_answer(
+        dialect, old=(unique,), new=(_unique(dialect, ["a"]),)
+    )
+
+    assert answer.operations is None
+    assert answer.state == "absent"
+
+
+def test_the_chain_passes_the_consumers_single_action_guard(dialect):
+    """One expression -> one statement, and nothing table- or schema-level."""
+    old = (
+        _primary_key(dialect, ["id"]),
+        _check(dialect, name="ck_age"),
+    )
+    new = (_unique(dialect, ["email"], name="uq_email"),)
+    answer = _constraint_answer(dialect, old=old, new=new)
+
+    entry = resolve_point(
+        TableConstraintChangeSuggestion(
+            table_name="t",
+            old_constraint_declarations=old,
+            new_constraint_declarations=new,
+            operations=answer.operations,
+        ),
+        dialect,
+    )
+    assert entry.state == "actions"
+    for statement in entry.operations:
+        assert isinstance(statement, AlterTableStatement)
+        assert len(statement.actions) == 1
+        sql, params = statement.to_sql()
+        assert sql.startswith("ALTER TABLE ")
+        assert "DROP TABLE" not in sql
+        assert "DROP SCHEMA" not in sql
+        assert params == ()
 
 
 def test_constraint_change_evidence(dialect):
-    """ADD is renderable from live declarations; the blockers are capability."""
+    """ADD and the by-kind DROP are renderable; the remaining gaps are grammar."""
     assert dialect.supports_add_constraint() is True
     assert dialect.supports_drop_constraint() is True
     assert dialect.supports_drop_constraint_if_exists() is False
     assert dialect.supports_add_constraint_if_not_exists() is False
     assert dialect.supports_drop_constraint_by_kind() is True
 
-    # The two existing nodes are by-value constraint / by-name drop. The first
-    # is fed by the enriched declarations; the second has no kind/columns field
-    # for the Snowflake-only drop-by-kind grammar.
-    assert "constraint" in AddTableConstraintAction.__name__.lower()
+    # The declaration-carrying drop node is what the by-kind form needs.
     assert "constraint" in DropTableConstraintAction.__name__.lower()
     params = inspect.signature(DropTableConstraintAction.__init__).parameters
     assert "constraint_name" in params
-    assert not {"kind", "branch", "columns"} & set(params)
+    assert "constraint" in params
+    assert "if_exists" in params
+    assert "cascade" in params
+
     by_kind_doc = inspect.getdoc(dialect.supports_drop_constraint_by_kind)
     assert "CHECK" in by_kind_doc and "constraint_name is required" in by_kind_doc
+    assert "Now renderable" in by_kind_doc
 
     doc = _module_doc(SnowflakeTableConstraintChangeSuggestionMixin)
     assert "sql/alter-table" in doc
@@ -234,11 +422,12 @@ def test_constraint_change_evidence(dialect):
     assert "old_constraint_declarations" in doc
     assert "new_constraint_declarations" in doc
     assert "DropTableConstraintAction" in doc
+    assert "ENABLE NOVALIDATE" in doc
     assert "projection" not in doc.lower()
 
 
-def test_enriched_constraint_declarations_change_the_reason_not_the_answer(dialect):
-    """Live branches are present and ADD-able; the answer stays False on capability."""
+def test_enriched_declarations_yield_a_complete_constraint_chain(dialect):
+    """The old capability objection is gone: the live branches build the chain."""
     check = ComparisonPredicate(dialect, "=", Column(dialect, "age"), Literal(dialect, 0))
     old = (
         TableConstraint(dialect, branch=TablePrimaryKeyConstraint(dialect, ["id"]), name="pk_t"),
@@ -261,26 +450,15 @@ def test_enriched_constraint_declarations_change_the_reason_not_the_answer(diale
     assert isinstance(old[1].branch, TableCheckConstraint)
     assert isinstance(new[0].branch, TableUniqueConstraint)
 
-    # The enriched node is enough for a real ADD chain: no kind is lost any more.
-    statement = AlterTableStatement(
-        dialect,
-        Table(dialect, point.table_name),
-        [AddTableConstraintAction(dialect, new[0])],
-    )
-    assert statement.to_sql()[0] == (
-        'ALTER TABLE "db.public.t" ADD CONSTRAINT "uq_email" UNIQUE ("email")'
-    )
-    assert isinstance(statement.actions[0].constraint.branch, TableUniqueConstraint)
-
     answer = dialect.suggest_table_constraint_change(point)
-    assert answer.operations is False
-    assert answer.state == "unaddressable"
+    assert answer.state == "actions"
+    assert [statement.to_sql()[0] for statement in answer.operations] == [
+        'ALTER TABLE "db.public.t" DROP PRIMARY KEY',
+        'ALTER TABLE "db.public.t" DROP CONSTRAINT "ck_age"',
+        'ALTER TABLE "db.public.t" ADD CONSTRAINT "uq_email" UNIQUE ("email")',
+    ]
     assert answer.old_constraint_declarations == old
     assert answer.new_constraint_declarations == new
-    # Capability, not the shape of the point, is the remaining blocker.
-    assert dialect.supports_add_constraint() is True
-    assert dialect.supports_drop_constraint_if_exists() is False
-    assert dialect.supports_add_constraint_if_not_exists() is False
 
 
 def test_enriched_fields_leave_the_other_three_answers_unchanged(dialect):

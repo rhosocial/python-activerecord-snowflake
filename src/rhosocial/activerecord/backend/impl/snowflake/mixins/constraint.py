@@ -306,16 +306,17 @@ not mistake the pins for working behaviour:
   spelling specifically, and is a different question from the backend-only
   :meth:`supports_table_constraint_novalidate`, which gates the
   ``{ VALIDATE | NOVALIDATE }`` *property*.
-* **Drop-by-kind has no node to hang on.**  ``DropTableConstraint`` carries a
-  ``constraint_name`` only, so ``DROP PRIMARY KEY (cols)`` -- the shape
-  :meth:`supports_drop_constraint_by_kind` records -- cannot be expressed.  A
-  node that carries kind-plus-columns is core S1 work.
+* **Drop-by-kind now has a node.**  ``DropTableConstraintAction`` carries the
+  declaration (``constraint=``), and this dialect's formatter spells
+  ``DROP PRIMARY KEY`` / ``DROP UNIQUE (<cols>)`` / ``DROP FOREIGN KEY (<cols>)``
+  from its branch.  A CHECK is still by name only: it is not in the kind list
+  and the reference requires ``constraint_name`` for it.
 * **``CASCADE`` sits on the by-kind ``DROP`` branch.**  Core appends ``CASCADE``
   to ``DROP CONSTRAINT <name>``, which is grammatically fine; what has no gate
   is ``RESTRICT``, the other value the same bracket allows.
-* **``{ ALTER | MODIFY }``, by-kind addressing, and "CHECK must be by name"**
-  have no node on this core either.  All three are grammar facts recorded above
-  so that the S1/S3 shape work has them written down.
+* **``{ ALTER | MODIFY }`` and "CHECK must be by name"** have no node on this
+  core.  Both are grammar facts recorded above so that the S1/S3 shape work has
+  them written down.
 
 Name note
 ---------
@@ -327,15 +328,18 @@ probes, the ``naming_*`` family, ``supports_{column,table}_constraint_rely``,
 ``supports_{column,table}_on_update_action``, ``supports_add_constraint_if_not_exists``,
 ``supports_table_rename_constraint``, ``supports_table_alter_constraint``,
 ``supports_table_add_{primary_key,unique,check,foreign_key}_constraint``,
-``supports_table_constraint_comment`` and ``supports_drop_constraint_by_kind``
-are **backend-only** on this core: no ``ConstraintMixin`` or ``DDLColumnMixin``
-in ``rhosocial.activerecord.backend.dialect.mixins`` declares or consults any
-of them.  They are the names from
+``supports_table_constraint_comment`` are **backend-only** on this core: no
+``ConstraintMixin`` or ``DDLColumnMixin`` in
+``rhosocial.activerecord.backend.dialect.mixins`` declares or consults them.
+They are the names from
 ``.claude/plan/2026-10-11/snowflake-constraint-coverage.md`` and they are
 declared here so the grammar answer is written down in one place next to its
 evidence, **on the understanding that core S3 may rename or absorb them**.  The
 flat switches are the ones core's renderers actually consult today; the two
 groups are kept apart deliberately, and every docstring says which it is.
+``supports_drop_constraint_by_kind`` is no longer in that group: core's
+``ConstraintSupport`` declares it, ``DropTableConstraintAction`` carries the
+declaration, and :mod:`..ddl` renders the by-kind spelling.
 """
 
 #: The page the inline/out-of-line constraint productions and every property
@@ -1877,13 +1881,14 @@ class SnowflakeConstraintMixin:
         **CHECK is excluded**, twice over: it is not in the kind list, and the
         reference adds *"For CHECK constraints, the constraint_name is required."*
 
-        **Known gap, recorded not worked around.**  ``DropTableConstraint``
-        carries a ``constraint_name`` only, so this shape has no node to hang on
-        and cannot be rendered today.  A node carrying kind-plus-columns is core
-        S1 work; the value here records that the capability exists so that work
-        knows what to aim at.
+        **Now renderable.**  Core's ``DropTableConstraintAction`` carries the
+        declaration (``constraint=``) as well as a name, and this dialect
+        overrides ``format_drop_table_constraint_action`` in :mod:`..ddl` to
+        spell the by-kind branch.  A declaration-only CHECK is refused there by
+        name, because the grammar gives it no kind alternative.
 
-        Name note: no core probe of this name exists.
+        The probe is declared here and on ``ConstraintSupport``; it gates the
+        render path the same way ``supports_drop_constraint`` does.
 
         文档（待云端验证）: grammar-only, not server-verified.
         """

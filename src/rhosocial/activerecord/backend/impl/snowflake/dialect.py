@@ -219,11 +219,10 @@ class SnowflakeDialect(
     SnowflakeCreateTableLayoutSuggestionMixin,
     SnowflakeGeneratedValueSuggestionMixin,
     # The four multi-step change points. No column-position action exists;
-    # constraint ADD is possible from the enriched declarations but neither a
-    # two-anchor guard nor a drop-by-kind node exists for a complete chain;
-    # index DDL is hybrid-only and unmodelled; and there is no addressable
-    # partition DDL. Each answer is the explicit unsupported state with its
-    # evidence.
+    # constraint ADD is possible from the enriched declarations, and a drop can
+    # now be addressed by kind from the same declarations (CHECK by name); index
+    # DDL is hybrid-only and unmodelled; and there is no addressable partition
+    # DDL. Each answer carries its own evidence.
     SnowflakeColumnReorderSuggestionMixin,
     SnowflakeTableConstraintChangeSuggestionMixin,
     SnowflakeTableIndexChangeSuggestionMixin,

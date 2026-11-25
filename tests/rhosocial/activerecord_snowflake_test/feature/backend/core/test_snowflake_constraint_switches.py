@@ -86,6 +86,7 @@ CONSTRAINT_SWITCHES = {
     "supports_add_constraint": True,
     "supports_drop_constraint": True,
     "supports_drop_constraint_if_exists": False,
+    "supports_drop_constraint_by_kind": True,
     "supports_validate_constraint": False,
     # The two that live on other Snowflake mixins but answer constraint
     # questions, so they are pinned here too.
@@ -145,7 +146,6 @@ BACKEND_ONLY_SWITCHES = (
     "supports_table_add_unique_constraint",
     "supports_table_add_check_constraint",
     "supports_table_add_foreign_key_constraint",
-    "supports_drop_constraint_by_kind",
     "supports_table_rename_constraint",
     "supports_table_alter_constraint",
 )

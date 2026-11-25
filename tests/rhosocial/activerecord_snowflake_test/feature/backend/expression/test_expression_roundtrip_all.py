@@ -668,6 +668,15 @@ def register_specials():
             ),
         ),
     )
+    # The constructor now accepts "no address at all": its defaulted
+    # ``constraint_name`` is skipped by the introspective guess, and the class
+    # builds an action the formatter then refuses for having neither address.
+    # Supply the name form so the row exercises the render path this backend
+    # must keep working, instead of pinning a malformed action.
+    register_special_constructor(
+        "statements.ddl_alter.DropTableConstraintAction",
+        lambda d: ddl_alter.DropTableConstraintAction(d, "c"),
+    )
 
     # -- declared-result annotations ----------------------------------------
     # An annotation renders what it annotates, and ``format_declared_result``

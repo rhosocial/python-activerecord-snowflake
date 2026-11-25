@@ -11,6 +11,11 @@ from rhosocial.activerecord.backend.expression.statements import (
     ColumnPrimaryKeyConstraint,
     ColumnUniqueConstraint,
     IdentityClause,
+    TableCheckConstraint,
+    TableConstraint,
+    TableForeignKeyConstraint,
+    TablePrimaryKeyConstraint,
+    TableUniqueConstraint,
 )
 
 
@@ -190,6 +195,56 @@ class SnowflakeAlterColumnModifierMixin:
         return super().format_alter_column_action(expr)
 
     def format_drop_table_constraint_action(self, expr) -> Tuple[str, tuple]:
+        """Render Snowflake's ``DROP`` constraint action, by name or by kind.
+
+        The grammar has one production with two addressable forms::
+
+            DROP {   CONSTRAINT <constraint_name>
+                   | PRIMARY KEY
+                   | UNIQUE | FOREIGN KEY ( <col_name> [ , ... ] ) }
+                 [ CASCADE | RESTRICT ]
+
+        **By name** -- ``constraint_name`` -- renders ``DROP CONSTRAINT <name>``.
+        It is the only address a CHECK can use: the reference states *"For CHECK
+        constraints, the constraint_name is required"*, and CHECK is not one of
+        the kind alternatives.  When both an address and a name are present,
+        the name wins; this is the same preference the shared formatter states.
+
+        **By kind** -- only a declaration and no name -- renders ``DROP PRIMARY
+        KEY`` / ``DROP UNIQUE (<cols>)`` / ``DROP FOREIGN KEY (<cols>)``.  The
+        declaration is a :class:`TableConstraint`; its branch says which kind
+        it is.  ``PRIMARY KEY`` is the table's one primary key and needs no
+        column list; ``UNIQUE`` and ``FOREIGN KEY`` name the local columns the
+        production requires.  A declaration-only CHECK is refused by name,
+        since it has no kind branch and no name here.
+
+        The ``[ CASCADE | RESTRICT ]`` tail is one switch on this node, so only
+        ``CASCADE`` is renderable; it stays appended exactly as before.  No
+        branch carries ``IF EXISTS`` -- ``supports_drop_constraint_if_exists``
+        answers ``False`` -- so that request is refused before rendering.
+
+        Args:
+            expr: The action carrying the name or the declaration, and the
+                optional cascade flag.
+
+        Returns:
+            A ``(sql, params)`` tuple with empty parameters.
+
+        Raises:
+            ValueError: Neither ``constraint_name`` nor ``constraint`` is given,
+                or a kind form names a kind whose column list the grammar
+                requires but the declaration does not carry.
+            TypeError: ``constraint`` is not a :class:`TableConstraint`.
+            UnsupportedFeatureError: ``IF EXISTS`` was requested, or the
+                declaration's branch has no kind alternative in this grammar
+                (CHECK included).
+
+        https://docs.snowflake.com/en/sql-reference/sql/alter-table
+        """
+        if expr.constraint_name is None and expr.constraint is None:
+            raise ValueError(
+                "DropTableConstraintAction requires constraint_name or constraint"
+            )
         if getattr(expr, "if_exists", None) is True:
             raise UnsupportedFeatureError(
                 self.name,
@@ -197,8 +252,52 @@ class SnowflakeAlterColumnModifierMixin:
                 suggestion="Snowflake does not support IF EXISTS on DROP CONSTRAINT. "
                            "Pre-check information_schema.TABLE_CONSTRAINTS.",
             )
-        name = self.format_identifier(expr.constraint_name)
-        result = f"DROP CONSTRAINT {name}"
-        if getattr(expr, "cascade", None):
+        if expr.constraint_name is not None:
+            result = f"DROP CONSTRAINT {self.format_identifier(expr.constraint_name)}"
+        else:
+            result = self._format_drop_constraint_by_kind(expr.constraint)
+        if getattr(expr, "cascade", False):
             result += " CASCADE"
         return result, ()
+
+    def _format_drop_constraint_by_kind(self, declaration) -> str:
+        """Render the declaration-only ``DROP`` branch, or refuse it by name."""
+        if not isinstance(declaration, TableConstraint):
+            raise TypeError(
+                "DropTableConstraintAction.constraint must be a TableConstraint, "
+                f"got {type(declaration).__name__}"
+            )
+        branch = declaration.branch
+        if isinstance(branch, TablePrimaryKeyConstraint):
+            # One primary key per table: the grammar's branch names the kind
+            # alone, so no column list is rendered.
+            return "DROP PRIMARY KEY"
+        if isinstance(branch, TableUniqueConstraint):
+            return f"DROP UNIQUE ({self._format_drop_constraint_columns(branch, 'UNIQUE')})"
+        if isinstance(branch, TableForeignKeyConstraint):
+            return (
+                "DROP FOREIGN KEY "
+                f"({self._format_drop_constraint_columns(branch, 'FOREIGN KEY')})"
+            )
+        if isinstance(branch, TableCheckConstraint):
+            raise UnsupportedFeatureError(
+                self.name,
+                "DROP CONSTRAINT by kind for CHECK",
+                suggestion="CHECK is not one of the kind alternatives: Snowflake requires "
+                           "constraint_name for a CHECK constraint. Pass the name instead "
+                           "of the declaration.",
+            )
+        raise UnsupportedFeatureError(
+            self.name,
+            f"DROP CONSTRAINT by kind for {type(branch).__name__}",
+            suggestion="Snowflake addresses PRIMARY KEY, UNIQUE and FOREIGN KEY by kind; "
+                       "address any other constraint by its name.",
+        )
+
+    def _format_drop_constraint_columns(self, branch, kind: str) -> str:
+        """The mandatory local column list of a by-kind ``DROP``."""
+        if not branch.columns:
+            raise ValueError(
+                f"DROP {kind} requires at least one column, but the declaration has none"
+            )
+        return ", ".join(self.format_identifier(column) for column in branch.columns)
