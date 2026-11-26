@@ -23,11 +23,13 @@ class SnowflakeRoutineMixin:
     def suggest_functions(self) -> "FunctionSuggestion":
         """Return the SQL function catalogue this dialect renders.
 
-        Snowflake ships a large built-in function library; this mapping is
-        intentionally empty so function-gated tests skip rather than assume
-        availability.
+        Snowflake ships a large built-in function library, but this backend
+        does not publish a catalogue. The suggestion says so with
+        ``state="no-protocol"`` rather than an empty ``"actions"`` catalogue,
+        which would read as "renders no functions" and make a function-gated
+        test assert against a vocabulary that does not exist.
         """
-        return FunctionSuggestion({})
+        return FunctionSuggestion({}, state="no-protocol")
 
     def format_create_procedure_statement(
         self, expr: "SnowflakeCreateProcedureStatement"
