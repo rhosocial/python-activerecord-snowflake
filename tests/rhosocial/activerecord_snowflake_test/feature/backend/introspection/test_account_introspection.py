@@ -472,11 +472,11 @@ class TestSyncAccountObjectIntrospection:
         assert first is second
         assert sync_executor.execute.call_count == 1
 
-    def test_list_schemas_passes_database_as_identifier(
+    def test_list_schema_infos_passes_database_as_identifier(
         self, sync_introspector, sync_executor
     ):
         sync_executor.execute.return_value = [schema_row()]
-        schemas = sync_introspector.list_schemas("ANALYTICS")
+        schemas = sync_introspector.list_schema_infos("ANALYTICS")
         assert schemas == [SnowflakeSchemaInfo(
             name="PUBLIC",
             catalog_name="ANALYTICS",
@@ -492,13 +492,13 @@ class TestSyncAccountObjectIntrospection:
             SCHEMAS_IN_DATABASE_SQL, ()
         )
 
-    def test_list_schemas_does_not_share_between_databases(
+    def test_list_schema_infos_does_not_share_between_databases(
         self, sync_introspector, sync_executor
     ):
         sync_executor.execute.return_value = [schema_row()]
-        sync_introspector.list_schemas()
-        sync_introspector.list_schemas("ANALYTICS")
-        sync_introspector.list_schemas("ANALYTICS")
+        sync_introspector.list_schema_infos()
+        sync_introspector.list_schema_infos("ANALYTICS")
+        sync_introspector.list_schema_infos("ANALYTICS")
         assert sync_executor.execute.call_count == 2
 
     def test_list_warehouses_executes_show(
@@ -568,11 +568,11 @@ class TestAsyncAccountObjectIntrospection:
         assert first is second
         assert async_executor.execute.await_count == 1
 
-    async def test_list_schemas_awaits_the_same_sql(
+    async def test_list_schema_infos_awaits_the_same_sql(
         self, async_introspector, async_executor
     ):
         async_executor.execute.return_value = [schema_row()]
-        [schema] = await async_introspector.list_schemas("ANALYTICS")
+        [schema] = await async_introspector.list_schema_infos("ANALYTICS")
         assert schema.name == "PUBLIC"
         async_executor.execute.assert_awaited_once_with(
             SCHEMAS_IN_DATABASE_SQL, ()
@@ -626,7 +626,7 @@ class TestAccountObjectValues:
     def test_sync_and_async_methods_have_identical_signatures(self):
         for name in (
             "list_databases",
-            "list_schemas",
+            "list_schema_infos",
             "list_warehouses",
             "get_table_storage_metrics",
         ):

@@ -456,7 +456,7 @@ class TestSyncBranchDispatch:
             ),
             ("database", None, "get_database_info", (), {}, "Database Info"),
             ("databases", None, "list_databases", (), {}, "Databases"),
-            ("schemas", None, "list_schemas", (), {"database": None}, "Schemas"),
+            ("schemas", None, "list_schema_infos", (), {"database": None}, "Schemas"),
             ("warehouses", None, "list_warehouses", (), {}, "Warehouses"),
             ("routines", None, "list_routines", (), {"schema": None}, "Routines"),
             ("sequences", None, "list_sequences", (), {"schema": None}, "Sequences"),

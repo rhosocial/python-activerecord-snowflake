@@ -238,11 +238,15 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.partition import (
 from rhosocial.activerecord.backend.impl.snowflake.expression.sample import (
     SnowflakeSampleExpression,
 )
+from rhosocial.activerecord.backend.impl.snowflake.expression.introspection import (
+    SnowflakeObjectExistsQueryStatement,
+)
 from rhosocial.activerecord.backend.impl.snowflake.expression.show import (
     SnowflakeShowStatement,
     SnowflakeShowObjectType,
     SnowflakeShowScope,
 )
+from rhosocial.activerecord.backend.introspection.types import ItemKind
 from expression_roundtrip_harness import (
     assert_params_equal,
     build_read_registry,
@@ -1019,6 +1023,21 @@ def register_specials():
         "functions.string.OverlayExpression",
         lambda d: OverlayExpression(
             d, Column(d, "name"), Literal(d, "ab"), Literal(d, 2), Literal(d, 3)
+        ),
+    )
+
+    # -- the neutral-state statements ---------------------------------------
+    #
+    # ``kind`` is a core enum, and the heuristic has no placeholder for an
+    # enum: it hands the parameter an "x" the class's own ``ItemKind``
+    # coercion refuses. A member with a catalogue behind it is the real
+    # question, and the statement renders with the sequence view. The
+    # table-state statement needs no entry -- its parameters are a name and a
+    # schema, which the heuristic fills.
+    register_special_constructor(
+        "expression.introspection.SnowflakeObjectExistsQueryStatement",
+        lambda d: SnowflakeObjectExistsQueryStatement(
+            d, kind=ItemKind.SEQUENCE, name="seq", schema="PUBLIC"
         ),
     )
 

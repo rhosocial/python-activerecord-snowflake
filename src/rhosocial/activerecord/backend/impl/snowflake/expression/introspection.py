@@ -1,7 +1,7 @@
 # src/rhosocial/activerecord/backend/impl/snowflake/expression/introspection.py
 """Account-object introspection statements for Snowflake.
 
-Four statements live here, one per question this backend asks the catalog that
+Six statements live here, one per question this backend asks the catalog that
 core's introspection expressions do not model:
 
 * :class:`SnowflakeDatabaseListQueryStatement` -- which databases exist.
@@ -10,6 +10,11 @@ core's introspection expressions do not model:
   see.
 * :class:`SnowflakeTableStorageMetricsQueryStatement` -- what one table is
   billed for storage.
+* :class:`SnowflakeTableStateQueryStatement` -- one table's kind, clustering
+  and comment, as the neutral ``TableState`` wants them.
+* :class:`SnowflakeObjectExistsQueryStatement` -- whether one named object of
+  a :class:`~rhosocial.activerecord.backend.introspection.types.ItemKind`
+  exists.
 
 They are expressions, which is the point: each one is a *statement node* whose
 ``to_sql()`` renders through
@@ -44,17 +49,22 @@ from typing import Optional
 from rhosocial.activerecord.backend.expression.introspection import (
     IntrospectionExpression,
 )
+from rhosocial.activerecord.backend.introspection.types import ItemKind
+
+from .coercion import as_member
 
 __all__ = [
     "SnowflakeDatabaseListQueryStatement",
     "SnowflakeFileFormatListQueryStatement",
     "SnowflakeFunctionListQueryStatement",
+    "SnowflakeObjectExistsQueryStatement",
     "SnowflakePipeListQueryStatement",
     "SnowflakeProcedureListQueryStatement",
     "SnowflakeSchemaListQueryStatement",
     "SnowflakeSequenceListQueryStatement",
     "SnowflakeStageListQueryStatement",
     "SnowflakeStreamListQueryStatement",
+    "SnowflakeTableStateQueryStatement",
     "SnowflakeTableStorageMetricsQueryStatement",
     "SnowflakeTaskListQueryStatement",
     "SnowflakeWarehouseListQueryStatement",
@@ -349,3 +359,111 @@ class SnowflakeStreamListQueryStatement(IntrospectionExpression):
     def format_method(self) -> str:
         """The dialect formatting method that renders this expression."""
         return "format_stream_list_query_statement"
+
+
+class SnowflakeTableStateQueryStatement(IntrospectionExpression):
+    """One table's kind, clustering and comment, from ``INFORMATION_SCHEMA.TABLES``.
+
+    Documentation: https://docs.snowflake.com/en/sql-reference/info-schema/tables
+
+    Core's ``TableState`` asks for four things this backend can read from a
+    single row of the table catalogue: the table's *kind* (regular, transient
+    or temporary), any *compound traits* (clustering), the table's *comment*,
+    and (through the manager's own partition answer) whether a partition
+    scheme exists. The ``TABLES`` page documents the columns this statement
+    selects:
+
+    * ``IS_TRANSIENT`` -- "Indicates whether this is a transient table" (``VARCHAR``).
+    * ``IS_TEMPORARY`` -- the same, for temporary tables, with ``YES``/``NO`` values.
+    * ``CLUSTERING_KEY`` -- "Clustering key for the table".
+    * ``AUTO_CLUSTERING_ON`` -- a real ``BOOLEAN`` for automatic clustering.
+    * ``TABLE_TYPE`` -- the catalogue's own kind spelling, kept in the state's
+      ``raw`` so a vendor kind (``HYBRID TABLE``, ``DYNAMIC TABLE``) is not
+      folded away.
+    * ``COMMENT`` -- "Comment for this table".
+
+    Deliberately not selected: the storage parameters ``DATA_RETENTION_TIME_IN_DAYS``,
+    ``DEFAULT_DDL_COLLATION`` and the ``STAGE_*`` properties. Those are reported
+    by ``SHOW TABLES``, not by this view, and ``StorageOptionsState`` is left at
+    its defaults rather than filled with a guess -- see the introspector's
+    ``get_table_state``.
+
+    The view's two view spellings are excluded by the dialect formatter: this
+    statement asks a question about a table, and a view has no neutral table
+    kind.
+
+    Args:
+        dialect: The dialect that renders this statement.
+        table_name: The table to read. A bind value, compared to ``TABLE_NAME``.
+        schema: Schema to filter by, or ``None`` for any schema.
+
+    Example:
+        >>> expr = SnowflakeTableStateQueryStatement(dialect, "ORDERS", schema="PUBLIC")
+        >>> sql, params = expr.to_sql()
+    """
+
+    def __init__(
+        self,
+        dialect,
+        table_name: str,
+        schema: Optional[str] = None,
+    ):
+        super().__init__(dialect, schema)
+        self.table_name = table_name
+
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_table_state_query_statement"
+
+
+class SnowflakeObjectExistsQueryStatement(IntrospectionExpression):
+    """A one-row read that answers whether one named catalogue object exists.
+
+    The question is core's ``item_exists(kind, name, schema)``: does a shared
+    object of this kind exist. A listing answers the same fact only by
+    returning every object in the schema, so this statement filters the one
+    name and asks for a single row.
+
+    The kinds this backend can answer are named by the dialect formatter
+    (``format_object_exists_query_statement``), together with the view and
+    column each one is read from. A kind with no Snowflake catalogue there is
+    refused at render time with the same protocol error the manager's own
+    refusal raises, so an unanswerable kind cannot render a query that claims
+    to answer it. ``ItemKind.SCHEMA`` is account-structure rather than a
+    schema object, so it reads ``SCHEMATA`` and takes no schema filter.
+
+    Args:
+        dialect: The dialect that renders this statement.
+        kind: The core :class:`ItemKind` to ask about, or the word it carries.
+            Stored as that word rather than as the member: this backend's own
+            enums define ``__str__ = str.__str__`` so an artifact carries their
+            value, but a core ``str`` enum does not, and its wire form is
+            ``"ItemKind.SEQUENCE"`` -- unreadable by the member's own lookup.
+            The formatter turns the word back into the member.
+        name: The object's name, compared to the view's own name column.
+        schema: Schema to filter by where the kind is schema-scoped, or ``None``
+            for any schema.
+
+    Example:
+        >>> expr = SnowflakeObjectExistsQueryStatement(
+        ...     dialect, ItemKind.SEQUENCE, "ORDER_SEQ", schema="PUBLIC"
+        ... )
+        >>> sql, params = expr.to_sql()
+    """
+
+    def __init__(
+        self,
+        dialect,
+        kind: "ItemKind",
+        name: str,
+        schema: Optional[str] = None,
+    ):
+        super().__init__(dialect, schema)
+        self.kind = as_member(ItemKind, kind, parameter="kind").value
+        self.name = name
+
+    @property
+    def format_method(self) -> str:
+        """The dialect formatting method that renders this expression."""
+        return "format_object_exists_query_statement"

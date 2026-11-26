@@ -3,6 +3,7 @@
 
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
+from rhosocial.activerecord.backend.dialect.exceptions import ProtocolNotImplementedError
 from rhosocial.activerecord.backend.expression import (
     CaseExpression,
     Column,
@@ -31,7 +32,7 @@ from rhosocial.activerecord.backend.expression.query_parts import JoinClause, Jo
 from rhosocial.activerecord.backend.expression.sources.derived import DerivedTableSource
 from rhosocial.activerecord.backend.expression.sources.relation import NamedRelationRef
 from rhosocial.activerecord.backend.expression.types.string import VarCharType
-from rhosocial.activerecord.backend.introspection.types import ProfileSource
+from rhosocial.activerecord.backend.introspection.types import ItemKind, ProfileSource
 
 from ..expression.introspection import (
     SnowflakeDatabaseListQueryStatement,
@@ -64,6 +65,11 @@ if TYPE_CHECKING:
         ViewListQueryStatement,
     )
     from rhosocial.activerecord.backend.introspection.types import IntrospectionScope
+
+    from ..expression.introspection import (
+        SnowflakeObjectExistsQueryStatement,
+        SnowflakeTableStateQueryStatement,
+    )
 
 
 class SnowflakeIntrospectionMixin:
@@ -508,6 +514,151 @@ class SnowflakeIntrospectionMixin:
             conditions,
             [self._catalog_column("TABLE_NAME")],
         )
+
+    def format_table_state_query_statement(
+        self, expr: "SnowflakeTableStateQueryStatement"
+    ) -> Tuple[str, tuple]:
+        """``INFORMATION_SCHEMA.TABLES`` for one table's neutral state.
+
+        Documentation: https://docs.snowflake.com/en/sql-reference/info-schema/tables
+
+        The seven columns are what ``TableState`` can carry from this view:
+        the catalogue's kind spelling, the transient and temporary flags, the
+        clustering key with its automatic-clustering switch, and the comment.
+        The storage parameters (``DATA_RETENTION_TIME_IN_DAYS``,
+        ``DEFAULT_DDL_COLLATION``, the ``STAGE_*`` properties) are ``SHOW
+        TABLES`` facts, not columns of this view, so they are left unread
+        rather than filled with a guess -- ``StorageOptionsState`` keeps its
+        defaults and the reason is recorded on
+        :meth:`~...introspection.introspector.SnowflakeIntrospector.get_table_state`.
+
+        ``table_name`` and ``schema`` are bind values: they are compared to the
+        view's columns, not interpolated into an object name.
+
+        The two view spellings are excluded. A view is not a table and has no
+        neutral table kind, so a view name answers with no row -- which the
+        manager reports as ``ObjectNotFoundError`` -- rather than with a state
+        whose ``kind`` would read "regular".
+        """
+        from ..introspection.table_types import SNOWFLAKE_VIEW_TYPES
+
+        params = expr.get_params()
+        table_name = params.get("table_name", "")
+        schema = params.get("schema", "")
+
+        return self._catalog_query(
+            [
+                self._catalog_column("TABLE_NAME"),
+                self._catalog_column("TABLE_TYPE"),
+                self._catalog_column("IS_TRANSIENT"),
+                self._catalog_column("IS_TEMPORARY"),
+                self._catalog_column("CLUSTERING_KEY"),
+                self._catalog_column("AUTO_CLUSTERING_ON"),
+                self._catalog_column("COMMENT"),
+            ],
+            self._information_schema_view("TABLES"),
+            [
+                ComparisonPredicate(
+                    self,
+                    "eq",
+                    self._catalog_column("TABLE_SCHEMA"),
+                    Literal(self, schema),
+                ),
+                ComparisonPredicate(
+                    self,
+                    "eq",
+                    self._catalog_column("TABLE_NAME"),
+                    Literal(self, table_name),
+                ),
+                # A view is not a table and has no neutral table kind; the
+                # two view spellings are dropped so a view name answers with
+                # no row rather than a state whose ``kind`` says "regular".
+                ~InPredicate(
+                    self,
+                    self._catalog_column("TABLE_TYPE"),
+                    Literal(self, list(SNOWFLAKE_VIEW_TYPES), inline=True),
+                ),
+            ],
+        )
+
+    #: The view, name column and schema column that answer one ``ItemKind``.
+    #:
+    #: Keyed by the core member, so the vocabulary stays core's: a kind this
+    #: backend has no catalogue for is absent, and the manager refuses it
+    #: through the base refusal instead of fabricating an answer. ``None`` as
+    #: the schema column means the kind is not schema-scoped -- ``SCHEMATA`` is
+    #: a database-level view and the schema is the object being named.
+    _OBJECT_EXISTS_VIEWS = {
+        ItemKind.SCHEMA: ("SCHEMATA", "SCHEMA_NAME", None),
+        ItemKind.TABLE: ("TABLES", "TABLE_NAME", "TABLE_SCHEMA"),
+        ItemKind.SEQUENCE: ("SEQUENCES", "SEQUENCE_NAME", "SEQUENCE_SCHEMA"),
+        ItemKind.FUNCTION: ("FUNCTIONS", "FUNCTION_NAME", "FUNCTION_SCHEMA"),
+    }
+
+    def format_object_exists_query_statement(
+        self, expr: "SnowflakeObjectExistsQueryStatement"
+    ) -> Tuple[str, tuple]:
+        """One filtered row of the view that lists the asked-about kind.
+
+        ``LIMIT 1`` is what turns a listing into an existence question: the
+        statement asks for at most one row carrying the name, and the manager
+        reads presence as ``True``. The limit is a bind parameter like every
+        other number this dialect renders.
+
+        ``ItemKind.TABLE`` excludes the two view spellings, because a view is
+        not a table: ``TABLES`` lists both, and answering ``True`` for a view
+        would make ``TABLE`` mean "table or view". The vendor table kinds --
+        external, hybrid, Iceberg, dynamic, event -- are tables and stay.
+
+        A kind absent from the table above raises the protocol refusal naming
+        ``item_exists``, the same one the manager raises: a statement built
+        directly with an unsupported kind must not render a query that claims
+        to answer it.
+        """
+        params = expr.get_params()
+        kind = ItemKind(params.get("kind"))
+        name = params.get("name", "")
+        schema = params.get("schema", "")
+
+        entry = self._OBJECT_EXISTS_VIEWS.get(kind)
+        if entry is None:
+            raise ProtocolNotImplementedError(
+                self.name, "StructureIntrospectionSupport", "item_exists"
+            )
+        view_name, name_column, schema_column = entry
+
+        conditions = [
+            ComparisonPredicate(
+                self, "eq", self._catalog_column(name_column), Literal(self, name)
+            )
+        ]
+        if schema_column is not None:
+            conditions.append(
+                ComparisonPredicate(
+                    self, "eq", self._catalog_column(schema_column), Literal(self, schema)
+                )
+            )
+        if kind is ItemKind.TABLE:
+            from ..introspection.table_types import SNOWFLAKE_VIEW_TYPES
+
+            conditions.append(
+                ~InPredicate(
+                    self,
+                    self._catalog_column("TABLE_TYPE"),
+                    Literal(self, list(SNOWFLAKE_VIEW_TYPES), inline=True),
+                )
+            )
+
+        statement = QueryStatement(
+            self,
+            select=[self._catalog_column(name_column)],
+            from_=self._information_schema_view(view_name),
+        )
+        statement.where = WhereClause(
+            self, LogicalPredicate(self, "AND", *conditions)
+        )
+        statement.limit_offset = LimitOffsetClause(self, limit=1)
+        return statement.to_sql()
 
     def format_column_info_query_statement(
         self, expr: "ColumnInfoQueryStatement"

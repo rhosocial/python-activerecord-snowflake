@@ -138,11 +138,11 @@ Each of these is one catalogue read, or one `SHOW` for warehouses. None scans th
 | Foreign keys | `list_foreign_keys()` | `REFERENTIAL_CONSTRAINTS` + `KEY_COLUMN_USAGE` + `TABLE_CONSTRAINTS` |
 | Database | `get_database_info()` | `CURRENT_DATABASE()`, `CURRENT_VERSION()` |
 | Databases | `list_databases()` | `SNOWFLAKE.INFORMATION_SCHEMA.DATABASES` |
-| Schemas | `list_schemas()` | `INFORMATION_SCHEMA.SCHEMATA` |
+| Schemas | `list_schema_infos()`, `list_schemas()` | `INFORMATION_SCHEMA.SCHEMATA` |
 | Warehouses | `list_warehouses()` | `SHOW WAREHOUSES` |
 | Storage metrics | `get_table_storage_metrics()` | `TABLE_STORAGE_METRICS` joined to `TABLES` |
 | Routines | `list_routines()` | `INFORMATION_SCHEMA.FUNCTIONS` + `PROCEDURES` |
-| Sequences | `list_sequences()` | `INFORMATION_SCHEMA.SEQUENCES` |
+| Sequences | `list_sequences()`, `list_sequence_states()` | `INFORMATION_SCHEMA.SEQUENCES` |
 | Stages | `list_stages()` | `INFORMATION_SCHEMA.STAGES` |
 | File formats | `list_file_formats()` | `INFORMATION_SCHEMA.FILE_FORMATS` |
 | Pipes | `list_pipes()` | `INFORMATION_SCHEMA.PIPES` |
@@ -177,7 +177,7 @@ The other fields are the catalogue's own: `ORDINAL_POSITION`, `IS_NULLABLE` (rea
 
 `list_routines()` reads two views because Snowflake stores functions and procedures separately: `INFORMATION_SCHEMA.FUNCTIONS` and `INFORMATION_SCHEMA.PROCEDURES`. The columns are prefixed per view, so the parser reads the prefix off the `kind` it was given, and the two listings are merged and sorted by `(kind, name, argument_signature)`. `argument_signature` is the view's own signature text, which is how overloads are distinguished; `return_type` is `DATA_TYPE`; `language` is the view's `FUNCTION_LANGUAGE` / `PROCEDURE_LANGUAGE`. The engine-specific remainder -- volatility, security, handler, runtime, packages, integrations, secrets -- is in `extra` under the documented uppercase name.
 
-`list_sequences()` projects `INFORMATION_SCHEMA.SEQUENCES` onto core's `SequenceInfo`, with Snowflake's facts in `extra`. `MINIMUM_VALUE`, `MAXIMUM_VALUE` and `CYCLE_OPTION` are documented "Not applicable for Snowflake" and stay `None`; `START_VALUE` and `INCREMENT` are documented `VARCHAR` and are converted to integers. `NEXT_VALUE` is the value the sequence will produce next, not a last-produced value, so it is stored as `extra["snowflake_next_value"]` and `last_value` stays `None`.
+`list_sequences()` projects `INFORMATION_SCHEMA.SEQUENCES` onto core's `SequenceInfo`, with Snowflake's facts in `extra`. `MINIMUM_VALUE`, `MAXIMUM_VALUE` and `CYCLE_OPTION` are documented "Not applicable for Snowflake" and stay `None`; `START_VALUE` and `INCREMENT` are documented `VARCHAR` and are converted to integers. `NEXT_VALUE` is the value the sequence will produce next, not a last-produced value, so it is stored as `extra["snowflake_next_value"]` and `last_value` stays `None`. `list_sequence_states()` is the same catalogue read projected onto core's neutral `SequenceState`: `owned_by` stays `None` because `SEQUENCE_OWNER` is a role rather than a column reference, and the role, `NEXT_VALUE` and data type travel in `raw`.
 
 Stages, file formats, pipes, tasks and streams share one stable record shape (`SnowflakeCatalogObjectInfo`): name, kind, catalog, schema, owner, comment, created and last altered, with each family's engine-specific columns in `extra`. The first three are database-level Information Schema views; tasks and streams have no such view, so they are read through `SHOW TASKS` / `SHOW STREAMS`, scoped with `IN SCHEMA` when a schema is configured. `SHOW` rows are documented lowercase and are normalized before parsing.
 
@@ -199,7 +199,7 @@ These are four different questions, and the answers keep them apart.
 
 `list_databases()` reads every database in the account from `INFORMATION_SCHEMA.DATABASES`, qualified with `SNOWFLAKE` so the statement resolves `INFORMATION_SCHEMA` even when the session has no current database -- the state the CLI is in when it is given an account and no database. The view is privilege-filtered: it shows the objects the session's role may access, so the answer is what the role can see, not a claim of omniscience.
 
-`list_schemas()` reads `SCHEMATA`, which is a database-level view: `database=None` means "the current database" and is a legitimate request, while naming a database qualifies the view with it. A database name is rendered as a quoted identifier, not a bind value -- it is part of an object name -- and quoting is case-sensitive in Snowflake, so a caller passes the catalogue's own spelling.
+`list_schemas()` is core's neutral answer: the bare schema names of the session's current database, as `List[str]`, with no database parameter. `list_schema_infos()` is this backend's complete answer and reads `SCHEMATA`, which is a database-level view: `database=None` means "the current database" and is a legitimate request, while naming a database qualifies the view with it. A database name is rendered as a quoted identifier, not a bind value -- it is part of an object name -- and quoting is case-sensitive in Snowflake, so a caller passes the catalogue's own spelling. Both methods exist because they promise different things; `list_schemas()` projects the names out of the rows `list_schema_infos()` reads, and the CLI's `schemas` type prints the complete record.
 
 `list_warehouses()` is a `SHOW`, because there is no `INFORMATION_SCHEMA` view for warehouses. Its output columns are documented lowercase and its flags spell `Y`/`N`, unlike the views' uppercase columns and `'YES'`/`'NO'`, so the parser normalises the keys before reading and reads flags through one helper that accepts `Y`, `YES`, `TRUE`, `1` and a real boolean. `SHOW` rows are not post-processed through `RESULT_SCAN`: that function scans the session's most recent statement, which a cache miss elsewhere could replace, and it fails silently rather than erroring. The driver's cursor description is per-cursor and cannot be displaced. The command returns at most ten thousand records per object type and only objects the role may access; neither is a defect this backend can repair, so neither is hidden.
 
@@ -210,6 +210,26 @@ These are four different questions, and the answers keep them apart.
 The four billed tiers are `ACTIVE_BYTES`, `TIME_TRAVEL_BYTES`, `FAILSAFE_BYTES` and `RETAINED_FOR_CLONE_BYTES`; their sum is the table's retained footprint and is what `get_table_info()` puts on `size_bytes`. The split slots `data_size_bytes` and `index_size_bytes` stay `None`: storage is managed micro-partition bytes with no index side to attribute them to, which is the engine's shape rather than a missing measurement.
 
 `get_table_storage_metrics()` returns `None` for no row, and that `None` is ambiguous by documentation: the view returns no rows to roles other than `ACCOUNTADMIN`. "The table is gone" and "this role may not see its metrics" cannot be told apart from this view, and the method does not pretend to tell them apart. The CLI exits 1 with a message about absent metrics rather than reporting a missing table.
+
+### Neutral object state
+
+Core's neutral state API -- `TableState`, `PartitionState`, `SequenceState`, `ItemKind` and the eight `*_state`/`list_schemas`/`item_exists` methods -- is answered where this backend's catalogue can answer it. A family the catalogue cannot answer refuses through the base protocol error naming the method, rather than returning an empty value that reads as a real answer.
+
+| Method | Snowflake answer |
+|--------|------------------|
+| `get_table_state(table_name, schema=None)` | One `TABLES` row: `kind` is `regular`, `transient` or `temporary`; `traits` carries `clustered` (a `CLUSTERING_KEY` is set) and `auto_clustering` (`AUTO_CLUSTERING_ON`); `comment` is the table comment; `raw` keeps the catalogue's own kind spelling, the clustering key text and both flags. A missing table, or a name that is a view, raises `ObjectNotFoundError`. |
+| `get_partition_state(table_name, schema=None, include_stats=False)` | `PartitionState(scheme=None)` with no bounds -- see below. |
+| `list_schemas()` | The current database's schema names, as `List[str]`. |
+| `list_sequence_states(schema=None)` | `INFORMATION_SCHEMA.SEQUENCES` projected onto `SequenceState`; `owned_by` stays `None` because `SEQUENCE_OWNER` is a role, and the role plus `NEXT_VALUE` stay in `raw`. |
+| `item_exists(kind, name, schema=None)` | `SCHEMA`, `TABLE` (views excluded), `SEQUENCE` and `FUNCTION`; one filtered `LIMIT 1` row, not a listing scanned in Python. |
+
+The rest refuse: `list_index_states` and `list_constraint_states` have no neutral answer this engine's metadata can fill honestly (`IndexState` describes a physical index's usability, visibility and backing constraint, and Snowflake has no physical indexes -- its constraint metadata is already projected as `list_indexes`; `ConstraintState` asks for validation/enforcement flags this catalogue does not report); `list_derived_objects` has no engine-created backing-object catalogue (an identity column's internal sequence is not a row in `SEQUENCES`, as the sequences section records); and `item_exists` refuses `TYPE`, `DOMAIN`, `EXTENSION`, `TABLESPACE`, `PARTITION_FUNCTION`, `PARTITION_SCHEME` and `FULLTEXT_CATALOG`. File formats and tags do exist here, but core's `ItemKind` names neither, so they are unaskable through `item_exists` rather than unimplemented -- `list_file_formats()` answers the first, and tags have no family yet.
+
+`get_table_state()` leaves `StorageOptionsState` at its defaults. `TABLES` reports none of the parameters that shape could carry, and Snowflake's storage parameters (retention, DDL collation, stage properties) live in `SHOW TABLES`, which this backend does not read; a default here means the engine's own behaviour, not an unknown. `partitioning` is filled with `PartitionState(scheme=None)`, so a caller sees an explicit "asked, no scheme" answer rather than `None`.
+
+`get_partition_state()` is the one judgement worth reading twice. Snowflake has no addressable partitions: the engine micro-partitions every standard table, and no DDL, name or id addresses one. `partition_capability()` already records `AUTOMATIC` and `supports_table_partitioning()` is `False` because it asks only whether partition DDL exists. The neutral `PartitionScheme` set names declarative schemes, so the answer is a state whose `scheme` is `None` and whose `bounds` are empty. That is stronger than a refusal, which would claim the backend cannot tell whether a table is partitioned at all, and stronger than `None`, which only says "not partitioned": the state records that the question was answered and that nothing addressable exists. `include_stats` changes nothing -- there is no partition to count. External tables are the caveat a caller owns: their `PARTITION BY (cols)` declares a partition expression, no view this backend reads reports it, and `get_table_state(...).raw["snowflake_table_type"]` is how a plan recognises one; nothing is invented for it.
+
+The CLI adds no `partitions` type. A listing would print an empty table and call it an answer, so the neutral method is where that question belongs; `triggers` is likewise absent because the engine has no triggers.
 
 ## Operational Families
 
@@ -433,7 +453,8 @@ python -m rhosocial.activerecord.backend.impl.snowflake introspect tables \
 |--------|-------------|
 | `get_database_info()` | The connected database and the known version |
 | `list_databases()` | Every database the role can see |
-| `list_schemas(database=None)` | A database's schemas, or the current database's |
+| `list_schema_infos(database=None)` | A database's complete schema records, or the current database's |
+| `list_schemas()` | The current database's schema names, as core's neutral `List[str]` |
 | `list_warehouses()` | Virtual warehouses, from `SHOW` |
 | `list_tables(schema=None, include_system=False, table_type=None)` | Tables, views and vendor table kinds |
 | `get_table_info(name, schema=None)` | One table with columns, indexes, foreign keys and `size_bytes` |
@@ -448,6 +469,10 @@ python -m rhosocial.activerecord.backend.impl.snowflake introspect tables \
 | `get_table_storage_metrics(table_name, schema=None)` | Billed storage, row count, clustering |
 | `list_routines(schema=None)` | Functions and procedures as one family |
 | `list_sequences(schema=None)` | Standalone sequences |
+| `list_sequence_states(schema=None)` | The same sequences as core's neutral `SequenceState` |
+| `get_table_state(table_name, schema=None)` | Kind, clustering traits, comment and the partition answer |
+| `get_partition_state(table_name, schema=None, include_stats=False)` | `PartitionState(scheme=None)`: no user-declared scheme |
+| `item_exists(kind, name, schema=None)` | Whether a schema/table/sequence/function exists; other kinds refuse |
 | `list_stages(schema=None)` | Named stages |
 | `list_file_formats(schema=None)` | Named file formats |
 | `list_pipes(schema=None)` | Pipes |

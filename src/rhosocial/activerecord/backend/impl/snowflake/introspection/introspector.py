@@ -28,6 +28,7 @@ Design principle: Sync and Async are separate and cannot coexist.
 import asyncio
 import copy
 import warnings
+from dataclasses import replace
 from typing import Any, Dict, List, Optional
 
 from rhosocial.activerecord.backend.introspection.base import (
@@ -42,6 +43,7 @@ from rhosocial.activerecord.backend.introspection.cache import (
 from rhosocial.activerecord.backend.introspection.executor import (
     IntrospectorExecutor,
 )
+from rhosocial.activerecord.backend.introspection.errors import ObjectNotFoundError
 from rhosocial.activerecord.backend.introspection.types import (
     ColumnNullable,
     IndexColumnInfo,
@@ -54,20 +56,26 @@ from rhosocial.activerecord.backend.introspection.types import (
     IntrospectionTableInfo,
     IntrospectionTriggerInfo,
     IntrospectionViewInfo,
+    ItemKind,
+    PartitionState,
     ReferentialAction,
     SequenceInfo,
+    SequenceState,
+    TableState,
 )
 
 from ..expression.introspection import (
     SnowflakeDatabaseListQueryStatement,
     SnowflakeFileFormatListQueryStatement,
     SnowflakeFunctionListQueryStatement,
+    SnowflakeObjectExistsQueryStatement,
     SnowflakePipeListQueryStatement,
     SnowflakeProcedureListQueryStatement,
     SnowflakeSchemaListQueryStatement,
     SnowflakeSequenceListQueryStatement,
     SnowflakeStageListQueryStatement,
     SnowflakeStreamListQueryStatement,
+    SnowflakeTableStateQueryStatement,
     SnowflakeTableStorageMetricsQueryStatement,
     SnowflakeTaskListQueryStatement,
     SnowflakeWarehouseListQueryStatement,
@@ -392,6 +400,48 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
                 )
             )
         return sequences
+
+    def parse_sequence_states(
+        self,
+        rows: List[Dict[str, Any]],
+        schema: str,
+    ) -> List[SequenceState]:
+        """Project ``SequenceInfo`` onto core's neutral ``SequenceState``.
+
+        The projection, not a second parser: the catalogue rows are read once
+        by :meth:`parse_sequences`, and the neutral shape is what that answer
+        carries once the engine-specific fields are set aside. That is the
+        arrangement the introspection rule names -- the complete class is this
+        backend's, the neutral one is a view of it -- and it keeps the two from
+        disagreeing about which column holds which fact.
+
+        ``owned_by`` is ``None`` deliberately. ``SEQUENCE_OWNER`` is a *role*,
+        not a column: PostgreSQL's sequences are owned by a table column, and
+        writing a role name into that slot would make the two engines' answers
+        read alike while meaning different things. The role stays in ``raw``
+        under its catalogue name.
+
+        ``START_VALUE`` and ``INCREMENT`` are the only figure slots this class
+        carries; the catalogue's ``NEXT_VALUE`` is the value the sequence will
+        produce next, not a last-produced value, so it stays in ``raw`` too.
+        """
+        return [
+            SequenceState(
+                name=sequence.name,
+                schema=sequence.schema,
+                owned_by=None,
+                start=sequence.start_value,
+                increment=sequence.increment,
+                raw={
+                    "snowflake_catalog": sequence.extra.get("snowflake_catalog"),
+                    "snowflake_owner": sequence.extra.get("snowflake_owner"),
+                    "snowflake_next_value": sequence.extra.get("snowflake_next_value"),
+                    "snowflake_ordered": sequence.extra.get("snowflake_ordered"),
+                    "snowflake_data_type": sequence.data_type,
+                },
+            )
+            for sequence in self.parse_sequences(rows, schema)
+        ]
 
     def parse_stages(
         self,
@@ -833,6 +883,78 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
                 )
             )
         return tables
+
+    def parse_table_state(
+        self,
+        rows: List[Dict[str, Any]],
+        table_name: str,
+        schema: str,
+    ) -> TableState:
+        """Read one ``TABLES`` row onto core's neutral ``TableState``.
+
+        ``kind`` is ``temporary`` when ``IS_TEMPORARY`` is ``YES`` or the
+        catalogue's own ``TABLE_TYPE`` spelling says ``TEMPORARY TABLE``,
+        ``transient`` when ``IS_TRANSIENT`` is ``YES``, and ``regular``
+        otherwise. Temporary wins over transient because it is the more
+        specific answer: Snowflake's temporary tables are short-lived objects
+        whose rows and metadata are session-scoped, while a transient table
+        persists without Time Travel/Fail-safe.
+
+        ``traits`` carries what the kind slot cannot: ``clustered`` when the
+        catalogue reports a ``CLUSTERING_KEY`` (the value itself is in ``raw``,
+        because a trait is a fact and the key is a text), and
+        ``auto_clustering`` when ``AUTO_CLUSTERING_ON`` is true. The catalogue's
+        table-type spelling is kept in ``raw`` for the same reason
+        :meth:`parse_tables` keeps it -- a vendor kind such as ``HYBRID TABLE``
+        must not be folded away at the only layer that saw it.
+
+        ``partitioning`` is not set here: it is the manager's answer, not this
+        row's, and :meth:`SnowflakeIntrospector.get_table_state` fills it from
+        :meth:`SnowflakeIntrospector.get_partition_state`.
+
+        An empty answer raises :class:`ObjectNotFoundError` rather than
+        returning a state for a table that is not there -- ``TableState`` has
+        no "absent" value and a fabricated one would read as a real table.
+        """
+        if not rows:
+            raise ObjectNotFoundError("table", table_name, schema)
+
+        row = self._upper_row(rows[0])
+        raw_type = read_table_type(row.get("TABLE_TYPE"))
+        is_temporary = (
+            self._as_flag(row.get("IS_TEMPORARY")) or raw_type == "TEMPORARY TABLE"
+        )
+        is_transient = self._as_flag(row.get("IS_TRANSIENT"))
+        clustering_key = row.get("CLUSTERING_KEY")
+        auto_clustering = self._as_flag(row.get("AUTO_CLUSTERING_ON"))
+
+        traits = []
+        if clustering_key:
+            traits.append("clustered")
+        if auto_clustering:
+            traits.append("auto_clustering")
+
+        if is_temporary:
+            kind = "temporary"
+        elif is_transient:
+            kind = "transient"
+        else:
+            kind = "regular"
+
+        return TableState(
+            name=row.get("TABLE_NAME") or table_name,
+            schema=row.get("TABLE_SCHEMA") or schema,
+            kind=kind,
+            traits=tuple(traits),
+            comment=row.get("COMMENT"),
+            raw={
+                "snowflake_table_type": raw_type,
+                "snowflake_clustering_key": clustering_key,
+                "snowflake_is_transient": is_transient,
+                "snowflake_is_temporary": is_temporary,
+                "snowflake_auto_clustering_on": auto_clustering,
+            },
+        )
 
     #: Concept name -> the ``INFORMATION_SCHEMA.COLUMNS`` column that carries
     #: that concept's width.
@@ -1400,8 +1522,16 @@ class SnowflakeIntrospector(SnowflakeIntrospectorMixin, AbstractIntrospector):
         self._cache.set(key, result)
         return result
 
-    def list_schemas(self, database: Optional[str] = None) -> List[SnowflakeSchemaInfo]:
+    def list_schema_infos(self, database: Optional[str] = None) -> List[SnowflakeSchemaInfo]:
         """List the schemas of *database*, or of the session's current one.
+
+        This is Snowflake's own complete answer -- owner, transient flag,
+        managed-access flag, retention, timestamps and comment -- and it is
+        named ``list_schema_infos`` because core's neutral ``list_schemas()``
+        now answers a different question: the bare names, with no database
+        parameter. Both are kept because they answer what each one promises:
+        the neutral method is the cross-dialect entry point, this one is the
+        catalogue's full record.
 
         ``SCHEMATA`` is a database-level view (documented on
         https://docs.snowflake.com/en/sql-reference/info-schema/schemata),
@@ -1412,10 +1542,11 @@ class SnowflakeIntrospector(SnowflakeIntrospectorMixin, AbstractIntrospector):
         for the quoting rule.
 
         The ``database`` is part of the cache key as a positional
-        discriminator, so ``list_schemas()`` and ``list_schemas("OTHER")``
-        cannot answer each other -- ``schema=`` would be the wrong slot for
-        it, because that parameter names the schema of the *requested*
-        objects, and here the database is the container being enumerated.
+        discriminator, so ``list_schema_infos()`` and
+        ``list_schema_infos("OTHER")`` cannot answer each other -- ``schema=``
+        would be the wrong slot for it, because that parameter names the
+        schema of the *requested* objects, and here the database is the
+        container being enumerated.
         """
         key = self._cache.key(IntrospectionScope.SCHEMA, database or "*", extra="schemas")
         cached = self._cache.get(key)
@@ -1425,6 +1556,28 @@ class SnowflakeIntrospector(SnowflakeIntrospectorMixin, AbstractIntrospector):
         result = self.parse_schemas(self._executor.execute(sql, params))
         self._cache.set(key, result)
         return result
+
+    def list_schemas(self) -> List[str]:
+        """The schema names of the session's current database.
+
+        Core's neutral answer is the names the server exposes, and it takes no
+        database parameter. Snowflake's namespaces live inside a database, so
+        "the schemas" means the current database's ``SCHEMATA`` rows; a caller
+        that needs another database, or the owner/comment/retention of each
+        row, calls :meth:`list_schema_infos`, which is this backend's complete
+        answer.
+
+        The names are the catalogue's spelling -- uppercase unless a schema
+        was created with a quoted name -- and are not filtered: the catalogue
+        itself lists ``INFORMATION_SCHEMA`` and ``PUBLIC`` as rows.
+        """
+        key = self._cache.key(IntrospectionScope.SCHEMA, extra="schema_names")
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        names = [info.name for info in self.list_schema_infos()]
+        self._cache.set(key, names)
+        return names
 
     def list_warehouses(self) -> List[SnowflakeWarehouseInfo]:
         """List the virtual warehouses the session's role can see.
@@ -1695,6 +1848,199 @@ class SnowflakeIntrospector(SnowflakeIntrospectorMixin, AbstractIntrospector):
         self._cache.set(key, result)
         return result
 
+    # ------------------------------------------------------------------ #
+    # Neutral object state -- core's dataclasses, not this backend's
+    # ------------------------------------------------------------------ #
+
+    def get_table_state(
+        self,
+        table_name: str,
+        schema: Optional[str] = None,
+    ) -> TableState:
+        """Read one table's kind, traits, comment and partition answer.
+
+        The row is the ``INFORMATION_SCHEMA.TABLES`` row for the table itself
+        (see :meth:`~..mixins.introspection.SnowflakeIntrospectionMixin.format_table_state_query_statement`),
+        parsed by :meth:`parse_table_state`. ``kind`` is ``regular``,
+        ``transient`` or ``temporary``; ``traits`` carries ``clustered`` and
+        ``auto_clustering``; the catalogue's own kind spelling and the
+        clustering key text stay in ``raw``.
+
+        ``partitioning`` is filled from :meth:`get_partition_state`, which
+        answers "no user-declared scheme" for every table this engine stores
+        itself. A caller reading the state therefore sees an explicit
+        ``PartitionState(scheme=None)`` rather than ``None``, and knows the
+        question was answered.
+
+        ``StorageOptionsState`` keeps its defaults on purpose. ``TABLES``
+        reports none of the parameters it could carry -- charset, collation,
+        compression, tablespace, engine -- because Snowflake does not have
+        those table properties in that shape; its storage parameters
+        (retention, DDL collation, stage properties) are ``SHOW TABLES`` facts
+        this backend does not read. A default here means "the engine's own
+        behaviour", which is what core's contract says ``None`` means, not an
+        unknown.
+
+        A table that does not exist raises
+        :class:`~rhosocial.activerecord.backend.introspection.errors.ObjectNotFoundError`:
+        the neutral signature returns a ``TableState``, which has no absent
+        value, and a fabricated state would read as a real table. The same
+        exception answers a name that is a view: ``TableState.kind`` names
+        table kinds, so a view is not this question's object and
+        :meth:`get_view_info` is where a view is described.
+
+        The answer is cached under the table scope with an ``extra`` slot, so
+        it cannot be served for, or into, ``get_table_info``'s answer.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.TABLE, table_name, schema=target_schema, extra="state"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeTableStateQueryStatement(
+            self.dialect, table_name=table_name, schema=target_schema
+        ).to_sql()
+        state = self.parse_table_state(
+            self._executor.execute(sql, params), table_name, target_schema
+        )
+        state = replace(
+            state, partitioning=self.get_partition_state(table_name, schema)
+        )
+        self._cache.set(key, state)
+        return state
+
+    def get_partition_state(
+        self,
+        table_name: str,
+        schema: Optional[str] = None,
+        include_stats: bool = False,
+    ) -> Optional[PartitionState]:
+        """Answer "no user-declared partition scheme", and say what that means.
+
+        Snowflake has no addressable partitions. Every standard table is
+        divided into micro-partitions by the engine, and nothing -- no DDL, no
+        partition name, no id -- addresses one; ``partition_capability()`` on
+        the dialect records ``AUTOMATIC`` for exactly that reason, and
+        ``supports_table_partitioning()`` is ``False`` because it asks only
+        whether addressable partition DDL exists. The neutral closed set
+        (``PartitionScheme``) names *declarative* schemes, so this engine
+        declares none: ``scheme`` is ``None`` and ``bounds`` is empty.
+
+        That is an answer, not a fabricated listing. Returning
+        ``PartitionState(scheme=None)`` says "asked, and there is no scheme",
+        which is stronger than core's ``None`` ("not partitioned") and much
+        stronger than the base refusal, which would claim the backend cannot
+        tell whether a table is partitioned at all. A migration planner needs
+        the difference: on this engine, carrying a source table's declarative
+        partitioning over is a no-op to report, not an error to abort on.
+
+        ``include_stats`` asks for per-partition row counts and bytes. There
+        is no partition here to measure, so nothing is queried and the flag
+        changes nothing; the bound list stays empty rather than made up.
+        ``raw`` records the engine's actual arrangement so a reader is not left
+        guessing why the answer is empty.
+
+        Two caveats belong to the caller, not to a wider state object. First,
+        this method reads no catalogue, so it does not check that the table
+        exists -- ``get_table_state`` and ``table_exists`` are the existence
+        questions. Second, external tables declare a partition *expression*
+        with ``PARTITION BY (cols)``, and no view this backend reads reports
+        it; a plan touching an external table must read
+        ``get_table_state(...).raw["snowflake_table_type"]`` and must not read
+        ``scheme=None`` as "unpartitioned". Nothing is invented for that case.
+        """
+        return PartitionState(
+            scheme=None,
+            raw={
+                "snowflake_partitioning": "automatic",
+                "snowflake_addressable_partitions": False,
+            },
+        )
+
+    def list_sequence_states(
+        self,
+        schema: Optional[str] = None,
+    ) -> List[SequenceState]:
+        """Read the standalone sequences of one schema as neutral states.
+
+        The same ``INFORMATION_SCHEMA.SEQUENCES`` read as
+        :meth:`list_sequences`, projected onto core's ``SequenceState`` by
+        :meth:`parse_sequence_states`; the two answers share the catalogue row
+        and differ only in shape, which is why they are separate methods rather
+        than one returning a union. ``owned_by`` is ``None`` because the view's
+        only ownership column is a role name, not a column reference.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SEQUENCE, schema=target_schema, extra="sequence_states"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeSequenceListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_sequence_states(
+            self._executor.execute(sql, params), target_schema
+        )
+        self._cache.set(key, result)
+        return result
+
+    def item_exists(
+        self,
+        kind: ItemKind,
+        name: str,
+        schema: Optional[str] = None,
+    ) -> bool:
+        """Whether one named shared object of ``kind`` exists.
+
+        Answered for the kinds this backend has a catalogue for:
+
+        * ``SCHEMA`` -- ``INFORMATION_SCHEMA.SCHEMATA`` (the current database's);
+        * ``TABLE`` -- ``INFORMATION_SCHEMA.TABLES``, with the view spellings
+          excluded, because a view is not a table;
+        * ``SEQUENCE`` -- ``INFORMATION_SCHEMA.SEQUENCES``;
+        * ``FUNCTION`` -- ``INFORMATION_SCHEMA.FUNCTIONS`` (user-defined and
+          external functions, not the built-ins).
+
+        The question is one filtered row carrying the limit 1, not a listing
+        scanned in Python, so its cost does not grow with the schema. The
+        dialect formatter owns the kind-to-view mapping, and a kind absent from
+        it refuses through the protocol error naming ``item_exists`` -- the
+        same refusal the core base raises, so an unanswerable kind cannot
+        masquerade as ``False``.
+
+        Kinds that refuse, and why:
+
+        * ``TYPE`` and ``DOMAIN`` -- this backend reads no catalogue of
+          user-defined types or domains, and does not claim one exists.
+        * ``EXTENSION``, ``TABLESPACE``, ``PARTITION_FUNCTION``,
+          ``PARTITION_SCHEME`` and ``FULLTEXT_CATALOG`` -- objects this engine
+          does not have in those shapes.
+        * file formats and tags, which Snowflake *does* have, are not askable
+          through this method at all: core's ``ItemKind`` names neither. File
+          formats are answered by :meth:`list_file_formats`; tags have no
+          family in this backend yet. Procedures are likewise absent from
+          ``ItemKind`` and are answered by :meth:`list_routines`.
+
+        Not cached: a yes/no answer for a named object must not stay stale for
+        the cache's TTL, which is what a just-created object would be for.
+
+        ``kind`` is coerced through :class:`ItemKind`, so a caller holding the
+        catalogue word (``"sequence"``) asks the same question as one holding
+        the member. An unusable word raises that enum's own ``ValueError``.
+        """
+        kind = ItemKind(kind)
+        target_schema = schema if schema is not None else self.default_schema
+        sql, params = SnowflakeObjectExistsQueryStatement(
+            self.dialect, kind=kind, name=name, schema=target_schema
+        ).to_sql()
+        return bool(self._executor.execute(sql, params))
+
 
 class _SnowflakeAsyncIntrospectorExecutor:
     """Async executor wrapping synchronous Snowflake cursor operations.
@@ -1792,10 +2138,14 @@ class AsyncSnowflakeIntrospector(SnowflakeIntrospectorMixin, AsyncAbstractIntros
         self._cache.set(key, result)
         return result
 
-    async def list_schemas(self, database: Optional[str] = None) -> List[SnowflakeSchemaInfo]:
+    async def list_schema_infos(
+        self, database: Optional[str] = None
+    ) -> List[SnowflakeSchemaInfo]:
         """List the schemas of *database*, or of the session's current one.
 
-        Asynchronous twin of :meth:`SnowflakeIntrospector.list_schemas`.
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_schema_infos`;
+        the ``database`` discriminator and the rename away from the neutral
+        ``list_schemas`` are explained there.
         """
         key = self._cache.key(IntrospectionScope.SCHEMA, database or "*", extra="schemas")
         cached = self._cache.get(key)
@@ -1805,6 +2155,19 @@ class AsyncSnowflakeIntrospector(SnowflakeIntrospectorMixin, AsyncAbstractIntros
         result = self.parse_schemas(await self._executor.execute(sql, params))
         self._cache.set(key, result)
         return result
+
+    async def list_schemas(self) -> List[str]:
+        """The schema names of the session's current database.
+
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_schemas`.
+        """
+        key = self._cache.key(IntrospectionScope.SCHEMA, extra="schema_names")
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+        names = [info.name for info in await self.list_schema_infos()]
+        self._cache.set(key, names)
+        return names
 
     async def list_warehouses(self) -> List[SnowflakeWarehouseInfo]:
         """List the virtual warehouses the session's role can see.
@@ -2030,3 +2393,104 @@ class AsyncSnowflakeIntrospector(SnowflakeIntrospectorMixin, AsyncAbstractIntros
         result = self.parse_streams(await self._executor.execute(sql, params))
         self._cache.set(key, result)
         return result
+
+    # ------------------------------------------------------------------ #
+    # Neutral object state -- async twins
+    # ------------------------------------------------------------------ #
+
+    async def get_table_state(
+        self,
+        table_name: str,
+        schema: Optional[str] = None,
+    ) -> TableState:
+        """Read one table's neutral state.
+
+        Asynchronous twin of :meth:`SnowflakeIntrospector.get_table_state`,
+        including the ``ObjectNotFoundError`` raised for a missing table and
+        the partition answer filled in from :meth:`get_partition_state`.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.TABLE, table_name, schema=target_schema, extra="state"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeTableStateQueryStatement(
+            self.dialect, table_name=table_name, schema=target_schema
+        ).to_sql()
+        state = self.parse_table_state(
+            await self._executor.execute(sql, params), table_name, target_schema
+        )
+        state = replace(
+            state, partitioning=await self.get_partition_state(table_name, schema)
+        )
+        self._cache.set(key, state)
+        return state
+
+    async def get_partition_state(
+        self,
+        table_name: str,
+        schema: Optional[str] = None,
+        include_stats: bool = False,
+    ) -> Optional[PartitionState]:
+        """Answer "no user-declared partition scheme".
+
+        Asynchronous twin of :meth:`SnowflakeIntrospector.get_partition_state`,
+        where the reasoning -- including why this is a state with
+        ``scheme=None`` rather than a refusal or an empty bound list, and the
+        external-table caveat -- is recorded. No I/O happens here either, so
+        the ``async`` keyword exists only for signature parity.
+        """
+        return PartitionState(
+            scheme=None,
+            raw={
+                "snowflake_partitioning": "automatic",
+                "snowflake_addressable_partitions": False,
+            },
+        )
+
+    async def list_sequence_states(
+        self,
+        schema: Optional[str] = None,
+    ) -> List[SequenceState]:
+        """Read the standalone sequences of one schema as neutral states.
+
+        Asynchronous twin of :meth:`SnowflakeIntrospector.list_sequence_states`.
+        """
+        target_schema = schema if schema is not None else self.default_schema
+        key = self._cache.key(
+            IntrospectionScope.SEQUENCE, schema=target_schema, extra="sequence_states"
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        sql, params = SnowflakeSequenceListQueryStatement(
+            self.dialect, schema=target_schema
+        ).to_sql()
+        result = self.parse_sequence_states(
+            await self._executor.execute(sql, params), target_schema
+        )
+        self._cache.set(key, result)
+        return result
+
+    async def item_exists(
+        self,
+        kind: ItemKind,
+        name: str,
+        schema: Optional[str] = None,
+    ) -> bool:
+        """Whether one named shared object of ``kind`` exists.
+
+        Asynchronous twin of :meth:`SnowflakeIntrospector.item_exists`, where
+        the answered kinds, the refused ones and the deliberate absence of
+        caching are recorded.
+        """
+        kind = ItemKind(kind)
+        target_schema = schema if schema is not None else self.default_schema
+        sql, params = SnowflakeObjectExistsQueryStatement(
+            self.dialect, kind=kind, name=name, schema=target_schema
+        ).to_sql()
+        return bool(await self._executor.execute(sql, params))

@@ -118,9 +118,9 @@ class TestSyncIntrospectDispatch:
             title="Databases",
         )
 
-    def test_schemas_reaches_list_schemas_with_database(self):
+    def test_schemas_reaches_list_schema_infos_with_database(self):
         introspector = MagicMock()
-        introspector.list_schemas.return_value = [
+        introspector.list_schema_infos.return_value = [
             SnowflakeSchemaInfo(
                 name="PUBLIC",
                 catalog_name="ANALYTICS",
@@ -139,7 +139,7 @@ class TestSyncIntrospectDispatch:
             introspector,
         )
 
-        introspector.list_schemas.assert_called_once_with(
+        introspector.list_schema_infos.assert_called_once_with(
             database="ANALYTICS"
         )
         [payload] = provider.display_results.call_args.args[0]

@@ -69,8 +69,11 @@ Three absences worth naming:
 
 *   **No `triggers` type.** Snowflake has no triggers, so there is no object to
     ask about. That is an engine fact, not a gap in the CLI.
-*   **No `partition-metadata` type.** The dialect carries a formatter for it,
-    but no introspector method reads it, so there is no answer behind the type.
+*   **No `partitions` type.** Snowflake's micro-partitions are not
+    user-addressable: there is no partition name or id to list, so the neutral
+    `get_partition_state` answers `PartitionState(scheme=None)` and a CLI type
+    would print an empty table and call it an answer. The question belongs to
+    the API, which states "no scheme" rather than refusing.
 *   **No `ddl` type.** DDL extraction is not offered by this backend:
     `supports_ddl_extraction()` answers False, and the dialect refuses to
     assemble text that would read as the engine's own.

@@ -125,7 +125,7 @@ class FakeIntrospector:
             )
         ]
 
-    def list_schemas(self, database=None):
+    def list_schema_infos(self, database=None):
         self.calls.append(("schemas", database))
         return [{"SCHEMA_NAME": "PUBLIC"}]
 
@@ -152,7 +152,7 @@ class AsyncFacade:
             "get_table_storage_metrics",
             "get_database_info",
             "list_databases",
-            "list_schemas",
+            "list_schema_infos",
             "list_warehouses",
         ):
             fn = getattr(sync, attr)

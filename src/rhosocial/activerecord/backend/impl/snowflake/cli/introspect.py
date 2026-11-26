@@ -92,9 +92,12 @@ INTROSPECT_TYPES = list(_TYPE_CAPABILITIES)
 
 # Note: "triggers" is intentionally excluded because Snowflake does not
 # support triggers -- the engine has no such object, so there is no question
-# to ask. "partition-metadata" is excluded for a different reason: the dialect
-# has a formatter for it, but no introspector method reads it, so there is no
-# answer behind the type.
+# to ask. A "partitions" type is excluded for a different reason: Snowflake's
+# micro-partitions are not user-addressable, so the neutral
+# ``get_partition_state`` answers ``PartitionState(scheme=None)`` and there is
+# no listing to print. Offering a type would print an empty table and call it
+# an answer; the API's "no scheme" answer is where that question belongs, and
+# no CLI family is added for it.
 
 #: Types that answer for a whole family (or for the session's context), not
 #: for one named object. A NAME given to one of them is refused rather than
@@ -585,7 +588,7 @@ def _handle_introspect_sync(args, backend: SnowflakeBackend, provider):
         elif args.type == "schemas":
             # SCHEMATA is a database-level view: --database names the
             # database to enumerate, or None for the session's current one.
-            schemas = introspector.list_schemas(database=args.database)
+            schemas = introspector.list_schema_infos(database=args.database)
             data = _serialize_for_output(schemas)
             provider.display_results(data, title="Schemas")
 
@@ -814,7 +817,7 @@ async def _handle_introspect_async(args, backend: AsyncSnowflakeBackend, provide
         elif args.type == "schemas":
             # SCHEMATA is a database-level view: --database names the
             # database to enumerate, or None for the session's current one.
-            schemas = await introspector.list_schemas(database=args.database)
+            schemas = await introspector.list_schema_infos(database=args.database)
             data = _serialize_for_output(schemas)
             provider.display_results(data, title="Schemas")
 

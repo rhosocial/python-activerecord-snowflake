@@ -232,8 +232,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"  ({len(databases)} row(s); executor questions cold={cold} warm={warm})")
 
         print("\nSchemas")
-        cold, schemas = _ask(counter, introspector.list_schemas)
-        warm, _ = _ask(counter, introspector.list_schemas)
+        cold, schemas = _ask(counter, introspector.list_schema_infos)
+        warm, _ = _ask(counter, introspector.list_schema_infos)
         _print_schemas(schemas)
         print(f"  ({len(schemas)} row(s); executor questions cold={cold} warm={warm})")
 
