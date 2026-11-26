@@ -59,6 +59,67 @@ class SnowflakeCapabilityMixin:
         """Snowflake supports EXPLAIN."""
         return True
 
+    # Snowflake's grammar is ``EXPLAIN [ USING { TABULAR | JSON | TEXT } ]
+    # <statement>``. Core's shared formatter spells the format as
+    # ``FORMAT <NAME>`` and appends PostgreSQL-style tails (ANALYZE, VERBOSE,
+    # COSTS, BUFFERS, TIMING, SETTINGS, WAL), none of which Snowflake accepts.
+    # This dialect leaves the shared formatter in place, so every one of those
+    # switches answers False: a caller that asks for such an option is refused
+    # by name instead of being handed SQL the server rejects.
+    #
+    # https://docs.snowflake.com/en/sql-reference/sql/explain
+    def supports_explain_analyze(self) -> bool:
+        """Snowflake has no ``EXPLAIN ANALYZE``; it never executes the query."""
+        return False
+
+    def supports_explain_verbose(self) -> bool:
+        """Snowflake has no ``VERBOSE`` tail."""
+        return False
+
+    def supports_explain_costs(self) -> bool:
+        """Snowflake has no ``COSTS`` option."""
+        return False
+
+    def supports_explain_buffers(self) -> bool:
+        """Snowflake has no ``BUFFERS`` option."""
+        return False
+
+    def supports_explain_timing(self) -> bool:
+        """Snowflake has no ``TIMING`` option."""
+        return False
+
+    def supports_explain_settings(self) -> bool:
+        """Snowflake has no ``SETTINGS`` option."""
+        return False
+
+    def supports_explain_wal(self) -> bool:
+        """Snowflake has no ``WAL`` option."""
+        return False
+
+    def supports_explain_format_text(self) -> bool:
+        """Snowflake writes ``USING TEXT``, never ``FORMAT TEXT``."""
+        return False
+
+    def supports_explain_format_json(self) -> bool:
+        """Snowflake writes ``USING JSON``, never ``FORMAT JSON``."""
+        return False
+
+    def supports_explain_format_xml(self) -> bool:
+        """Snowflake has no XML explain format."""
+        return False
+
+    def supports_explain_format_yaml(self) -> bool:
+        """Snowflake has no YAML explain format."""
+        return False
+
+    def supports_explain_format_tree(self) -> bool:
+        """Snowflake has no TREE explain format."""
+        return False
+
+    def supports_explain_format_traditional(self) -> bool:
+        """Snowflake has no TRADITIONAL explain format."""
+        return False
+
     def supports_advanced_grouping(self) -> bool:
         """Snowflake supports GROUPING SETS, ROLLUP, CUBE."""
         return True
@@ -471,15 +532,6 @@ class SnowflakeCapabilityMixin:
         is dead code and the core's False is what a caller sees.
         """
         return True
-
-    #: The JSON path function Snowflake spells this way. Declared so a
-    #: conformance check can tell it from a function inherited from the core,
-    #: which is MySQL's JSON_EXTRACT.
-    _JSON_FUNCTION_NAMES = ("GET_PATH",)
-
-    def supports_json_function(self, function_name: str) -> bool:
-        """Whether a named JSON function is available on this server."""
-        return function_name.upper() in self._JSON_FUNCTION_NAMES
 
     def format_json_function_expression(self, expr) -> Tuple[str, tuple]:
         """Render a JSON path with GET_PATH.

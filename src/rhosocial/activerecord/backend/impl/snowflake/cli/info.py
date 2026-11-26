@@ -36,13 +36,6 @@ logger = get_logger("rhosocial.activerecord.backend.snowflake")
 
 DIALECT_SPECIFIC_GROUPS = {"Snowflake-specific"}
 
-# Argument sets for support probes that require a parameter. The shared core
-# helper probes each argument separately instead of reporting the method as
-# unsupported merely because it needs an argument.
-SUPPORT_METHOD_ALL_ARGS: Dict[str, List[str]] = {
-    "supports_explain_format": ["TEXT", "JSON", "XML", "YAML", "TREE", "DOT"],
-}
-
 PROTOCOL_FAMILY_GROUPS: Dict[str, list] = {
     "Query Features": [
         WindowFunctionSupport, CTESupport, FilterClauseSupport,
@@ -161,7 +154,6 @@ def handle(args):
         dialect,
         family_groups=PROTOCOL_FAMILY_GROUPS,
         dialect_specific_groups=DIALECT_SPECIFIC_GROUPS,
-        all_args=SUPPORT_METHOD_ALL_ARGS,
         verbose=args.verbose,
     )
     info = {

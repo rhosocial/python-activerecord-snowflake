@@ -11,8 +11,7 @@ flattening everything into text columns.
 | `supports_variant_type()` | `True` | `VARIANT` columns and path/cast expressions |
 | `supports_array_type()` | `True` | `ARRAY` columns |
 | `supports_arrays()` | `True` | Native arrays |
-| `supports_json_type()` | `True` | JSON lives in `VARIANT` |
-| `supports_json_function(name)` | only `GET_PATH` | Arrow operators are refused |
+| `supports_json_type()` | `True` | JSON lives in `VARIANT`; paths render as `GET_PATH` and arrow operators are refused |
 
 ## VARIANT
 

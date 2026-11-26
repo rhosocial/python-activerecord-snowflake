@@ -75,8 +75,8 @@ here as prose rather than as code:
 * the JSON path operations ``json_path`` / ``json_value`` -- served by
   ``GET_PATH`` and its ``:`` shorthand, which the reference defines for "An
   expression that evaluates to a VARIANT, OBJECT, or ARRAY column" and which
-  this dialect already renders
-  (:attr:`~.capabilities.SnowflakeCapabilityMixin._JSON_FUNCTION_NAMES`).
+  this dialect already renders (``format_json_function_expression`` always
+  emits ``GET_PATH``).
   文档（待云端验证）<https://docs.snowflake.com/en/sql-reference/functions/get_path>
 
 **One probe was left open rather than answered, and stays open.** Core's

@@ -35,10 +35,6 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
         SnowflakeScalarTypeDefinition,
         SnowflakeObjectTypeDefinition,
     )
-    _TYPE_ACTION_TYPES = (
-        SnowflakeSetTypeCommentAction,
-        SnowflakeUnsetTypeCommentAction,
-    )
 
     def _has_type_support(self) -> bool:
         version = getattr(self, "version", None)
@@ -73,30 +69,6 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
         if not self._has_type_support():
             return ()
         return self._TYPE_DEFINITION_TYPES
-
-    def supports_type_definition(
-        self,
-        definition_type: Type[TypeDefinition],
-    ) -> bool:
-        try:
-            return self._has_type_support() and issubclass(
-                definition_type,
-                self._TYPE_DEFINITION_TYPES,
-            )
-        except TypeError:
-            return False
-
-    def supports_type_alter_action(
-        self,
-        action_type: Type[TypeAlterAction],
-    ) -> bool:
-        try:
-            return self._has_type_support() and issubclass(
-                action_type,
-                self._TYPE_ACTION_TYPES,
-            )
-        except TypeError:
-            return False
 
     def supports_create_type_if_not_exists(self) -> bool:
         return self._has_type_support()
@@ -152,7 +124,7 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
             raise UnsupportedFeatureError(self.name, "CREATE TYPE IF NOT EXISTS")
         if expr.or_replace and not self.supports_create_type_or_replace():
             raise UnsupportedFeatureError(self.name, "CREATE OR REPLACE TYPE")
-        if not self.supports_type_definition(type(expr.definition)):
+        if not issubclass(type(expr.definition), self.supported_type_definitions()):
             raise UnsupportedFeatureError(
                 self.name,
                 f"TYPE definition {expr.definition.definition_kind}",
@@ -189,11 +161,8 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
         action_parts = []
         action_params = []
         for action in expr.actions:
-            if not self.supports_type_alter_action(type(action)):
-                raise UnsupportedFeatureError(
-                    self.name,
-                    f"ALTER TYPE action {action.action_kind}",
-                )
+            # An action outside this backend's vocabulary has no grammar;
+            # ``format_type_alter_action`` ends in the refusal that names it.
             action_sql, params = action.to_sql()
             action_parts.append(action_sql)
             action_params.extend(params)

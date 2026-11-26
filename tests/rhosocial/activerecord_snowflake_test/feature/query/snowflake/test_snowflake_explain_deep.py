@@ -5,14 +5,11 @@ The shared testsuite contracts only assert that EXPLAIN *can run* against a live
 account.  This file covers Snowflake's local EXPLAIN surface without a database:
 the capability probes and the SQL that ``format_explain_statement`` renders.
 
-Snowflake's native grammar is ``EXPLAIN [ USING { TABULAR | TEXT } ] <query>``:
-there is no ``ANALYZE`` / ``FORMAT`` / ``VERBOSE`` tail.  The dialect leaves
-core's generic ``ExplainMixin`` in place, whose probes answer False for
-``supports_explain_analyze()`` and ``supports_explain_format()``.  Callers must
-consult those probes before passing PostgreSQL-style options.  The option
-rendering tests below pin the *inherited generic renderer's* exact output so a
-future Snowflake-specific renderer change is caught rather than silently
-changing the generated SQL.
+Snowflake's native grammar is ``EXPLAIN [ USING { TABULAR | JSON | TEXT } ]
+<statement>``: there is no ``ANALYZE`` / ``FORMAT`` / ``VERBOSE`` tail.  The
+dialect leaves core's generic ``ExplainMixin`` in place and declares every
+option switch False, so the generic formatter refuses -- by name -- any option
+it would otherwise have rendered as PostgreSQL-style SQL the server rejects.
 
 No real-DB result-interpretation test lives here: the only local database is the
 fakesnow (DuckDB) emulator, which cannot parse ``EXPLAIN`` at all (it falls back
@@ -22,6 +19,7 @@ coverage at this layer is construction-level only.
 """
 
 import pytest
+from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.expression import (
     Column,
     ComparisonPredicate,
@@ -49,6 +47,17 @@ def _select(dialect):
     return QueryStatement(dialect, select=[Column(dialect, "id")], from_=Table(dialect, "users"))
 
 
+#: Every format switch, paired with the enum member it answers for.
+FORMAT_SWITCHES = {
+    ExplainFormat.TEXT: "supports_explain_format_text",
+    ExplainFormat.JSON: "supports_explain_format_json",
+    ExplainFormat.XML: "supports_explain_format_xml",
+    ExplainFormat.YAML: "supports_explain_format_yaml",
+    ExplainFormat.TREE: "supports_explain_format_tree",
+    ExplainFormat.TRADITIONAL: "supports_explain_format_traditional",
+}
+
+
 @pytest.mark.unit
 class TestSnowflakeExplainCapabilities:
     """The dialect's EXPLAIN probes state what the Snowflake server accepts."""
@@ -62,26 +71,33 @@ class TestSnowflakeExplainCapabilities:
         assert dialect.supports_explain() is True
 
     def test_analyze_is_not_advertised(self, dialect):
-        """Snowflake's EXPLAIN grammar has no ANALYZE keyword.
-
-        The dialect keeps core's generic ExplainMixin, whose default probe is
-        False.  Callers must gate on this before passing ``analyze=True``.
-        """
+        """Snowflake's EXPLAIN grammar has no ANALYZE keyword."""
         assert dialect.supports_explain_analyze() is False
 
     @pytest.mark.parametrize("fmt", list(ExplainFormat))
     def test_structured_formats_are_not_advertised(self, dialect, fmt):
         """No ExplainFormat value is advertised.
 
-        Snowflake's ``USING TABULAR`` / ``USING TEXT`` are not modelled by
-        ``supports_explain_format`` and the generic probe answers False for
-        every enum member, including a raw ``TABULAR`` string.
+        Snowflake spells its output formats ``USING TEXT`` / ``USING JSON``;
+        the shared formatter would emit ``FORMAT <NAME>``, so no enum member,
+        including ``TABULAR``, maps to a renderable Snowflake option.
         """
-        assert dialect.supports_explain_format(fmt) is False
+        assert getattr(dialect, FORMAT_SWITCHES[fmt])() is False
 
-    def test_tabular_string_is_not_advertised(self, dialect):
-        """The raw Snowflake ``TABULAR`` format keyword still answers False."""
-        assert dialect.supports_explain_format("TABULAR") is False
+    @pytest.mark.parametrize(
+        "probe",
+        [
+            "supports_explain_verbose",
+            "supports_explain_costs",
+            "supports_explain_buffers",
+            "supports_explain_timing",
+            "supports_explain_settings",
+            "supports_explain_wal",
+        ],
+    )
+    def test_postgres_style_tails_are_not_advertised(self, dialect, probe):
+        """None of the generic formatter's tail options is Snowflake syntax."""
+        assert getattr(dialect, probe)() is False
 
 
 @pytest.mark.unit
@@ -123,34 +139,60 @@ class TestSnowflakeExplainRendering:
         assert sql == 'EXPLAIN SELECT "id" FROM "users" WHERE "age" > %s'
         assert params == (18,)
 
-    def test_analyze_option_renders_analyze_clause(self, dialect):
-        """``analyze=True`` is echoed as ``ANALYZE`` by the generic renderer.
+    def test_analyze_option_is_refused(self, dialect):
+        """``analyze=True`` has no Snowflake spelling and is named in the error."""
+        with pytest.raises(UnsupportedFeatureError):
+            ExplainStatement(dialect, _select(dialect), ExplainOptions(analyze=True)).to_sql()
 
-        The capability probe above reports ANALYZE unsupported; this test pins
-        the inherited renderer's behaviour, not an endorsement of the syntax.
+    def test_every_requested_format_is_refused(self, dialect):
+        """A requested ``FORMAT`` is invalid Snowflake syntax, so it is refused."""
+        for fmt in ExplainFormat:
+            options = ExplainOptions(format=fmt)
+            with pytest.raises(UnsupportedFeatureError):
+                ExplainStatement(dialect, _select(dialect), options).to_sql()
+
+    def test_costs_off_is_refused(self, dialect):
+        """``costs=False`` would render ``COSTS OFF``; Snowflake has no such option."""
+        options = ExplainOptions(costs=False)
+        with pytest.raises(UnsupportedFeatureError):
+            ExplainStatement(dialect, _select(dialect), options).to_sql()
+
+    def test_buffers_is_refused(self, dialect):
+        """``buffers=True`` would render ``BUFFERS``; Snowflake has no such option."""
+        options = ExplainOptions(buffers=True)
+        with pytest.raises(UnsupportedFeatureError):
+            ExplainStatement(dialect, _select(dialect), options).to_sql()
+
+    def test_verbose_is_refused(self, dialect):
+        """``verbose=True`` would render ``VERBOSE``; Snowflake has no such option."""
+        options = ExplainOptions(verbose=True)
+        with pytest.raises(UnsupportedFeatureError):
+            ExplainStatement(dialect, _select(dialect), options).to_sql()
+
+    def test_settings_is_refused(self, dialect):
+        """``settings=True`` would render ``SETTINGS``; Snowflake has no such option."""
+        options = ExplainOptions(settings=True)
+        with pytest.raises(UnsupportedFeatureError):
+            ExplainStatement(dialect, _select(dialect), options).to_sql()
+
+    def test_wal_is_refused(self, dialect):
+        """``wal=True`` would render ``WAL``; Snowflake has no such option."""
+        options = ExplainOptions(wal=True)
+        with pytest.raises(UnsupportedFeatureError):
+            ExplainStatement(dialect, _select(dialect), options).to_sql()
+
+    def test_timing_without_analyze_is_ignored(self, dialect):
+        """``timing`` only accompanies ``analyze``, which is itself refused.
+
+        Without ``analyze`` the generic formatter never emits ``TIMING``, so
+        the default-shaped SQL is still produced.
         """
-        sql, _ = ExplainStatement(dialect, _select(dialect), ExplainOptions(analyze=True)).to_sql()
-        assert sql == 'EXPLAIN ANALYZE SELECT "id" FROM "users"'
-
-    def test_format_option_renders_format_clause(self, dialect):
-        """A requested format is echoed as ``FORMAT <NAME>`` verbatim."""
-        options = ExplainOptions(format=ExplainFormat.JSON)
+        options = ExplainOptions(timing=True)
         sql, _ = ExplainStatement(dialect, _select(dialect), options).to_sql()
-        assert sql == 'EXPLAIN FORMAT JSON SELECT "id" FROM "users"'
+        assert sql == 'EXPLAIN SELECT "id" FROM "users"'
 
-    def test_costs_off_and_verbose_render(self, dialect):
-        """``costs=False`` and ``verbose=True`` produce their generic clauses."""
-        options = ExplainOptions(costs=False, verbose=True)
-        sql, _ = ExplainStatement(dialect, _select(dialect), options).to_sql()
-        assert sql == 'EXPLAIN COSTS OFF VERBOSE SELECT "id" FROM "users"'
-
-    def test_all_options_render_in_documented_order(self, dialect):
-        """The full option set renders in the generic formatter's fixed order.
-
-        Pinning the exact string makes any change to the inherited renderer
-        explicit.  None of these PostgreSQL-style clauses are valid Snowflake
-        syntax; the capability probes are the authority on what to pass.
-        """
+    def test_all_options_are_refused_at_the_first_clause(self, dialect):
+        """The full PostgreSQL option set stops at ``ANALYZE``."""
         options = ExplainOptions(
             analyze=True,
             format=ExplainFormat.JSON,
@@ -161,9 +203,5 @@ class TestSnowflakeExplainRendering:
             settings=True,
             wal=True,
         )
-        sql, params = ExplainStatement(dialect, _select(dialect), options).to_sql()
-        assert sql == (
-            "EXPLAIN ANALYZE FORMAT JSON COSTS OFF BUFFERS TIMING ON VERBOSE "
-            'SETTINGS WAL SELECT "id" FROM "users"'
-        )
-        assert params == ()
+        with pytest.raises(UnsupportedFeatureError):
+            ExplainStatement(dialect, _select(dialect), options).to_sql()
