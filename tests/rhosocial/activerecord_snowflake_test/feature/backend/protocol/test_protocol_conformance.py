@@ -67,7 +67,6 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     IdentityColumnSupport,
     ILIKESupport,
     IndexObjectSupport,
-    IntrospectionSupport,
     JSONSupport,
     JoinSupport,
     LateralJoinSupport,
@@ -91,11 +90,61 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     WildcardSupport,
     WindowFunctionSupport,
 )
+from rhosocial.activerecord.backend.dialect.exceptions import UnsupportedFeatureError
 from rhosocial.activerecord.backend.suggestion.protocols import (
     ColumnTypeSuggestionSupport,
     FunctionSuggestionSupport,
     GeneratedValueSuggestionSupport,
 )
+
+
+# Core's introspection surface is four families, each asking a different
+# question. This backend answers two of them and refuses the other two, so the
+# families are classified by their answers rather than by a structural
+# ``isinstance``: core's family mixin supplies every family's members, which
+# makes all four protocols match a dialect even when no probe answers True.
+#
+# ``answered`` is the classification. It is not a capability switch -- no
+# implementation is flipped here; an answered family is one this dialect reads
+# from a real catalogue, and an absent family is a negative with an explicit
+# refusal (every probe False, every formatter raising UnsupportedFeatureError).
+INTROSPECTION_FAMILIES = [
+    {
+        "name": "structure",
+        "sync": dialect_protocols.StructureIntrospectionSupport,
+        "async_": dialect_protocols.AsyncStructureIntrospectionSupport,
+        "answered": True,
+    },
+    {
+        "name": "operational-stats",
+        "sync": dialect_protocols.OperationalStatsIntrospectionSupport,
+        "async_": dialect_protocols.AsyncOperationalStatsIntrospectionSupport,
+        "answered": False,
+    },
+    {
+        "name": "data-profile",
+        "sync": dialect_protocols.DataProfileIntrospectionSupport,
+        "async_": dialect_protocols.AsyncDataProfileIntrospectionSupport,
+        "answered": True,
+    },
+    {
+        "name": "ddl-extraction",
+        "sync": dialect_protocols.DdlExtractionIntrospectionSupport,
+        "async_": dialect_protocols.AsyncDdlExtractionIntrospectionSupport,
+        "answered": False,
+    },
+]
+
+INTROSPECTION_ANSWERED = [f for f in INTROSPECTION_FAMILIES if f["answered"]]
+INTROSPECTION_REFUSED = [f for f in INTROSPECTION_FAMILIES if not f["answered"]]
+
+#: Every protocol of a refused family, for the "nothing is both" partition
+#: check. These stay out of ``SNOWFLAKE_PROTOCOLS`` on purpose.
+INTROSPECTION_REFUSED_PROTOCOLS = [
+    protocol
+    for family in INTROSPECTION_REFUSED
+    for protocol in (family["sync"], family["async_"])
+]
 
 
 # All protocols that SnowflakeDialect should implement
@@ -127,7 +176,16 @@ SNOWFLAKE_PROTOCOLS = [
     FilterClauseSupport,
     GeneratedColumnSupport,
     ILIKESupport,
-    IntrospectionSupport,
+    # Introspection is four families; the two this dialect answers are
+    # positives, both sync and async form. The other two are classified
+    # negatives with an explicit refusal in
+    # ``TestIntrospectionFamilyClassification`` -- a structural isinstance
+    # cannot tell them apart, because core's family mixin supplies the
+    # refusing formatters.
+    dialect_protocols.StructureIntrospectionSupport,
+    dialect_protocols.AsyncStructureIntrospectionSupport,
+    dialect_protocols.DataProfileIntrospectionSupport,
+    dialect_protocols.AsyncDataProfileIntrospectionSupport,
     JSONSupport,
     JoinSupport,
     LateralJoinSupport,
@@ -187,7 +245,6 @@ SNOWFLAKE_PROTOCOLS = [
     # Generic protocols Snowflake also satisfies. These are the capability
     # interfaces whose methods the dialect already supplies through its mixins;
     # leaving them unlisted made the partition test report them as unclassified.
-    dialect_protocols.AsyncIntrospectionSupport,
     dialect_protocols.DDLColumnSupport,
     dialect_protocols.DMLSupport,
     dialect_protocols.DQLSupport,
@@ -253,6 +310,22 @@ def get_own_protocol_methods(proto: type) -> set:
             continue
         methods.add(name)
     return methods
+
+
+def family_probes(protocol: type) -> list:
+    """A family protocol's own capability probes, by declaration name."""
+    return sorted(
+        name for name in get_own_protocol_methods(protocol)
+        if name.startswith("supports_")
+    )
+
+
+def family_formatters(protocol: type) -> list:
+    """A family protocol's own query formatters, by declaration name."""
+    return sorted(
+        name for name in get_own_protocol_methods(protocol)
+        if name.startswith("format_")
+    )
 
 
 @pytest.fixture
@@ -364,7 +437,10 @@ class TestSnowflakeDialectNegativeProtocolConformance:
         """Every generic protocol must be classified for Snowflake."""
         all_protos = set(get_all_generic_protocols().values())
         positive = {p for p in SNOWFLAKE_PROTOCOLS if p in all_protos}
-        negative = set(SNOWFLAKE_NOT_IMPLEMENTED)
+        # A refused introspection family is a negative too: core's family mixin
+        # makes the protocol match structurally, but the dialect answers none of
+        # its probes, so "not implemented" is the honest classification.
+        negative = set(SNOWFLAKE_NOT_IMPLEMENTED) | set(INTROSPECTION_REFUSED_PROTOCOLS)
 
         overlap = {p.__name__ for p in positive & negative}
         assert not overlap, f"Protocols in BOTH lists: {sorted(overlap)}"
@@ -375,6 +451,85 @@ class TestSnowflakeDialectNegativeProtocolConformance:
             f"Generic protocols not classified for Snowflake: {unclassified_names}. "
             f"Add each to SNOWFLAKE_PROTOCOLS or SNOWFLAKE_NOT_IMPLEMENTED."
         )
+
+
+class TestIntrospectionFamilyClassification:
+    """Classify each introspection family by what this dialect answers.
+
+    ``isinstance`` is deliberately not the classifier here. Core's family mixin
+    supplies every family's members -- the formatter that refuses included --
+    so all four protocols match the dialect even though this engine answers no
+    probe of two of them. A family is positive when the dialect reads it from a
+    real catalogue; an absent family is a negative whose refusal is explicit:
+    every probe False, every formatter raising ``UnsupportedFeatureError`` by
+    name, and no method of the family implemented by this backend.
+    """
+
+    def test_the_families_partition_into_answered_and_refused(self):
+        names = [family["name"] for family in INTROSPECTION_FAMILIES]
+        assert names == [
+            "structure",
+            "operational-stats",
+            "data-profile",
+            "ddl-extraction",
+        ]
+        assert [f["name"] for f in INTROSPECTION_ANSWERED] == [
+            "structure",
+            "data-profile",
+        ]
+        assert [f["name"] for f in INTROSPECTION_REFUSED] == [
+            "operational-stats",
+            "ddl-extraction",
+        ]
+
+    @pytest.mark.parametrize("family", INTROSPECTION_ANSWERED, ids=lambda f: f["name"])
+    def test_an_answered_family_is_in_the_positive_list(self, dialect, family):
+        for protocol in (family["sync"], family["async_"]):
+            assert protocol in SNOWFLAKE_PROTOCOLS
+            assert isinstance(dialect, protocol)
+
+    @pytest.mark.parametrize("family", INTROSPECTION_ANSWERED, ids=lambda f: f["name"])
+    def test_an_answered_family_answers_at_least_one_probe(self, dialect, family):
+        probes = family_probes(family["sync"])
+        assert probes, f"{family['name']} declares no probe"
+        assert any(getattr(dialect, probe)() for probe in probes), (
+            f"{family['name']} is classified as answered but answers no probe"
+        )
+
+    @pytest.mark.parametrize("family", INTROSPECTION_REFUSED, ids=lambda f: f["name"])
+    def test_an_absent_family_stays_out_of_the_positive_list(self, family):
+        for protocol in (family["sync"], family["async_"]):
+            assert protocol not in SNOWFLAKE_PROTOCOLS
+            assert protocol not in SNOWFLAKE_NOT_IMPLEMENTED
+
+    @pytest.mark.parametrize("family", INTROSPECTION_REFUSED, ids=lambda f: f["name"])
+    def test_an_absent_family_answers_every_probe_false(self, dialect, family):
+        probes = family_probes(family["sync"])
+        assert probes, f"{family['name']} declares no probe"
+        answered = [probe for probe in probes if getattr(dialect, probe)() is not False]
+        assert not answered, (
+            f"{family['name']} is classified as absent but answers {answered}"
+        )
+
+    @pytest.mark.parametrize("family", INTROSPECTION_REFUSED, ids=lambda f: f["name"])
+    def test_an_absent_family_refuses_each_formatter_by_name(self, dialect, family):
+        formatters = family_formatters(family["sync"])
+        assert formatters, f"{family['name']} declares no formatter"
+        for name in formatters:
+            with pytest.raises(UnsupportedFeatureError) as caught:
+                getattr(dialect, name)(None)
+            assert dialect.name in str(caught.value)
+            assert name in str(caught.value)
+
+    @pytest.mark.parametrize("family", INTROSPECTION_REFUSED, ids=lambda f: f["name"])
+    def test_an_absent_family_is_not_declared_by_this_backend(self, dialect, family):
+        own = "rhosocial.activerecord.backend.impl.snowflake"
+        for name in get_own_protocol_methods(family["sync"]):
+            winner = next(k for k in type(dialect).__mro__ if name in k.__dict__)
+            assert not winner.__module__.startswith(own), (
+                f"{family['name']} is classified absent, but "
+                f"{winner.__module__}.{winner.__name__}.{name} implements it"
+            )
 
 
 class TestProtocolNonOverlap:
@@ -392,11 +547,17 @@ class TestProtocolNonOverlap:
             # Snowflake's ARRAY protocol restates the generic ARRAY capability.
             ("ArraySupport", "SnowflakeArraySupport"),
             ("SnowflakeArraySupport", "ArraySupport"),
-            # Core declares the async introspection protocol as a mirror of the
-            # sync one: same probe names, both answered by this dialect. That is
-            # a deliberate sync/async pair, not two colliding interfaces.
-            ("IntrospectionSupport", "AsyncIntrospectionSupport"),
-            ("AsyncIntrospectionSupport", "IntrospectionSupport"),
+            # Core declares each async introspection family as a mirror of its
+            # sync twin: same probe names, same formatter names. Those are
+            # deliberate sync/async pairs, not two colliding interfaces.
+            ("StructureIntrospectionSupport", "AsyncStructureIntrospectionSupport"),
+            ("AsyncStructureIntrospectionSupport", "StructureIntrospectionSupport"),
+            ("OperationalStatsIntrospectionSupport", "AsyncOperationalStatsIntrospectionSupport"),
+            ("AsyncOperationalStatsIntrospectionSupport", "OperationalStatsIntrospectionSupport"),
+            ("DataProfileIntrospectionSupport", "AsyncDataProfileIntrospectionSupport"),
+            ("AsyncDataProfileIntrospectionSupport", "DataProfileIntrospectionSupport"),
+            ("DdlExtractionIntrospectionSupport", "AsyncDdlExtractionIntrospectionSupport"),
+            ("AsyncDdlExtractionIntrospectionSupport", "DdlExtractionIntrospectionSupport"),
         }
 
         from itertools import combinations

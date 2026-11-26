@@ -15,7 +15,11 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     ReturningSupport, UpsertSupport, LateralJoinSupport, JoinSupport,
     JSONSupport, ExplainSupport,
     ViewObjectSupport, NamespaceSupport, IndexObjectSupport,
-    ConstraintSupport, IntrospectionSupport,
+    ConstraintSupport,
+    StructureIntrospectionSupport,
+    OperationalStatsIntrospectionSupport,
+    DataProfileIntrospectionSupport,
+    DdlExtractionIntrospectionSupport,
     TransactionControlSupport,
     AdvancedGroupingSupport, ArraySupport, QualifyClauseSupport,
     MergeSupport,
@@ -50,7 +54,16 @@ PROTOCOL_FAMILY_GROUPS: Dict[str, list] = {
     "Query Analysis": [ExplainSupport, QualifyClauseSupport],
     "Named objects - View & Namespace": [ViewObjectSupport, NamespaceSupport],
     "DDL - Index & Constraint": [IndexObjectSupport, ConstraintSupport],
-    "Introspection": [IntrospectionSupport],
+    # Core's introspection surface is four families, one per question: what the
+    # catalogue declares, how objects have behaved, what the rows look like, and
+    # the text that recreates an object. Reporting them separately keeps a
+    # family's answer visible instead of averaged into a single line.
+    "Introspection": [
+        StructureIntrospectionSupport,
+        OperationalStatsIntrospectionSupport,
+        DataProfileIntrospectionSupport,
+        DdlExtractionIntrospectionSupport,
+    ],
     "Snowflake-specific": [
         SnowflakeTimeTravelSupport, SnowflakeVariantSupport,
         SnowflakeArraySupport, SnowflakeCloneSupport,

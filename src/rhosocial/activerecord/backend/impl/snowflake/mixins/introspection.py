@@ -75,7 +75,8 @@ if TYPE_CHECKING:
 class SnowflakeIntrospectionMixin:
     """Snowflake introspection capability declaration and query formatting.
 
-    This mixin implements the IntrospectionSupport protocol by:
+    This mixin answers core's introspection family protocols -- structure,
+    operational statistics, data profiles and DDL extraction -- by:
     1. Declaring which introspection features Snowflake supports (supports_* methods)
     2. Formatting SQL queries for introspection (format_*_query methods)
 
@@ -164,8 +165,8 @@ class SnowflakeIntrospectionMixin:
     # ------------------------------------------------------------------
     # Schema-object families core does not model yet
     # ------------------------------------------------------------------
-    # Core's ``IntrospectionSupport`` protocol names the families every
-    # backend shares; routines and the Snowflake catalog objects below have
+    # Core's introspection family protocols name the questions every backend
+    # shares; routines and the Snowflake catalog objects below have
     # no core member, so these switches are declared here, beside the
     # formatters that answer for them. The CLI's ``_TYPE_CAPABILITIES``
     # names each switch, and the tests refuse a type whose switch the

@@ -59,7 +59,6 @@ Ten catalogue families answer `True` among the original set -- the ten catalogue
 | `supports_object_dependencies()` | `False` | The declared object dependency graph |
 | `supports_ddl_extraction()` | `False` | The text that recreates an object |
 | `supports_ddl_extraction_native()` | `False` | Whether that text is the engine's own |
-| `supports_partition_info()` | `False` | Core's partition family |
 | `supports_extensions()` | `False` | Installed add-on components |
 
 The answers most easily mistaken for a gap in this backend, rather than a property of the engine, are triggers and the operational set.
@@ -68,7 +67,7 @@ The answers most easily mistaken for a gap in this backend, rather than a proper
 
 The operational families -- `unused-indexes`, `table-stats`, `runtime` and `index-stats` -- read counters of a shape this engine does not publish to a session: per-index access counts and per-table I/O counters. `dependencies` needs a declared edge catalogue, and Snowflake's catalogue does not record which view, task or stage mentions which table. `ddl` needs the engine's own retained text for an object; this backend reads no such text and refuses to assemble one, because an assembled `CREATE` would read as authoritative while being this library's guess. `ddl_extraction_native` is `False` for the same reason. All six switches are constants on this dialect: unlike a feature that appears in a later release, these answers do not vary by server version. Because `supports_ddl_extraction()` is permanently `False`, the CLI does not offer a `ddl` type; the capability and the DDL formatter stay on the dialect for a future real implementation.
 
-`supports_partition_info()` stays `False` by inheritance. Snowflake's own partition questions live under their own switches, and `supports_partition_metadata_introspection()` answers `False` because the dialect has a formatter for the family but no introspector method reads it. The CLI excludes `partition-metadata` for that reason, rather than offering a type with no answer behind it.
+Snowflake's own partition questions live under their own switches: `supports_partitioned_table_creation()` and `supports_partition_metadata_introspection()` both answer `False`, the latter because the dialect has a formatter for the family but no introspector method reads it. The CLI excludes `partition-metadata` for that reason, rather than offering a type with no answer behind it.
 
 `supports_extensions()` is `False` because this backend declares no catalogue mapping for add-on components, so there is nothing to answer a `True` with.
 
