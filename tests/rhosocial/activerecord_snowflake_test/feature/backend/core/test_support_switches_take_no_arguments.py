@@ -137,3 +137,97 @@ def test_the_scan_accepts_a_defaulted_parameter(tmp_path):
     )
     tree = ast.parse(probe.read_text(encoding="utf-8"))
     assert not _offenders(tree, "probe")
+
+
+def _base_name(base):
+    """The simple name a base class expression spells, if it spells one."""
+    if isinstance(base, ast.Name):
+        return base.id
+    if isinstance(base, ast.Attribute):
+        return base.attr
+    return None
+
+
+def _protocol_bases(tree, label):
+    """A ``*Dialect`` class must not inherit a ``*Support`` protocol.
+
+    A ``runtime_checkable`` protocol is satisfied structurally: if the dialect
+    really answers the protocol's members, ``isinstance`` is already True
+    without inheriting anything. Inheriting the protocol declares no
+    behaviour -- it copies the protocol's ellipsis stubs onto the class, so
+    ``isinstance`` answers True for members the dialect never implemented.
+    That is the lie the protocol conformance suite exists to catch, and this
+    scan keeps it out of the source tree.
+    """
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef) or not node.name.endswith("Dialect"):
+            continue
+        for base in node.bases:
+            name = _base_name(base)
+            if name and name.endswith("Support"):
+                found.append(f"{label}:{node.lineno} {node.name}({name})")
+    return found
+
+
+def _dialect_class_count():
+    """How many ``*Dialect`` classes the scan actually reached."""
+    count = 0
+    for path in _source_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        count += sum(
+            1
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ClassDef) and node.name.endswith("Dialect")
+        )
+    return count
+
+
+@pytest.mark.parametrize("path", _source_files(), ids=lambda p: str(p.name))
+def test_dialect_class_inherits_no_support_protocol(path):
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    offenders = _protocol_bases(tree, path.name)
+    assert not offenders, "\n".join(offenders)
+
+
+def test_the_protocol_base_scan_reaches_the_dialects():
+    files = _source_files()
+    assert files, "the source scan reached no files"
+    count = _dialect_class_count()
+    assert count > 0, f"the scan found no *Dialect class in {len(files)} source files"
+
+
+def test_the_scan_flags_a_planted_support_base(tmp_path):
+    probe = tmp_path / "_probe.py"
+    probe.write_text(
+        "class ProbeDialect(NamespaceSupport):\n" "    pass\n",
+        encoding="utf-8",
+    )
+    tree = ast.parse(probe.read_text(encoding="utf-8"))
+    offenders = _protocol_bases(tree, "probe")
+    assert offenders and "ProbeDialect(NamespaceSupport)" in offenders[0]
+
+
+def test_the_scan_flags_a_qualified_support_base(tmp_path):
+    """A protocol reached through its module is the same base."""
+    probe = tmp_path / "_probe.py"
+    probe.write_text(
+        "import protocols\n"
+        "class ProbeDialect(protocols.NamespaceSupport):\n" "    pass\n",
+        encoding="utf-8",
+    )
+    tree = ast.parse(probe.read_text(encoding="utf-8"))
+    assert _protocol_bases(tree, "probe")
+
+
+def test_the_scan_accepts_a_clean_dialect(tmp_path):
+    """The control: a real mixin base and a non-protocol base are fine."""
+    probe = tmp_path / "_probe.py"
+    probe.write_text(
+        "class ProbeDialect(MixinBase, object):\n"
+        "    pass\n"
+        "class Support:\n" "    pass\n",
+        encoding="utf-8",
+    )
+    tree = ast.parse(probe.read_text(encoding="utf-8"))
+    assert not _protocol_bases(tree, "probe")

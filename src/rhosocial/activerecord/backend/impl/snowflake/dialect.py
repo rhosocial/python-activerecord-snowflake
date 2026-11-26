@@ -21,55 +21,6 @@ if TYPE_CHECKING:
     from .expression.identifier import SnowflakeIdentifierExpression
 
 from rhosocial.activerecord.backend.dialect.base import SQLDialectBase
-from rhosocial.activerecord.backend.dialect.protocols import (
-    AdvancedGroupingSupport,
-    AlterTypeSupport,
-    ArraySupport,
-    AutoIncrementColumnSupport,
-    CollationSupport,
-    ConstraintSupport,
-    CreateTypeSupport,
-    CTESupport,
-    DataTypeSupport,
-    DropTypeSupport,
-    ExplainSupport,
-    FilterClauseSupport,
-    GeneratedColumnSupport,
-    ILIKESupport,
-    IdentityColumnSupport,
-    IndexObjectSupport,
-    IntrospectionSupport,
-    JSONSupport,
-    JoinSupport,
-    LateralJoinSupport,
-    MaterializedViewObjectSupport,
-    MergeSupport,
-    NamespaceSupport,
-    OrderedSetAggregationSupport,
-    PartitionSupport,
-    QualifyClauseSupport,
-    ReturningSupport,
-    SequenceObjectSupport,
-    SetOperationSupport,
-    TableObjectSupport,
-    TransactionControlSupport,
-    TruncateSupport,
-    TypeObjectSupport,
-    UpsertSupport,
-    ViewObjectSupport,
-    WildcardSupport,
-    WindowFunctionSupport,
-)
-from rhosocial.activerecord.backend.suggestion.protocols import (
-    ColumnReorderSuggestionSupport,
-    ColumnTypeSuggestionSupport,
-    CreateTableLayoutSuggestionSupport,
-    DataTypeSuggestionSupport,
-    PartitionSchemeChangeSuggestionSupport,
-    StringConcatenationSuggestionSupport,
-    TableConstraintChangeSuggestionSupport,
-    TableIndexChangeSuggestionSupport,
-)
 from rhosocial.activerecord.backend.dialect.mixins import (
 
     ArrayMixin,
@@ -122,27 +73,6 @@ from rhosocial.activerecord.backend.dialect.mixins import (
 )
 
 from .reserved_words import SNOWFLAKE_RESERVED_WORDS
-from .protocols import (
-    SnowflakeArraySupport,
-    SnowflakeCloneSupport,
-    SnowflakeDMLSupport,
-    SnowflakeFileFormatSupport,
-    SnowflakeMaterializedViewSupport,
-    SnowflakePartitionSupport,
-    SnowflakePipeSupport,
-    SnowflakePivotSupport,
-    SnowflakeRoutineSupport,
-    SnowflakeSampleSupport,
-    SnowflakeShowSupport,
-    SnowflakeStageSupport,
-    SnowflakeStreamSupport,
-    SnowflakeTableModifierSupport,
-    SnowflakeTaskSupport,
-    SnowflakeTimeTravelSupport,
-    SnowflakeUndropSupport,
-    SnowflakeVariantSupport,
-    SnowflakeWarehouseSupport,
-)
 from .mixins import (
     SnowflakeArrayMixin,
     SnowflakeCloneMixin,
@@ -270,9 +200,10 @@ class SnowflakeDialect(
     # overrides the shared defaults; each ``*NameMixin`` in turn precedes
     # NamespaceMixin so its own ``format_*_object`` wins over the inherited one.
     SnowflakeNamespaceMixin,
-    # The object tree. Each ``*NameMixin`` renders one object kind. The object
-    # protocols name those ``format_*_object`` methods and inherit
-    # ``NamespaceSupport``, so they come last and lose to both.
+    # The object tree. Each ``*NameMixin`` renders one object kind. The
+    # ``*Support`` protocols name those ``format_*_object`` methods; they are
+    # satisfied structurally by the methods these mixins define, so no protocol
+    # class is listed as a base.
     # The object kinds Snowflake's own statements hold. Trigger, routine,
     # foreign-table, synonym, domain and property-graph objects are left out on
     # purpose: the engine either has none of them, or exposes them through a
@@ -287,13 +218,6 @@ class SnowflakeDialect(
     SchemaNameMixin,
     DatabaseNameMixin,
     NamespaceMixin,
-    TableObjectSupport,
-    ViewObjectSupport,
-    MaterializedViewObjectSupport,
-    IndexObjectSupport,
-    SequenceObjectSupport,
-    TypeObjectSupport,
-    NamespaceSupport,
     # New Snowflake-specific mixins (BEFORE generic mixins they override)
     SnowflakeDateTimeMixin,
     SnowflakeCollationMixin,
@@ -400,75 +324,11 @@ class SnowflakeDialect(
     SnowflakeShowMixin,
     SnowflakeIntrospectionMixin,  # Must be before IntrospectionMixin
     IntrospectionMixin,
-    # Protocol supports (for isinstance checks)
-    AdvancedGroupingSupport,
-    ArraySupport,
-    AutoIncrementColumnSupport,
-    CollationSupport,
-    # Column classes: which operations a value carries, where DataTypeSupport
-    # answers how it is stored. The mixin (above) supplies the table; the
-    # suggestion protocol records that this dialect answers the question at all.
-    ColumnTypeSuggestionSupport,
-    CreateTableLayoutSuggestionSupport,
-    DataTypeSuggestionSupport,
-    StringConcatenationSuggestionSupport,
-    ColumnReorderSuggestionSupport,
-    TableConstraintChangeSuggestionSupport,
-    TableIndexChangeSuggestionSupport,
-    PartitionSchemeChangeSuggestionSupport,
-    CTESupport,
-    ConstraintSupport,
-    DataTypeSupport,
-    CreateTypeSupport,
-    AlterTypeSupport,
-    DropTypeSupport,
-    # SnowflakeTypeSupport is deliberately NOT a base here. It states the two
-    # conditional data-type probes -- CREATE TYPE arrived in server 10.8, the
-    # native UUID in 10.2 -- that no naming convention can express, and
-    # SnowflakeTypeSupportMixin implements both. Listing it as a base would only
-    # add an isinstance answer nothing asks for: no code in this backend tests
-    # it, and it does not appear in the conformance list either. It is still
-    # exported from ``protocols``, which is what the protocol is for.
-    ExplainSupport,
-    FilterClauseSupport,
-    GeneratedColumnSupport,
-    ILIKESupport,
-    IdentityColumnSupport,
-    IntrospectionSupport,
-    JSONSupport,
-    JoinSupport,
-    LateralJoinSupport,
-    MergeSupport,
-    OrderedSetAggregationSupport,
-    QualifyClauseSupport,
-    ReturningSupport,
-    SetOperationSupport,
-    TransactionControlSupport,
-    TruncateSupport,
-    UpsertSupport,
-    WildcardSupport,
-    WindowFunctionSupport,
-    PartitionSupport,
-    # Snowflake-specific protocol supports
-    SnowflakePartitionSupport,
-    SnowflakeTimeTravelSupport,
-    SnowflakeVariantSupport,
-    SnowflakeArraySupport,
-    SnowflakeCloneSupport,
-    SnowflakeStageSupport,
-    SnowflakeWarehouseSupport,
-    SnowflakeStreamSupport,
-    SnowflakeTaskSupport,
-    SnowflakePipeSupport,
-    SnowflakeFileFormatSupport,
-    SnowflakeRoutineSupport,
-    SnowflakeUndropSupport,
-    SnowflakeMaterializedViewSupport,
-    SnowflakeTableModifierSupport,
-    SnowflakeSampleSupport,
-    SnowflakePivotSupport,
-    SnowflakeDMLSupport,
-    SnowflakeShowSupport,
+    # No ``*Support`` protocol is a base here: each is ``runtime_checkable`` and
+    # satisfied structurally by the methods the mixins above define. Inheriting
+    # one would only add its ellipsis stubs -- attributes that make
+    # ``isinstance`` answer True for a method this dialect never implemented,
+    # which is the lie the conformance suite exists to catch.
 ):
     """Snowflake SQL dialect implementation.
 
