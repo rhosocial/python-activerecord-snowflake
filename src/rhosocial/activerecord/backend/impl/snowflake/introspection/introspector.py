@@ -104,6 +104,61 @@ class SnowflakeIntrospectorMixin(IntrospectorMixin):
     which calls SnowflakeIntrospectionMixin.format_*_query() methods.
     """
 
+    #: Kinds this engine has no objects of, in any shape core names.
+    #:
+    #: Snowflake has no user-defined types or domains -- its semi-structured
+    #: types (``VARIANT``, ``OBJECT``, ``ARRAY``) are built in and are not
+    #: named objects. It has no extensions, no tablespaces, no SQL Server-style
+    #: partition functions/schemes, and no full-text catalogues. It also has no
+    #: secondary indexes: a clustering key is engine-managed, has no name and
+    #: cannot be created or dropped, so ``INDEX`` names nothing either. For all
+    #: of these the honest answer is a definite ``False``, not a refusal --
+    #: there is no catalogue to be missing a query for.
+    ITEM_KINDS_WITHOUT_OBJECTS = frozenset(
+        {
+            ItemKind.TYPE,
+            ItemKind.DOMAIN,
+            ItemKind.INDEX,
+            ItemKind.EXTENSION,
+            ItemKind.TABLESPACE,
+            ItemKind.PARTITION_FUNCTION,
+            ItemKind.PARTITION_SCHEME,
+            ItemKind.FULLTEXT_CATALOG,
+        }
+    )
+
+    #: Kinds answered by a catalogue query, one per entry in the dialect's
+    #: ``_OBJECT_EXISTS_VIEWS``. Together with ``ITEM_KINDS_WITHOUT_OBJECTS``
+    #: this covers every ``ItemKind``, so ``item_exists`` refuses nothing
+    #: today. Declared, not derived at the call site, so an offline guard can
+    #: assert each kind's branch.
+    ITEM_KINDS_WITH_QUERY = frozenset(
+        {
+            ItemKind.SCHEMA,
+            ItemKind.TABLE,
+            ItemKind.SEQUENCE,
+            ItemKind.FUNCTION,
+        }
+    )
+
+    @classmethod
+    def item_kind_branch(cls, kind: ItemKind) -> str:
+        """How ``item_exists`` must treat one ``ItemKind``.
+
+        ``"absent"`` -- this engine has no such objects: answer ``False`` with
+        no query. ``"query"`` -- read the catalogue and answer from the rows.
+        ``"unanswerable"`` -- the engine is meant to have them and this backend
+        has no query: refuse. The third label is empty today; it stays in the
+        code so a future supported kind cannot silently fall through to
+        ``False``.
+        """
+        kind = ItemKind(kind)
+        if kind in cls.ITEM_KINDS_WITHOUT_OBJECTS:
+            return "absent"
+        if kind in cls.ITEM_KINDS_WITH_QUERY:
+            return "query"
+        return "unanswerable"
+
     @property
     def default_schema(self) -> str:
         """Return the Snowflake schema name from the backend config.
@@ -1998,34 +2053,42 @@ class SnowflakeIntrospector(SnowflakeIntrospectorMixin, AbstractIntrospector):
     ) -> bool:
         """Whether one named shared object of ``kind`` exists.
 
-        Answered for the kinds this backend has a catalogue for:
+        Core's three-case rule, with every kind classified rather than refused
+        wholesale:
 
-        * ``SCHEMA`` -- ``INFORMATION_SCHEMA.SCHEMATA`` (the current database's);
-        * ``TABLE`` -- ``INFORMATION_SCHEMA.TABLES``, with the view spellings
-          excluded, because a view is not a table;
-        * ``SEQUENCE`` -- ``INFORMATION_SCHEMA.SEQUENCES``;
-        * ``FUNCTION`` -- ``INFORMATION_SCHEMA.FUNCTIONS`` (user-defined and
-          external functions, not the built-ins).
+        * kinds in ``ITEM_KINDS_WITHOUT_OBJECTS`` -- ``TYPE``, ``DOMAIN``,
+          ``INDEX``, ``EXTENSION``, ``TABLESPACE``, ``PARTITION_FUNCTION``,
+          ``PARTITION_SCHEME``, ``FULLTEXT_CATALOG`` -- name nothing this
+          engine has, so the answer is a definite ``False`` with no query.
+          ``INDEX`` belongs here because Snowflake has no secondary indexes;
+          its clustering keys are engine-managed and are not named objects.
+        * kinds in ``ITEM_KINDS_WITH_QUERY`` -- ``SCHEMA``, ``TABLE``,
+          ``SEQUENCE``, ``FUNCTION`` -- are answered from the catalogue:
+
+          - ``SCHEMA`` -- ``INFORMATION_SCHEMA.SCHEMATA`` (the current
+            database's);
+          - ``TABLE`` -- ``INFORMATION_SCHEMA.TABLES``, with the view
+            spellings excluded, because a view is not a table;
+          - ``SEQUENCE`` -- ``INFORMATION_SCHEMA.SEQUENCES``;
+          - ``FUNCTION`` -- ``INFORMATION_SCHEMA.FUNCTIONS`` (user-defined and
+            external functions, not the built-ins).
+
+        * any other kind is a genuine gap: the engine is supposed to have such
+          objects and this backend has no query for them, so it refuses
+          through the protocol error naming ``item_exists``. No kind is in
+          that branch today -- the two declared sets cover every
+          ``ItemKind`` -- but the branch stays so a supported kind added to
+          core later cannot silently answer ``False``.
 
         The question is one filtered row carrying the limit 1, not a listing
         scanned in Python, so its cost does not grow with the schema. The
-        dialect formatter owns the kind-to-view mapping, and a kind absent from
-        it refuses through the protocol error naming ``item_exists`` -- the
-        same refusal the core base raises, so an unanswerable kind cannot
-        masquerade as ``False``.
+        dialect formatter owns the kind-to-view mapping.
 
-        Kinds that refuse, and why:
-
-        * ``TYPE`` and ``DOMAIN`` -- this backend reads no catalogue of
-          user-defined types or domains, and does not claim one exists.
-        * ``EXTENSION``, ``TABLESPACE``, ``PARTITION_FUNCTION``,
-          ``PARTITION_SCHEME`` and ``FULLTEXT_CATALOG`` -- objects this engine
-          does not have in those shapes.
-        * file formats and tags, which Snowflake *does* have, are not askable
-          through this method at all: core's ``ItemKind`` names neither. File
-          formats are answered by :meth:`list_file_formats`; tags have no
-          family in this backend yet. Procedures are likewise absent from
-          ``ItemKind`` and are answered by :meth:`list_routines`.
+        File formats and tags, which Snowflake *does* have, are not askable
+        through this method at all: core's ``ItemKind`` names neither. File
+        formats are answered by :meth:`list_file_formats`; tags have no
+        family in this backend yet. Procedures are likewise absent from
+        ``ItemKind`` and are answered by :meth:`list_routines`.
 
         Not cached: a yes/no answer for a named object must not stay stale for
         the cache's TTL, which is what a just-created object would be for.
@@ -2035,6 +2098,8 @@ class SnowflakeIntrospector(SnowflakeIntrospectorMixin, AbstractIntrospector):
         the member. An unusable word raises that enum's own ``ValueError``.
         """
         kind = ItemKind(kind)
+        if self.item_kind_branch(kind) == "absent":
+            return False
         target_schema = schema if schema is not None else self.default_schema
         sql, params = SnowflakeObjectExistsQueryStatement(
             self.dialect, kind=kind, name=name, schema=target_schema
@@ -2485,10 +2550,12 @@ class AsyncSnowflakeIntrospector(SnowflakeIntrospectorMixin, AsyncAbstractIntros
         """Whether one named shared object of ``kind`` exists.
 
         Asynchronous twin of :meth:`SnowflakeIntrospector.item_exists`, where
-        the answered kinds, the refused ones and the deliberate absence of
-        caching are recorded.
+        the three branches, the answered kinds, the absent kinds and the
+        deliberate absence of caching are recorded.
         """
         kind = ItemKind(kind)
+        if self.item_kind_branch(kind) == "absent":
+            return False
         target_schema = schema if schema is not None else self.default_schema
         sql, params = SnowflakeObjectExistsQueryStatement(
             self.dialect, kind=kind, name=name, schema=target_schema

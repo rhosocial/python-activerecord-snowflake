@@ -31,6 +31,9 @@ from rhosocial.activerecord.backend.impl.snowflake.introspection import (
     SnowflakeIntrospector,
     SnowflakeIntrospectorMixin,
 )
+from rhosocial.activerecord.backend.impl.snowflake.mixins.introspection import (
+    SnowflakeIntrospectionMixin,
+)
 from rhosocial.activerecord.backend.introspection.base import (
     AbstractIntrospector,
     AsyncAbstractIntrospector,
@@ -224,6 +227,7 @@ class TestStateStatements:
         for kind in (
             ItemKind.TYPE,
             ItemKind.DOMAIN,
+            ItemKind.INDEX,
             ItemKind.EXTENSION,
             ItemKind.TABLESPACE,
             ItemKind.PARTITION_FUNCTION,
@@ -485,6 +489,7 @@ class TestItemExists:
         (
             ItemKind.TYPE,
             ItemKind.DOMAIN,
+            ItemKind.INDEX,
             ItemKind.EXTENSION,
             ItemKind.TABLESPACE,
             ItemKind.PARTITION_FUNCTION,
@@ -492,15 +497,21 @@ class TestItemExists:
             ItemKind.FULLTEXT_CATALOG,
         ),
     )
-    def test_kinds_without_a_catalogue_refuse(
+    def test_kinds_without_objects_answer_false_without_a_query(
         self, sync_introspector, sync_executor, kind
     ):
-        with pytest.raises(ProtocolNotImplementedError) as caught:
-            sync_introspector.item_exists(kind, "X")
-        message = str(caught.value)
-        assert "item_exists" in message
-        assert "Snowflake" in message
+        assert sync_introspector.item_exists(kind, "X") is False
         sync_executor.execute.assert_not_called()
+
+    async def test_awaiting_absence_is_also_offline(self, async_introspector):
+        assert (
+            await async_introspector.item_exists(ItemKind.INDEX, "IX") is False
+        )
+        assert (
+            await async_introspector.item_exists(ItemKind.TYPE, "MY_TYPE")
+            is False
+        )
+        async_introspector._executor.execute.assert_not_called()
 
     def test_answers_are_not_cached(self, sync_introspector, sync_executor):
         sync_executor.execute.return_value = [{"SEQUENCE_NAME": "ORDER_SEQ"}]
@@ -548,6 +559,65 @@ class TestItemExists:
             await async_introspector.item_exists(ItemKind.FUNCTION, "OTHER")
             is False
         )
+
+
+class TestItemKindClassification:
+    """Offline guard for the declared ``item_exists`` kind sets.
+
+    Iterates every core ``ItemKind`` so a kind added to the vocabulary later
+    cannot fall through unnoticed: each member must be in exactly one declared
+    set, take that set's branch, and no kind may take the refusal branch.
+    """
+
+    @staticmethod
+    def _sets():
+        return (
+            SnowflakeIntrospector.ITEM_KINDS_WITH_QUERY,
+            SnowflakeIntrospector.ITEM_KINDS_WITHOUT_OBJECTS,
+        )
+
+    def test_the_declared_sets_are_disjoint_and_cover_every_kind(self):
+        answered, absent = self._sets()
+        assert answered.isdisjoint(absent)
+        assert answered | absent == set(ItemKind)
+        assert answered == frozenset(
+            {
+                ItemKind.SCHEMA,
+                ItemKind.TABLE,
+                ItemKind.SEQUENCE,
+                ItemKind.FUNCTION,
+            }
+        )
+        # The declared answered set is exactly the dialect's renderable kinds;
+        # the two live in different modules and must not drift apart.
+        assert answered == frozenset(
+            SnowflakeIntrospectionMixin._OBJECT_EXISTS_VIEWS
+        )
+        assert SnowflakeIntrospectorMixin.ITEM_KINDS_WITH_QUERY == answered
+        assert (
+            SnowflakeIntrospectorMixin.ITEM_KINDS_WITHOUT_OBJECTS == absent
+        )
+
+    def test_every_kind_takes_its_declared_branch(
+        self, sync_introspector, sync_executor
+    ):
+        answered, absent = self._sets()
+        sync_executor.execute.return_value = []
+        for kind in ItemKind:
+            expected = "absent" if kind in absent else "query"
+            assert kind in (answered if expected == "query" else absent)
+            assert sync_introspector.item_kind_branch(kind) == expected
+            sync_executor.execute.reset_mock()
+            answer = sync_introspector.item_exists(kind, "X")
+            assert answer is False
+            if expected == "absent":
+                sync_executor.execute.assert_not_called()
+            else:
+                sync_executor.execute.assert_called_once()
+
+    def test_no_supported_kind_is_refused(self, sync_introspector):
+        for kind in ItemKind:
+            assert sync_introspector.item_kind_branch(kind) != "unanswerable"
 
 
 # ================================================================== #

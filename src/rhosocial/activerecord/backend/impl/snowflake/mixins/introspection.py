@@ -583,9 +583,11 @@ class SnowflakeIntrospectionMixin:
 
     #: The view, name column and schema column that answer one ``ItemKind``.
     #:
-    #: Keyed by the core member, so the vocabulary stays core's: a kind this
-    #: backend has no catalogue for is absent, and the manager refuses it
-    #: through the base refusal instead of fabricating an answer. ``None`` as
+    #: Keyed by the core member, so the vocabulary stays core's. Every kind
+    #: missing here is either one this engine has no objects of -- the
+    #: introspector answers those ``False`` without a query -- or, if a
+    #: supported kind is ever added to ``ItemKind`` without a query, a genuine
+    #: gap the formatter refuses rather than pretends is absent. ``None`` as
     #: the schema column means the kind is not schema-scoped -- ``SCHEMATA`` is
     #: a database-level view and the schema is the object being named.
     _OBJECT_EXISTS_VIEWS = {
@@ -610,10 +612,12 @@ class SnowflakeIntrospectionMixin:
         would make ``TABLE`` mean "table or view". The vendor table kinds --
         external, hybrid, Iceberg, dynamic, event -- are tables and stay.
 
-        A kind absent from the table above raises the protocol refusal naming
-        ``item_exists``, the same one the manager raises: a statement built
-        directly with an unsupported kind must not render a query that claims
-        to answer it.
+        A kind absent from the table above cannot render a query. Those in
+        ``ITEM_KINDS_WITHOUT_OBJECTS`` never get here: the manager answers
+        them ``False``. Any other kind would be a supported object whose
+        catalogue query is genuinely missing, and raises the protocol refusal
+        naming ``item_exists`` so the gap cannot pass as an answer -- the same
+        rule core states for ``item_exists``.
         """
         params = expr.get_params()
         kind = ItemKind(params.get("kind"))
