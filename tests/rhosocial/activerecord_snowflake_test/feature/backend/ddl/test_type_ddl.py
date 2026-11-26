@@ -147,7 +147,9 @@ def test_capabilities_protocol_and_mro():
     assert SnowflakeDialect.format_type_definition is SnowflakeTypeDDLMixin.format_type_definition
 
     mro = SnowflakeDialect.__mro__
-    assert mro.index(SnowflakeTypeDDLMixin) < mro.index(CreateTypeSupport)
+    assert SnowflakeTypeDDLMixin in mro
+    # CREATE TYPE is satisfied structurally, so the protocol is not an MRO member.
+    assert CreateTypeSupport not in mro
 
 
 def test_version_boundary_and_low_version_fail_fast():
