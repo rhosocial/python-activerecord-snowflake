@@ -41,6 +41,26 @@ LEGACY_PATTERN = re.compile(
     r"\bIntrospectionSupport\b" r"|\bAsyncIntrospectionSupport\b" r"|\bsupports_partition_info\b"
 )
 
+#: The one document that describes ``item_exists``, and the corrected
+#: statements pinned verbatim. The old text claimed ``item_exists`` refused
+#: kinds it simply does not query; the code answers ``False`` for those without
+#: a query and keeps an empty refusal branch.
+ITEM_EXISTS_DOC = REPO_ROOT / "docs" / "en_US" / "introspection" / "README.md"
+
+PINNED_ITEM_EXISTS_STATEMENTS = (
+    "`item_exists` follows core's three-case rule, classifying every `ItemKind`"
+    " rather than refusing the kinds it does not query.",
+    "answer `False` **without issuing a query**",
+    "kinds Snowflake lacks answer `False` with no query; no kind is refused today",
+)
+
+#: The retired claims, kept so a later edit cannot restore the old behaviour
+#: description in another document.
+RETIRED_ITEM_EXISTS_CLAIMS = (
+    "`item_exists` refuses `TYPE`",
+    "other kinds refuse",
+)
+
 #: (module, sync protocol name, async twin name) for the four families.
 FAMILY_MODULES = [
     (structure, "StructureIntrospectionSupport", "AsyncStructureIntrospectionSupport"),
@@ -140,3 +160,32 @@ class TestPartitionQuestionResolvesToTheMetadataProbe:
         own = vars(SnowflakePartitionSupport)
         assert "supports_external_table_partitioning" in own
         assert "supports_partition_info" not in own
+
+
+class TestItemExistsDocsMatchTheCode:
+    """Pin the corrected ``item_exists`` documentation.
+
+    Chosen mechanism: **pin the corrected sentences verbatim**, rather than
+    forbidding an ``item_exists`` + ``refuse`` co-occurrence on one line. The
+    document's paragraphs are single long lines, and the honest corrected text
+    does mention refusal (the third, intentionally empty branch) and lists the
+    kinds Snowflake lacks on the same line, so a co-occurrence rule would need
+    an allow-list of exactly the sentences it is meant to protect. Pinning the
+    statements -- plus asserting the retired claims are gone -- tests the claim
+    itself and names what is missing when it fails.
+    """
+
+    def test_the_corrected_classification_is_pinned(self):
+        text = ITEM_EXISTS_DOC.read_text(encoding="utf-8")
+        missing = [s for s in PINNED_ITEM_EXISTS_STATEMENTS if s not in text]
+        assert not missing, f"item_exists doc statement(s) missing: {missing}"
+
+    def test_no_document_claims_item_exists_refuses_kinds(self):
+        offenders = []
+        for path in (REPO_ROOT / "docs").rglob("*.md"):
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            for claim in RETIRED_ITEM_EXISTS_CLAIMS:
+                if claim in text:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: {claim!r}")
+        assert not offenders, f"docs still claim item_exists refuses kinds: {offenders}"
+
