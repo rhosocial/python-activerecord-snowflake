@@ -82,7 +82,6 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     ReturningSupport,
     SequenceObjectSupport,
     SetOperationSupport,
-    SQLFunctionSupport,
     TableObjectSupport,
     TransactionControlSupport,
     TruncateSupport,
@@ -94,6 +93,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
 )
 from rhosocial.activerecord.backend.suggestion.protocols import (
     ColumnTypeSuggestionSupport,
+    FunctionSuggestionSupport,
     GeneratedValueSuggestionSupport,
 )
 
@@ -118,6 +118,9 @@ SNOWFLAKE_PROTOCOLS = [
     # Column classes: which operations a value carries, where DataTypeSupport
     # answers how it is stored. SnowflakeColumnTypeMixin supplies the table.
     ColumnTypeSuggestionSupport,
+    # The function catalogue is a suggestion (a value), not a support switch;
+    # Snowflake answers with an empty mapping so gated tests skip.
+    FunctionSuggestionSupport,
     CommentSupport,
     DataTypeSupport,
     ExplainSupport,
@@ -133,7 +136,6 @@ SNOWFLAKE_PROTOCOLS = [
     QualifyClauseSupport,
     ReturningSupport,
     SetOperationSupport,
-    SQLFunctionSupport,
     TransactionControlSupport,
     TruncateSupport,
     UpsertSupport,

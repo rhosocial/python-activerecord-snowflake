@@ -16,7 +16,7 @@ from rhosocial.activerecord.backend.dialect.protocols import (
     JSONSupport, ExplainSupport,
     ViewObjectSupport, NamespaceSupport, IndexObjectSupport,
     ConstraintSupport, IntrospectionSupport,
-    TransactionControlSupport, SQLFunctionSupport,
+    TransactionControlSupport,
     AdvancedGroupingSupport, ArraySupport, QualifyClauseSupport,
     MergeSupport,
 )
@@ -51,7 +51,6 @@ PROTOCOL_FAMILY_GROUPS: Dict[str, list] = {
     "Named objects - View & Namespace": [ViewObjectSupport, NamespaceSupport],
     "DDL - Index & Constraint": [IndexObjectSupport, ConstraintSupport],
     "Introspection": [IntrospectionSupport],
-    "SQL Functions": [SQLFunctionSupport],
     "Snowflake-specific": [
         SnowflakeTimeTravelSupport, SnowflakeVariantSupport,
         SnowflakeArraySupport, SnowflakeCloneSupport,

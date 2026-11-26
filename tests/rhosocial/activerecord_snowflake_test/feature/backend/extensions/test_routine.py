@@ -34,6 +34,20 @@ class TestSnowflakeRoutineProtocol:
     def test_supports_routines(self, dialect):
         assert dialect.supports_routines() is True
 
+    def test_suggest_functions_keeps_the_catalogue_empty(self, dialect):
+        """The function catalogue is a value read through ``.functions``.
+
+        Snowflake ships a large built-in function library, so the catalogue is
+        deliberately empty: gated tests skip rather than assume availability.
+        """
+        from rhosocial.activerecord.backend.suggestion.definitions import (
+            FunctionSuggestion,
+        )
+
+        suggestion = dialect.suggest_functions()
+        assert isinstance(suggestion, FunctionSuggestion)
+        assert suggestion.functions == {}
+
 
 class TestSnowflakeCreateProcedure:
     """CREATE [OR REPLACE] PROCEDURE statement generation."""
