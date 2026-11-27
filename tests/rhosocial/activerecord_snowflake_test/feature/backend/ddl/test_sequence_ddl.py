@@ -70,8 +70,9 @@ class TestCreateSequenceRendering:
         assert sql == 'CREATE SEQUENCE "s" NOORDER'
 
     def test_order_pair_is_mutually_exclusive(self, dialect):
+        expr = CreateSequenceStatement(dialect, _seq(dialect), order=True, no_order=True)
         with pytest.raises(ValueError, match="order and no_order are mutually exclusive"):
-            CreateSequenceStatement(dialect, _seq(dialect), order=True, no_order=True)
+            expr.to_sql()
 
     def test_namespaced_name(self, dialect):
         """The sequence object renders its own namespace; the formatter does not."""
@@ -135,8 +136,9 @@ class TestAlterSequenceRendering:
         assert exc_info.value.feature_name == "ALTER SEQUENCE CACHE"
 
     def test_order_pair_is_mutually_exclusive(self, dialect):
+        expr = AlterSequenceStatement(dialect, _seq(dialect), order=True, no_order=True)
         with pytest.raises(ValueError, match="order and no_order are mutually exclusive"):
-            AlterSequenceStatement(dialect, _seq(dialect), order=True, no_order=True)
+            expr.to_sql()
 
 
 #: ``(label, create_kwargs, alter_kwargs)`` for each clause Snowflake lacks.

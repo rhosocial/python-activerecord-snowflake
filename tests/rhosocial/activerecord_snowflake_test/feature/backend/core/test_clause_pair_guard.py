@@ -139,12 +139,14 @@ def _query(d):
 
 
 def _render(build: Callable[[], object]) -> Outcome:
-    """Render one state; a refusal is an outcome, a construction error is too.
+    """Build one state, then render it; a refusal is an outcome, not a failure.
 
-    Two kinds of refusal are kept apart on purpose: ``ValueError`` is the
-    older constructor-time phase (still used by most pairs), while
-    ``TypeError`` is where a node that collects at construction answers a
-    payload/caller error at render time.
+    A malformed pair can be judged in either phase: some nodes still raise
+    ``ValueError`` in ``__init__``, while the ones that collect their payload
+    at construction judge it in the formatter's ``validate()`` call and raise
+    from ``to_sql()``. Build first, then classify the render, so both phases
+    answer the same outcome channel. ``TypeError`` is kept separate: it is
+    where a node answers a payload/caller error at render time.
     """
     try:
         expr = build()
@@ -156,6 +158,8 @@ def _render(build: Callable[[], object]) -> Outcome:
         return ("refused", exc.feature_name)
     except TypeError as exc:
         return ("type-error", str(exc))
+    except ValueError as exc:
+        return ("value-error", str(exc))
     return ("rendered", sql)
 
 

@@ -144,9 +144,14 @@ class TestRefusedOptions:
         assert exc_info.value.feature_name == feature
 
     def test_cache_zero_is_refused_at_construction(self, dialect):
-        """``cache=0`` is no longer a sentinel spelling; ``no_cache`` is."""
+        """``cache=0`` is no longer a sentinel spelling; ``no_cache`` is.
+
+        The clause is collected at construction and judged by the formatter's
+        ``validate()`` call, so the refusal now escapes from ``to_sql()``.
+        """
+        expr = _identity(dialect, cache=0)
         with pytest.raises(ValueError, match="cache must be a positive integer"):
-            _identity(dialect, cache=0)
+            expr.to_sql()
 
     def test_cycle_false_is_unspecified(self, dialect):
         """``cycle=False`` is no longer a spelling: the unset pair emits nothing."""
@@ -154,8 +159,9 @@ class TestRefusedOptions:
         assert sql == " IDENTITY(1, 1)"
 
     def test_order_pair_is_mutually_exclusive(self, dialect):
+        expr = _identity(dialect, order=True, no_order=True)
         with pytest.raises(ValueError, match="order and no_order are mutually exclusive"):
-            _identity(dialect, order=True, no_order=True)
+            expr.to_sql()
 
     def test_always_is_refused(self, dialect):
         """``ALWAYS`` used to render byte-identical to ``BY DEFAULT``."""
