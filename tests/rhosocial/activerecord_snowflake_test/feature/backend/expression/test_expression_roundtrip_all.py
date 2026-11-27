@@ -1104,14 +1104,9 @@ UNCONSTRUCTIBLE = (
     "rhosocial.activerecord.backend.expression.statements.ddl_partition.PartitionByListClause",
     "rhosocial.activerecord.backend.expression.statements.ddl_partition.PartitionByRangeClause",
     "rhosocial.activerecord.backend.expression.statements.ddl_partition.PartitionClause",
-    # The three UUID nodes refuse in __init__, not in to_sql(): Snowflake
-    # spells no UUID SQL, so the answer is the same for every argument and no
-    # registered constructor can change it. Measured with valid arguments --
-    # an invalid ``which`` raises ValueError first and hides the dialect's
-    # answer, which is how the nil/max constant was first misread as rescuable.
-    "rhosocial.activerecord.backend.expression.uuid.UUIDCastFunction",
-    "rhosocial.activerecord.backend.expression.uuid.UUIDConstantExpression",
-    "rhosocial.activerecord.backend.expression.uuid.UUIDGenerationExpression",
+    # The three UUID value nodes left this list when their constructors stopped
+    # refusing a dialect; Snowflake's "no UUID SQL" answer now comes from
+    # `format_uuid_*` at render time, which the matrix classifies.
 )
 
 #: Formatters Snowflake declares no implementation of, grouped by the feature
@@ -1240,6 +1235,13 @@ UNMODELLED_FORMATTERS = {
     "the TableSource root (every concrete row source overrides its formatter; the "
     "root carries nothing but an alias and is never rendered)": (
         "format_table_source",
+    ),
+    "the UUID value nodes (this dialect composes no UUID support mixin: "
+    "Snowflake spells no UUID generation, constant or text-to-UUID cast, so "
+    "all three nodes reach the dispatch and find no base method declared)": (
+        "format_uuid_generation_expression",
+        "format_uuid_constant_expression",
+        "format_uuid_cast",
     ),
 }
 
