@@ -149,18 +149,19 @@ class AsyncSnowflakeBackend(
             conn_params = {
                 'user': config.username,
                 'password': config.password,
-                'account': getattr(config, 'account', None),
+                'account': config.account,
                 'database': config.database,
             }
-            if getattr(config, 'warehouse', None):
+            if config.warehouse:
                 conn_params['warehouse'] = config.warehouse
-            if getattr(config, 'schema', None) or getattr(config, 'schema_name', None):
-                conn_params['schema'] = getattr(config, 'schema', None) or getattr(config, 'schema_name', None)
-            if getattr(config, 'role', None):
+            schema = config.schema or config.schema_name
+            if schema:
+                conn_params['schema'] = schema
+            if config.role:
                 conn_params['role'] = config.role
-            if getattr(config, 'authenticator', None):
+            if config.authenticator:
                 conn_params['authenticator'] = config.authenticator
-            if getattr(config, 'session_parameters', None):
+            if config.session_parameters:
                 conn_params['session_parameters'] = config.session_parameters
 
             loop = asyncio.get_event_loop()

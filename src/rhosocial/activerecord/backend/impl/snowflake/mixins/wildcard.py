@@ -37,18 +37,17 @@ https://docs.snowflake.com/en/sql-reference/sql/select ; nothing here was
 measured.
 """
 
-from typing import TYPE_CHECKING, Tuple
+from typing import Tuple, Union
 
-from rhosocial.activerecord.backend.expression.core import AllColumnsWildcard
+from rhosocial.activerecord.backend.expression.core import (
+    AllColumnsWildcard,
+    RowCountWildcard,
+)
 
 from ..expression.wildcard import (
     SnowflakeAllColumnsWildcard,
     SnowflakeRowCountWildcard,
 )
-
-if TYPE_CHECKING:  # pragma: no cover
-    from rhosocial.activerecord.backend.expression.bases import BaseExpression
-
 
 class SnowflakeWildcardMixin:
     """Render Snowflake's filtered wildcards, and delegate everything else.
@@ -60,7 +59,9 @@ class SnowflakeWildcardMixin:
     keeps core's bare ``*`` and ``rel.*`` paths byte-identical.
     """
 
-    def format_all_columns_wildcard(self, expr: "BaseExpression") -> Tuple[str, tuple]:
+    def format_all_columns_wildcard(
+        self, expr: "Union[AllColumnsWildcard, SnowflakeAllColumnsWildcard]"
+    ) -> Tuple[str, tuple]:
         """Render ``*`` / ``rel.*``, optionally followed by ``ILIKE`` / ``EXCLUDE``.
 
         Self-contained: the asterisk half and the filter are both spelled here,
@@ -95,7 +96,9 @@ class SnowflakeWildcardMixin:
             return f"{sql}{suffix}", params
         return sql, params
 
-    def format_row_count_wildcard(self, expr: "BaseExpression") -> Tuple[str, tuple]:
+    def format_row_count_wildcard(
+        self, expr: "Union[RowCountWildcard, SnowflakeRowCountWildcard]"
+    ) -> Tuple[str, tuple]:
         """Render ``COUNT``'s argument: the bare ``*``, or Snowflake's qualified form.
 
         Core's node renders ``*`` and carries no relation; the Snowflake node adds

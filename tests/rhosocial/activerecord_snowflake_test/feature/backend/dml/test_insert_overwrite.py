@@ -71,7 +71,7 @@ class TestSnowflakeInsertOverwrite:
         expr = InsertStatement(
             dialect, into=Table(dialect, "t"), source=select_source, columns=["id", "name"]
         )
-        sql, _ = dialect.format_insert_overwrite_statement(expr)
+        sql, _ = dialect._render_insert_overwrite(expr)
         assert sql.startswith("INSERT OVERWRITE INTO ")
 
     def test_plain_insert_unchanged(self, dialect, select_source):

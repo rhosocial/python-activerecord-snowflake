@@ -11,13 +11,18 @@ These formatters are independently callable; the generic core
 ``TableMixin`` CREATE TABLE renderer is not modified.
 """
 
-from typing import Tuple, TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:  # pragma: no cover
+    from rhosocial.activerecord.backend.expression.statements.ddl_table import (
+        CreateTableOptions,
+    )
+
     from ..expression.partition import (
         SnowflakeAlterTableClusteringStatement,
         SnowflakeClusterByClause,
     )
+    from ..expression.table_options import SnowflakeCreateTableOptions
 
 
 class SnowflakeTableModifierMixin:
@@ -128,7 +133,9 @@ class SnowflakeTableModifierMixin:
         """Snowflake supports CLUSTER BY clustering keys."""
         return True
 
-    def format_create_table_options(self, expr) -> Tuple[str, tuple]:
+    def format_create_table_options(
+        self, expr: "Union[CreateTableOptions, SnowflakeCreateTableOptions]"
+    ) -> Tuple[str, tuple]:
         """Format the CREATE header modifiers for Snowflake.
 
         Accepts both the generic ``CreateTableOptions`` (renders ``OR REPLACE``)

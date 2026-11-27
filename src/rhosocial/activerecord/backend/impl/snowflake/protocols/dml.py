@@ -32,7 +32,7 @@ class SnowflakeDMLSupport(Protocol):
         """Format an INSERT statement (honours the ``overwrite`` option)."""
         ...
 
-    def format_insert_overwrite_statement(
+    def _render_insert_overwrite(
         self, expr: "InsertStatement"
     ) -> Tuple[str, tuple]:
         """Format an INSERT OVERWRITE statement."""

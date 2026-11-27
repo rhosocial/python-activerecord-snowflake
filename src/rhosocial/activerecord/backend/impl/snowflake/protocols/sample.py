@@ -29,13 +29,13 @@ class SnowflakeSampleSupport(Protocol):
         """Whether the TABLESAMPLE clause is supported."""
         ...
 
-    def format_sample_expression(
+    def _render_sample_expression(
         self, expr: "SnowflakeSampleExpression"
     ) -> Tuple[str, tuple]:
         """Format a SAMPLE clause."""
         ...
 
-    def format_tablesample_clause(
+    def _render_tablesample_clause(
         self, expr: "SnowflakeSampleExpression"
     ) -> Tuple[str, tuple]:
         """Format a TABLESAMPLE clause."""

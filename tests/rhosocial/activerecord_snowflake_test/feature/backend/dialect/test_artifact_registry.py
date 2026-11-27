@@ -38,10 +38,17 @@ from rhosocial.activerecord.backend.impl.snowflake.expression.types import (
     SnowflakeVarcharType,
 )
 from rhosocial.activerecord.backend.impl.snowflake.registry import backend_registry
-from rhosocial.activerecord.backend.impl.sqlite.dialect import SQLiteDialect
-from rhosocial.activerecord.backend.impl.sqlite.expression.vacuum import (
-    SQLiteVacuumStatement,
-)
+
+
+class ForeignBackendKind(BaseExpression):
+    """A kind owned by no registry here; stands in for another backend's node.
+
+    The refusal under test is about the *kind name*, so a locally declared node
+    exercises it without importing a foreign backend's implementation package.
+    """
+
+    def __init__(self, dialect):
+        super().__init__(dialect)
 
 
 def _dialect():
@@ -134,15 +141,14 @@ def test_every_formatter_declaring_node_is_discovered_by_the_walk():
 
 def test_a_foreign_backends_kind_is_refused_by_name():
     """A kind Snowflake does not own is refused, never resolved to another class."""
-    sqlite = SQLiteDialect((3, 38, 0))
-    artifact = serialize(SQLiteVacuumStatement(sqlite))
+    artifact = serialize(ForeignBackendKind(_dialect()))
 
     with pytest.raises(ExpressionDeserializationError) as caught:
         deserialize(artifact, _dialect())
-    assert "sqlite_vacuum_statement" in str(caught.value)
+    assert ForeignBackendKind.kind() in str(caught.value)
 
     with pytest.raises(RegistryError) as refused:
-        _dialect().artifact_registry().resolve_node(SQLiteVacuumStatement.kind())
+        _dialect().artifact_registry().resolve_node(ForeignBackendKind.kind())
     assert refused.value.reason is RegistryReason.KIND_NOT_REGISTERED
 
 

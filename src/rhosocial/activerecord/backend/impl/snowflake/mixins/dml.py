@@ -43,10 +43,10 @@ class SnowflakeDMLMixin:
 
         """
         if isinstance(expr, SnowflakeInsertExpression) and expr.overwrite:
-            return self.format_insert_overwrite_statement(expr)
+            return self._render_insert_overwrite(expr)
         return super().format_insert_statement(expr)
 
-    def format_insert_overwrite_statement(
+    def _render_insert_overwrite(
         self, expr: "InsertStatement"
     ) -> Tuple[str, tuple]:
         """Format an INSERT OVERWRITE INTO statement.

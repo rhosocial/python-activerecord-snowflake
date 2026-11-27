@@ -114,7 +114,7 @@ class SnowflakeDatabaseMixin:
         if isinstance(expr, SnowflakeCreateDatabaseExpression) and expr.clone:
             parts.append(f"CLONE {self.format_identifier(expr.clone)}")
         if expr.comment:
-            escaped_comment = expr.comment.replace("'", "''")
+            escaped_comment = self.escape_sql_string(expr.comment)
             parts.append(f"COMMENT = '{escaped_comment}'")
         return " ".join(parts), ()
 

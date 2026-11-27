@@ -382,7 +382,7 @@ class SnowflakeDialect(
         """Snowflake supports IDENTIFIER() dynamic binding."""
         return True
 
-    def format_snowflake_identifier_expression(self, expr: str) -> str:
+    def _render_dynamic_identifier(self, expr: str) -> str:
         """Format an IDENTIFIER(placeholder) dynamic object reference."""
         placeholder = self.get_parameter_placeholder()
         return f"IDENTIFIER({placeholder})"
@@ -402,7 +402,7 @@ class SnowflakeDialect(
         Returns:
             Tuple of (SQL string, identifier parameter tuple).
         """
-        sql = self.format_snowflake_identifier_expression(expr.identifier)
+        sql = self._render_dynamic_identifier(expr.identifier)
         return sql, (expr.identifier,)
 
     def format_begin_transaction_statement(self, expr: "BeginTransactionStatement") -> Tuple[str, tuple]:

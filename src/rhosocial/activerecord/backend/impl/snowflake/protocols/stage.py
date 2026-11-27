@@ -57,13 +57,13 @@ class SnowflakeStageSupport(Protocol):
         """Format DROP STAGE statement."""
         ...
 
-    def format_copy_into_load(
+    def _render_copy_into_load(
         self, expr: "SnowflakeCopyIntoStatement"
     ) -> Tuple[str, tuple]:
         """Format COPY INTO <table> FROM <stage> (load)."""
         ...
 
-    def format_copy_into_unload(
+    def _render_copy_into_unload(
         self, expr: "SnowflakeCopyIntoStatement"
     ) -> Tuple[str, tuple]:
         """Format COPY INTO <stage> FROM <table> (unload)."""

@@ -340,9 +340,12 @@ class SnowflakeVectorAdapter(VectorAdapterBase):
             return json.dumps(values)
         if target_type is list:
             return values
+        target_name = (
+            target_type.__name__ if isinstance(target_type, type) else repr(target_type)
+        )
         raise ValueError(
             "Snowflake vectors are written either as a list (ARRAY) or as "
-            f"JSON text (VECTOR), not {getattr(target_type, '__name__', target_type)!r}"
+            f"JSON text (VECTOR), not {target_name}"
         )
 
     def _decode(self, value: Any, options: Dict[str, Any]) -> Vector:

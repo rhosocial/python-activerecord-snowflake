@@ -18,6 +18,11 @@ from ..dialect import SnowflakeDialect
 from ..mixins import SnowflakeBackendMixin, SnowflakeConcurrencyMixin
 from ..transaction import SnowflakeTransactionManager
 
+# Developer-authored capability probes. They are declared constants, not SQL
+# assembled from caller input: no value is ever concatenated into them.
+_PING_SQL = "SELECT 1"
+_SERVER_VERSION_SQL = "SELECT CURRENT_VERSION()"
+
 
 class SnowflakeBackend(
     IntrospectorBackendMixin,
@@ -105,18 +110,19 @@ class SnowflakeBackend(
             conn_params = {
                 'user': config.username,
                 'password': config.password,
-                'account': getattr(config, 'account', None),
+                'account': config.account,
                 'database': config.database,
             }
-            if getattr(config, 'warehouse', None):
+            if config.warehouse:
                 conn_params['warehouse'] = config.warehouse
-            if getattr(config, 'schema', None) or getattr(config, 'schema_name', None):
-                conn_params['schema'] = getattr(config, 'schema', None) or getattr(config, 'schema_name', None)
-            if getattr(config, 'role', None):
+            schema = config.schema or config.schema_name
+            if schema:
+                conn_params['schema'] = schema
+            if config.role:
                 conn_params['role'] = config.role
-            if getattr(config, 'authenticator', None):
+            if config.authenticator:
                 conn_params['authenticator'] = config.authenticator
-            if getattr(config, 'session_parameters', None):
+            if config.session_parameters:
                 conn_params['session_parameters'] = config.session_parameters
 
             self._connection = snowflake.connector.connect(**conn_params)
@@ -153,7 +159,7 @@ class SnowflakeBackend(
             return False
         try:
             cursor = self._connection.cursor()
-            cursor.execute("SELECT 1")
+            cursor.execute(_PING_SQL)
             cursor.close()
             return True
         except Exception:
@@ -199,7 +205,7 @@ class SnowflakeBackend(
         if self._connection:
             try:
                 cursor = self._connection.cursor()
-                cursor.execute("SELECT CURRENT_VERSION()")
+                cursor.execute(_SERVER_VERSION_SQL)
                 row = cursor.fetchone()
                 cursor.close()
                 if row:
@@ -249,8 +255,8 @@ class SnowflakeBackend(
         """
         from rhosocial.activerecord.backend.result import QueryResult
 
-        last_insert_id = getattr(cursor, "lastrowid", None)
-        affected_rows = getattr(cursor, "rowcount", 0)
+        last_insert_id = cursor.lastrowid
+        affected_rows = cursor.rowcount
 
         # Detect fakesnow/DuckDB RETURNING quirks
         _FAKESNOW_COLUMNS = {

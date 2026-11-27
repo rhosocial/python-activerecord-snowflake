@@ -194,3 +194,31 @@ jobs:
         run: |
           export PYTHONPATH=src:tests
           pytest tests/ -n 4 --dist=loadgroup --tb=short --ignore=tests/benchmark
+
+  formal-rules-contracts:
+    name: Formal rules contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install "rhosocial-activerecord @ git+https://github.com/rhosocial/python-activerecord.git@feature/activerecord-migration"  # NOSONAR
+          pip install "rhosocial-activerecord-testsuite @ git+https://github.com/rhosocial/python-activerecord-testsuite.git@feature/activerecord-migration"  # NOSONAR
+          pip install -e . --no-deps
+
+      - name: Formal rules contracts
+        # Isolated from the full suite: these modules read source and metadata
+        # only, and module-level global registries elsewhere can make an
+        # order-dependent pass meaningless. No warehouse is involved.
+        run: |
+          export PYTHONPATH=src:tests
+          python -m pytest tests/rhosocial/activerecord_snowflake_test/feature/rules -q -p no:warnings
