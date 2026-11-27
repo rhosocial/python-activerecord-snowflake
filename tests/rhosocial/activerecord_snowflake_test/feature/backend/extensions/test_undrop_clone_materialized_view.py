@@ -181,10 +181,11 @@ class TestSnowflakeGenericMaterializedViewInterop:
         assert '("alias_c1")' in sql
 
     def test_generic_expression_requires_query(self, dialect):
+        # The node collects; a missing required query is a render-time error.
         expr = CreateMaterializedViewStatement(
             dialect=dialect, view=MaterializedView(dialect, "mv"), query=None
         )
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             expr.to_sql()
 
     def test_snowflake_expression_accepts_core_field_names(self, dialect):

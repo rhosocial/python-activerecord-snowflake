@@ -40,9 +40,10 @@ signature*: ``("rendered", sql)``, ``("refused", feature_name)``, or
 
 Mandatory pairs (``AlterConstraintAction.enforced`` / ``not_enforced``) have no
 "neither" state at all: the action *is* the keyword. They are guarded by
-:class:`MandatoryPairCase`, which requires "neither" and "both" to raise
-``ValueError`` and each requested spelling to be answered (rendered or refused
-by name) rather than dropped.
+:class:`MandatoryPairCase`, which requires "neither" and "both" to be refused
+(``TypeError`` where the clause is judged at render time, ``ValueError`` where
+it is still judged in ``__init__``) and each requested spelling to be answered
+(rendered or refused by name) rather than dropped.
 
 Not server-verified
 ===================
@@ -138,7 +139,13 @@ def _query(d):
 
 
 def _render(build: Callable[[], object]) -> Outcome:
-    """Render one state; a refusal is an outcome, a construction error is too."""
+    """Render one state; a refusal is an outcome, a construction error is too.
+
+    Two kinds of refusal are kept apart on purpose: ``ValueError`` is the
+    older constructor-time phase (still used by most pairs), while
+    ``TypeError`` is where a node that collects at construction answers a
+    payload/caller error at render time.
+    """
     try:
         expr = build()
     except ValueError as exc:
@@ -147,6 +154,8 @@ def _render(build: Callable[[], object]) -> Outcome:
         sql, _params = expr.to_sql()
     except UnsupportedFeatureError as exc:
         return ("refused", exc.feature_name)
+    except TypeError as exc:
+        return ("type-error", str(exc))
     return ("rendered", sql)
 
 
@@ -590,6 +599,10 @@ class MandatoryPairCase:
     a_outcome: Outcome
     b_outcome: Outcome
     note: str = ""
+    #: The outcome kind the pair's grammar refusal answers with. A clause
+    #: judged at render time answers ``type-error``; one still judged in
+    #: ``__init__`` answers ``value-error``.
+    refusal: str = "value-error"
 
 
 MANDATORY_CASES: Tuple[MandatoryPairCase, ...] = (
@@ -607,6 +620,8 @@ MANDATORY_CASES: Tuple[MandatoryPairCase, ...] = (
             "Snowflake declares supports_alter_constraint_enforced() False; both "
             "spellings are refused by name, neither is dropped."
         ),
+        # Core judges this action's grammar at render time.
+        refusal="type-error",
     ),
 )
 
@@ -619,7 +634,7 @@ class TestMandatoryPairs:
     @pytest.mark.parametrize("case", MANDATORY_CASES, ids=MANDATORY_IDS)
     def test_neither_set_is_refused(self, case):
         outcome = _render(lambda: case.build(_dialect()))
-        assert outcome[0] == "value-error", f"{case.case_id}: {outcome!r}"
+        assert outcome[0] == case.refusal, f"{case.case_id}: {outcome!r}"
         assert case.neither_fragment in outcome[1], f"{case.case_id}: {outcome[1]!r}"
 
     @pytest.mark.parametrize("case", MANDATORY_CASES, ids=MANDATORY_IDS)
@@ -631,9 +646,9 @@ class TestMandatoryPairs:
             )
 
     @pytest.mark.parametrize("case", MANDATORY_CASES, ids=MANDATORY_IDS)
-    def test_both_set_is_refused_at_construction(self, case):
+    def test_both_set_is_refused(self, case):
         outcome = _render(lambda: case.build(_dialect(), **{case.a: True, case.b: True}))
-        assert outcome[0] == "value-error", f"{case.case_id}: {outcome!r}"
+        assert outcome[0] == case.refusal, f"{case.case_id}: {outcome!r}"
         assert f"{case.a} and {case.b} are mutually exclusive options" in outcome[1], (
             f"{case.case_id}: {outcome[1]!r}"
         )
