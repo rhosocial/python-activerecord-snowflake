@@ -19,8 +19,9 @@ a caller can report the gap as "unsupported" rather than "nothing to do".
 
 Evidence: the ``tableColumnAction`` production of ``ALTER TABLE``,
 https://docs.snowflake.com/en/sql-reference/sql/alter-table (read 2026-11-25).
-The dialect also declares ``supports_multi_action_alter_table() == False``:
-one action per statement, with no positional action among them.
+The grammar also takes one ``tableAction`` per statement, with no positional
+action among them; the formatter emits one action per statement for every
+dialect, so a reorder cannot ride along with other changes.
 """
 from dataclasses import replace
 

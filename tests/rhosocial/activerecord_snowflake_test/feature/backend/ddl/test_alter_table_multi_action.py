@@ -1,12 +1,12 @@
 # tests/rhosocial/activerecord_snowflake_test/feature/backend/ddl/test_alter_table_multi_action.py
-"""Snowflake ALTER TABLE accepts only one action per statement.
+"""One expression renders one action, on every dialect.
 
-The shared ALTER TABLE formatter comma-joins actions when the dialect's
-``supports_multi_action_alter_table()`` probe is True. Snowflake's grammar has
-no such comma-separated action list, so the dialect answers False. Rendering a
-multi-action statement on such a dialect now fails fast with
-``UnsupportedFeatureError`` rather than semicolon-joining several statements
-into one unexecutable string. A single-action statement still renders normally.
+Snowflake's grammar takes one ``tableAction`` per ``ALTER TABLE``, and the
+framework reaches the same shape everywhere: a statement carrying two actions
+fails fast with ``UnsupportedFeatureError`` rather than comma-joining them.
+Comma-joining would hide the second action from the caller's plan -- its own
+phase, permission and destructive check. A single-action statement renders
+normally.
 """
 
 import pytest
@@ -50,9 +50,6 @@ def _two_action_statement(dialect):
 
 
 class TestSnowflakeMultiActionAlterTable:
-    def test_probe_is_false(self, dialect):
-        assert dialect.supports_multi_action_alter_table() is False
-
     def test_two_actions_are_refused(self, dialect):
         with pytest.raises(UnsupportedFeatureError, match="multiple actions"):
             _two_action_statement(dialect).to_sql()
