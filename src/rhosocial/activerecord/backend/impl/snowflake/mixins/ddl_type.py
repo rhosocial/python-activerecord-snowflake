@@ -170,13 +170,12 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
         # ``cascade`` / ``restrict`` are declared only by this backend's
         # expression, which collects both flags and refuses neither at
         # construction time: the render-time check below is the single gate.
-        # The core statement has no such fields, so a plain one renders the
-        # bare form.
-        if isinstance(expr, SnowflakeDropTypeExpression):
-            if expr.cascade:
-                raise UnsupportedFeatureError(self.name, "DROP TYPE CASCADE")
-            if expr.restrict:
-                raise UnsupportedFeatureError(self.name, "DROP TYPE RESTRICT")
+        # It reads the fields rather than the class, so the gate holds even if
+        # the expression arrives through a different re-export path.
+        if getattr(expr, "cascade", False):
+            raise UnsupportedFeatureError(self.name, "DROP TYPE CASCADE")
+        if getattr(expr, "restrict", False):
+            raise UnsupportedFeatureError(self.name, "DROP TYPE RESTRICT")
         return f"DROP TYPE {self._format_type_name(expr)}", ()
 
     def format_type_definition(
