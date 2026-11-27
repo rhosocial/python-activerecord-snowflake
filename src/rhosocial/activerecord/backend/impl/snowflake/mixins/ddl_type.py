@@ -168,10 +168,10 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
         if expr.if_exists:
             raise UnsupportedFeatureError(self.name, "DROP TYPE IF EXISTS")
         # ``cascade`` / ``restrict`` are declared only by this backend's
-        # expression, which refuses either spelling at construction time and
-        # pins both fields to False; the render-time refusal stays as the
-        # second gate rather than silently trusting the first. The core
-        # statement has no such fields, so a plain one renders the bare form.
+        # expression, which collects both flags and refuses neither at
+        # construction time: the render-time check below is the single gate.
+        # The core statement has no such fields, so a plain one renders the
+        # bare form.
         if isinstance(expr, SnowflakeDropTypeExpression):
             if expr.cascade:
                 raise UnsupportedFeatureError(self.name, "DROP TYPE CASCADE")

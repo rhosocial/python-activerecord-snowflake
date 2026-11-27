@@ -208,23 +208,13 @@ class SnowflakeDropTypeExpression(DropTypeStatement):
             raise TypeError("cascade must be a bool")
         if not isinstance(restrict, bool):
             raise TypeError("restrict must be a bool")
-        if cascade:
-            raise UnsupportedFeatureError(
-                dialect.name,
-                "DROP TYPE CASCADE",
-                suggestion="Snowflake DROP TYPE does not support CASCADE.",
-            )
-        if restrict:
-            raise UnsupportedFeatureError(
-                dialect.name,
-                "DROP TYPE RESTRICT",
-                suggestion="Snowflake DROP TYPE does not support RESTRICT.",
-            )
         super().__init__(
             dialect,
             type,
             if_exists=if_exists,
         )
+        self.cascade = cascade
+        self.restrict = restrict
         self.cascade = False
         self.restrict = False
 
