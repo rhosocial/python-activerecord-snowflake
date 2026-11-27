@@ -108,6 +108,10 @@ class SnowflakeSequenceMixin:
                 f"got {type(expr.sequence).__name__}"
             )
 
+        # A malformed two-spelling option is judged here, at render time, by
+        # core's public validation rather than in the constructor.
+        expr.validate()
+
         parts = ["CREATE SEQUENCE"]
         if expr.if_not_exists:
             parts.append("IF NOT EXISTS")
@@ -287,6 +291,10 @@ class SnowflakeSequenceMixin:
                 f"{type(expr).__name__}.sequence must be a Sequence, "
                 f"got {type(expr.sequence).__name__}"
             )
+
+        # A malformed two-spelling option is judged here, at render time, by
+        # core's public validation rather than in the constructor.
+        expr.validate()
 
         parts = [f"ALTER SEQUENCE {expr.sequence.to_sql()[0]}"]
 

@@ -52,6 +52,9 @@ class SnowflakeGeneratedColumnMixin:
             UnsupportedFeatureError: The dialect cannot express the clause, the
                 requested generation mode, or one of the requested options.
         """
+        # A malformed two-spelling option is judged here, at render time, by
+        # core's public validation rather than in the constructor.
+        expr.validate()
         if not self.supports_identity_column():
             raise UnsupportedFeatureError(
                 self.name,
