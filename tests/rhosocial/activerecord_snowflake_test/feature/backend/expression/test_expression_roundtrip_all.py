@@ -155,6 +155,7 @@ from rhosocial.activerecord.backend.expression.statements import (
     ddl_domain,
     ddl_function,
     ddl_index,
+    ddl_partition,
     ddl_schema,
     ddl_sequence,
     ddl_table,
@@ -168,6 +169,7 @@ from rhosocial.activerecord.backend.expression.statements.ddl_database import (
     AlterDatabaseAction,
 )
 from rhosocial.activerecord.backend.expression.statements.ddl_domain import (
+    AddDomainCheckAction,
     DomainCheckConstraint,
     RenameDomainAction,
 )
@@ -177,6 +179,7 @@ from rhosocial.activerecord.backend.expression.statements.ddl_table import (
     ForeignKeyConstraint,
     IndexDefinition,
     ReferencesClause,
+    TableCheckConstraint,
     TableConstraint,
     TablePrimaryKeyConstraint,
 )
@@ -444,6 +447,18 @@ def register_specials():
         "statements.ddl_alter.DropIndexAction",
         lambda d: ddl_alter.DropIndexAction(d, Index(d, "i")),
     )
+    # An ALTER CONSTRAINT action carries the enforcement keyword and the branch
+    # the keyword rides on; both sit behind a defaulted positional and a
+    # keyword-only parameter, so the guess cannot fill them. A named CHECK with
+    # ``enforced=True`` is a complete action. Snowflake's own probe refuses
+    # constraint enforcement at render, so the matrix records that capability
+    # gap rather than a construction failure.
+    register_special_constructor(
+        "statements.ddl_alter.AlterConstraintAction",
+        lambda d: ddl_alter.AlterConstraintAction(
+            d, "chk", enforced=True, constraint_kind=TableCheckConstraint
+        ),
+    )
 
     # -- schemas, sequences, databases, domains, types -----------------------
     register_special_constructor(
@@ -503,6 +518,15 @@ def register_specials():
         "statements.ddl_domain.DomainCheckConstraint",
         lambda d: DomainCheckConstraint(d, _column_predicate(d), name="chk"),
     )
+    # An ADD DOMAIN CHECK action needs the constraint node built just above; the
+    # guess supplies a bare string, which the constructor now collects and the
+    # render-time check still refuses, so supply the real constraint.
+    register_special_constructor(
+        "statements.ddl_domain.AddDomainCheckAction",
+        lambda d: AddDomainCheckAction(
+            d, DomainCheckConstraint(d, _column_predicate(d), name="chk")
+        ),
+    )
     register_special_constructor(
         "statements.ddl_type.CreateTypeStatement",
         lambda d: ddl_type.CreateTypeStatement(
@@ -518,6 +542,29 @@ def register_specials():
     register_special_constructor(
         "statements.ddl_type.DropTypeStatement",
         lambda d: ddl_type.DropTypeStatement(d, type=Type(d, "t")),
+    )
+
+    # -- declarative PARTITION BY: refused at render, not at construction -----
+    # All four take ``keys: Sequence[BaseExpression]``; the guess reads the
+    # ``Sequence`` alias as a catalogue object and hands the parameter something
+    # no clause can render. A real column is the payload. Snowflake's own
+    # ``format_partition_clause`` then says the feature is absent, which is the
+    # answer a declarative clause gets on this server.
+    register_special_constructor(
+        "statements.ddl_partition.PartitionByRangeClause",
+        lambda d: ddl_partition.PartitionByRangeClause(d, [Column(d, "id")]),
+    )
+    register_special_constructor(
+        "statements.ddl_partition.PartitionByListClause",
+        lambda d: ddl_partition.PartitionByListClause(d, [Column(d, "id")]),
+    )
+    register_special_constructor(
+        "statements.ddl_partition.PartitionByHashClause",
+        lambda d: ddl_partition.PartitionByHashClause(d, [Column(d, "id")]),
+    )
+    register_special_constructor(
+        "statements.ddl_partition.PartitionClause",
+        lambda d: ddl_partition.PartitionClause(d, "RANGE", [Column(d, "id")]),
     )
 
     # -- routines, triggers, comments ----------------------------------------
@@ -1051,63 +1098,17 @@ register_specials()
 
 #: Classes the generic introspective constructor cannot build.
 #:
-#: Each is a real coverage gap, named here so it is visible rather than lost.
-#: :meth:`TestMatrixIntegrity.test_unconstructible_list_is_exact` pins the tuple
-#: in both directions, so a class that starts needing an exemption fails until
-#: this entry is justified and a stale entry fails too.
+#: Empty, and it must stay empty: every collected class now builds once its
+#: required payload is supplied, which every remaining gap gets from a
+#: registered special constructor above. The tuple is kept rather than deleted
+#: because :meth:`TestMatrixIntegrity.test_unconstructible_list_is_exact`
+#: compares the observed set against it in both directions.
 #:
-#: Sorted, because the integrity test compares against a sorted tuple of what it
-#: observes. Every remaining entry is the same shape: a required parameter the
-#: introspective guess cannot supply, because it sits behind a defaulted
-#: positional or is a member of a closed set. Registering a constructor is the way
-#: to retire any of them.
-#:
-#: ``XMLTableExpression`` used to be a fifth entry here, and it never was a gap in
-#: the class. It wants ``columns: Sequence[XMLTableColumn]``, and the guess read
-#: that annotation's *alias* name -- ``"Sequence"`` -- decided it named a catalogue
-#: object and handed the parameter a ``Sequence`` instead of a list of columns.
-#: The class was fine and the harness was wrong. It constructs now, and what it
-#: reports is a real answer: Snowflake has no SQL/XML at all, so the dispatch finds
-#: no ``format_xml_table_expression``. That is why the method is in
-#: :data:`UNMODELLED_FORMATTERS` under SQL/XML rather than the class staying pinned
-#: here -- the matrix could not find that out while the class could not be built.
-UNCONSTRUCTIBLE = (
-    # ALTER CONSTRAINT. ``name`` and ``constraint_kind`` sit behind defaulted
-    # positionals and are keyword-only, so the introspective constructor skips
-    # them and the class refuses an incomplete action (`ValueError:
-    # constraint_name must be a non-empty string`, because the defaulted
-    # ``constraint_name`` stays None).
-    "rhosocial.activerecord.backend.expression.statements.ddl_alter.AlterConstraintAction",
-    # ADD DOMAIN CHECK. Widens a ``SQLPredicate`` into a ``DomainCheckConstraint``
-    # and needs one. The guess supplies a bare *string*: the annotation names a
-    # ``DomainCheckConstraint``, whose ``\bDomain\b`` fragment does not match
-    # inside the longer word, so the guess falls through to its name-based default
-    # and the class raises ``TypeError: check must be a DomainCheckConstraint
-    # instance, got str``. Registering a constructor for it would need the same
-    # predicate this module already builds for ``JoinClause``, and the class is
-    # unreachable under Snowflake either way -- it names a formatter Snowflake
-    # does not declare (see :data:`UNMODELLED_FORMATTERS`), so rendering it would
-    # be an ``UnsupportedFeatureError`` whatever it was built from. Building it
-    # would buy no assertion.
-    "rhosocial.activerecord.backend.expression.statements.ddl_domain.AddDomainCheckAction",
-    # Core's declarative PARTITION BY clauses arrived with the migration wave.
-    # The introspective constructor reads ``keys: Sequence[BaseExpression]`` by
-    # its ``Sequence`` alias and hands the parameter a catalogue ``Sequence``
-    # instead of a non-empty list of expressions, so all four refuse at
-    # construction -- the same harness limitation already recorded for
-    # XMLTableExpression above. Registering a constructor would buy no
-    # assertion: Snowflake has no declarative table partitioning (it uses
-    # automatic micro-partitioning, CLUSTER BY, or its own
-    # SnowflakeExternalPartitionClause), so each of these answers
-    # UnsupportedFeatureError once built.
-    "rhosocial.activerecord.backend.expression.statements.ddl_partition.PartitionByHashClause",
-    "rhosocial.activerecord.backend.expression.statements.ddl_partition.PartitionByListClause",
-    "rhosocial.activerecord.backend.expression.statements.ddl_partition.PartitionByRangeClause",
-    "rhosocial.activerecord.backend.expression.statements.ddl_partition.PartitionClause",
-    # The three UUID value nodes left this list when their constructors stopped
-    # refusing a dialect; Snowflake's "no UUID SQL" answer now comes from
-    # `format_uuid_*` at render time, which the matrix classifies.
-)
+#: ``XMLTableExpression`` is the precedent for why the default is "register a
+#: constructor" rather than "pin": the guess misread its ``Sequence`` annotation
+#: as a request for a catalogue object, the class was fine, and once it built the
+#: matrix found Snowflake's real answer (no SQL/XML, an unmodelled formatter).
+UNCONSTRUCTIBLE = ()
 
 #: Formatters Snowflake declares no implementation of, grouped by the feature
 #: that is absent, each group naming every method the matrix's classes need.
