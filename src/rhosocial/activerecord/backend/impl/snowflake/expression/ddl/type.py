@@ -215,8 +215,6 @@ class SnowflakeDropTypeExpression(DropTypeStatement):
         )
         self.cascade = cascade
         self.restrict = restrict
-        self.cascade = False
-        self.restrict = False
 
 
 # No registration loop, for the reason ``expression/types.py`` gives at its
