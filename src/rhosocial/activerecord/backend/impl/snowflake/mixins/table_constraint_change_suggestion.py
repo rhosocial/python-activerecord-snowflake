@@ -202,7 +202,7 @@ class SnowflakeTableConstraintChangeSuggestionMixin:
                 AlterTableStatement(
                     self,
                     Table(self, point.table_name),
-                    [self._drop_constraint_action(old_declaration)],
+                    self._drop_constraint_action(old_declaration),
                 )
             )
 
@@ -216,7 +216,7 @@ class SnowflakeTableConstraintChangeSuggestionMixin:
                 AlterTableStatement(
                     self,
                     Table(self, point.table_name),
-                    [AddTableConstraintAction(self, new_declaration)],
+                    AddTableConstraintAction(self, new_declaration),
                 )
             )
 

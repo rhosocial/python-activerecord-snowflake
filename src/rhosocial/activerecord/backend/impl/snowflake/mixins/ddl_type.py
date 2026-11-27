@@ -82,9 +82,6 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
     def supports_drop_type_if_exists(self) -> bool:
         return False
 
-    def supports_multiple_type_alter_actions(self) -> bool:
-        return False
-
     def _format_type_name(
         self,
         expr: Union[CreateTypeStatement, AlterTypeStatement, DropTypeStatement],
@@ -154,22 +151,13 @@ class SnowflakeTypeDDLMixin(UserDefinedTypeMixin):
         self._require_type_support("ALTER TYPE")
         if expr.if_exists and not self.supports_alter_type_if_exists():
             raise UnsupportedFeatureError(self.name, "ALTER TYPE IF EXISTS")
-        if not expr.actions:
-            raise ValueError("ALTER TYPE requires at least one action")
-        if len(expr.actions) > 1 and not self.supports_multiple_type_alter_actions():
-            raise UnsupportedFeatureError(self.name, "multiple ALTER TYPE actions")
-        action_parts = []
-        action_params = []
-        for action in expr.actions:
-            # An action outside this backend's vocabulary has no grammar;
-            # ``format_type_alter_action`` ends in the refusal that names it.
-            action_sql, params = action.to_sql()
-            action_parts.append(action_sql)
-            action_params.extend(params)
+        # An action outside this backend's vocabulary has no grammar;
+        # ``format_type_alter_action`` ends in the refusal that names it.
+        action_sql, action_params = expr.action.to_sql()
         parts = ["ALTER TYPE"]
         if expr.if_exists:
             parts.append("IF EXISTS")
-        parts.extend((self._format_type_name(expr), ", ".join(action_parts)))
+        parts.extend((self._format_type_name(expr), action_sql))
         return " ".join(parts), tuple(action_params)
 
     def format_drop_type_statement(

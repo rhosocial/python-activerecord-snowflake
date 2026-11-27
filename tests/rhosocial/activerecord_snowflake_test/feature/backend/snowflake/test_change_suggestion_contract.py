@@ -282,7 +282,7 @@ def test_unnamed_primary_key_removal_is_a_real_drop_by_kind(dialect):
     assert _sql(answer) == ['ALTER TABLE "t" DROP PRIMARY KEY']
     statement = answer.operations[0]
     assert isinstance(statement, AlterTableStatement)
-    action = statement.actions[0]
+    action = statement.action
     assert isinstance(action, DropTableConstraintAction)
     assert action.constraint is primary_key
     assert action.constraint_name is None
@@ -293,7 +293,7 @@ def test_unnamed_unique_removal_renders_its_columns(dialect):
     answer = _constraint_answer(dialect, old=(unique,))
 
     assert _sql(answer) == ['ALTER TABLE "t" DROP UNIQUE ("a", "b")']
-    assert answer.operations[0].actions[0].constraint is unique
+    assert answer.operations[0].action.constraint is unique
 
 
 def test_unnamed_foreign_key_removal_renders_its_local_columns(dialect):
@@ -301,7 +301,7 @@ def test_unnamed_foreign_key_removal_renders_its_local_columns(dialect):
     answer = _constraint_answer(dialect, old=(foreign_key,))
 
     assert _sql(answer) == ['ALTER TABLE "t" DROP FOREIGN KEY ("a")']
-    assert answer.operations[0].actions[0].constraint is foreign_key
+    assert answer.operations[0].action.constraint is foreign_key
 
 
 def test_named_check_removal_uses_the_name_form(dialect):
@@ -309,7 +309,7 @@ def test_named_check_removal_uses_the_name_form(dialect):
     answer = _constraint_answer(dialect, old=(check,))
 
     assert _sql(answer) == ['ALTER TABLE "t" DROP CONSTRAINT "ck_age"']
-    action = answer.operations[0].actions[0]
+    action = answer.operations[0].action
     assert action.constraint_name == "ck_age"
     assert action.constraint is None
 
@@ -337,8 +337,8 @@ def test_same_name_primary_key_redefinition_drops_then_adds(dialect):
         'ALTER TABLE "t" ADD CONSTRAINT "pk_t" PRIMARY KEY ("a", "b")',
     ]
     drop_action, add_action = (
-        answer.operations[0].actions[0],
-        answer.operations[1].actions[0],
+        answer.operations[0].action,
+        answer.operations[1].action,
     )
     assert isinstance(drop_action, DropTableConstraintAction)
     assert drop_action.constraint is old
@@ -353,7 +353,7 @@ def test_adding_a_key_is_a_real_add_statement(dialect):
     assert _sql(answer) == [
         'ALTER TABLE "t" ADD CONSTRAINT "uq_email" UNIQUE ("email")'
     ]
-    assert answer.operations[0].actions[0].constraint is unique
+    assert answer.operations[0].action.constraint is unique
 
 
 def test_unchanged_declarations_need_no_action(dialect):
@@ -387,7 +387,7 @@ def test_the_chain_passes_the_consumers_single_action_guard(dialect):
     assert entry.state == "actions"
     for statement in entry.operations:
         assert isinstance(statement, AlterTableStatement)
-        assert len(statement.actions) == 1
+        assert statement.action is not None
         sql, params = statement.to_sql()
         assert sql.startswith("ALTER TABLE ")
         assert "DROP TABLE" not in sql

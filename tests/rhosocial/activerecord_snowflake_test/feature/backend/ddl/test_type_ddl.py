@@ -134,7 +134,6 @@ def test_capabilities_protocol_and_mro():
     assert dialect.supports_create_type_or_replace() is True
     assert dialect.supports_alter_type_if_exists() is True
     assert dialect.supports_drop_type_if_exists() is False
-    assert dialect.supports_multiple_type_alter_actions() is False
     assert dialect.supported_type_definitions() == (
         SnowflakeScalarTypeDefinition,
         SnowflakeObjectTypeDefinition,
@@ -171,7 +170,7 @@ def test_version_boundary_and_low_version_fail_fast():
     reference = SnowflakeUserDefinedType(dialect, type_name="age")
     statements = [
         CreateTypeStatement(dialect, Type(dialect, "age"), scalar),
-        AlterTypeStatement(dialect, Type(dialect, "age"), [set_action]),
+        AlterTypeStatement(dialect, Type(dialect, "age"), set_action),
         DropTypeStatement(dialect, Type(dialect, "age")),
     ]
 
@@ -347,13 +346,13 @@ def test_alter_type_set_and_unset_comment_actions():
     set_expression = SnowflakeAlterTypeExpression(
         dialect,
         Type(dialect, "age", catalog_name="DB", schema_name="APP"),
-        [set_action],
+        set_action,
         if_exists=True,
     )
     unset_expression = AlterTypeStatement(
         dialect,
         Type(dialect, "age", schema_name="APP"),
-        [SnowflakeUnsetTypeCommentAction(dialect)],
+        SnowflakeUnsetTypeCommentAction(dialect),
     )
 
     assert set_expression.to_sql() == (
@@ -366,7 +365,7 @@ def test_alter_type_set_and_unset_comment_actions():
     )
 
 
-def test_alter_type_rejects_multiple_or_unknown_actions():
+def test_alter_type_a_list_is_not_an_action():
     dialect = _dialect()
 
     expression = AlterTypeStatement(
@@ -377,7 +376,7 @@ def test_alter_type_rejects_multiple_or_unknown_actions():
             SnowflakeUnsetTypeCommentAction(dialect),
         ],
     )
-    with pytest.raises(UnsupportedFeatureError, match="multiple ALTER TYPE actions"):
+    with pytest.raises(TypeError, match="TypeAlterAction"):
         expression.to_sql()
 
     class UnsupportedAction(TypeAlterAction):

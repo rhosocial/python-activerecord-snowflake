@@ -168,7 +168,7 @@ CASES = [
     (
         "alter type",
         lambda d, o: AlterTypeStatement(
-            d, o, [SnowflakeSetTypeCommentAction(d, "a note")]
+            d, o, SnowflakeSetTypeCommentAction(d, "a note")
         ),
         lambda d: Table(d, "users"),
         "AlterTypeStatement.type must be a Type, got Table",
@@ -290,7 +290,7 @@ class TestRightObjectKindStillRenders:
         alter_sql, _ = AlterTypeStatement(
             dialect,
             type_object,
-            [SnowflakeSetTypeCommentAction(dialect, "a note")],
+            SnowflakeSetTypeCommentAction(dialect, "a note"),
         ).to_sql()
         drop_sql, _ = DropTypeStatement(dialect, type_object).to_sql()
         assert create_sql.startswith("CREATE TYPE")

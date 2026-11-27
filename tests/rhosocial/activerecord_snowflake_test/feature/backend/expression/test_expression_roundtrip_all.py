@@ -494,7 +494,7 @@ def register_specials():
     register_special_constructor(
         "statements.ddl_domain.AlterDomainStatement",
         lambda d: ddl_domain.AlterDomainStatement(
-            d, Domain(d, "dom"), [RenameDomainAction(d, "other")]
+            d, Domain(d, "dom"), RenameDomainAction(d, "other")
         ),
     )
     # A DOMAIN CHECK is DDL: it must render without bind parameters, so its
@@ -512,7 +512,7 @@ def register_specials():
     register_special_constructor(
         "statements.ddl_type.AlterTypeStatement",
         lambda d: ddl_type.AlterTypeStatement(
-            d, type=Type(d, "t"), actions=[SnowflakeSetTypeCommentAction(d, "a note")]
+            d, type=Type(d, "t"), action=SnowflakeSetTypeCommentAction(d, "a note")
         ),
     )
     register_special_constructor(
@@ -888,7 +888,7 @@ def register_specials():
     register_special_constructor(
         "ddl.type.SnowflakeAlterTypeExpression",
         lambda d: SnowflakeAlterTypeExpression(
-            d, Type(d, "t"), [SnowflakeSetTypeCommentAction(d, "a note")]
+            d, Type(d, "t"), SnowflakeSetTypeCommentAction(d, "a note")
         ),
     )
     register_special_constructor(

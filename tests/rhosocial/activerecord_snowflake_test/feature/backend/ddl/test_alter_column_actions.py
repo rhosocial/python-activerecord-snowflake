@@ -60,7 +60,7 @@ def dialect():
 
 def _render(dialect, action):
     """Render one action as the single-action ALTER TABLE statement it sits in."""
-    return AlterTableStatement(dialect, Table(dialect, "t"), [action]).to_sql()
+    return AlterTableStatement(dialect, Table(dialect, "t"), action).to_sql()
 
 
 class TestCapabilityAnswers:

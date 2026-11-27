@@ -180,14 +180,14 @@ class SnowflakeAlterTypeExpression(AlterTypeStatement):
         self,
         dialect: "SQLDialectBase",
         type: "TypeObject",
-        actions: Sequence[TypeAlterAction],
+        action: TypeAlterAction,
         *,
         if_exists: bool = False,
     ) -> None:
         super().__init__(
             dialect,
             type,
-            actions,
+            action,
             if_exists=if_exists,
         )
 

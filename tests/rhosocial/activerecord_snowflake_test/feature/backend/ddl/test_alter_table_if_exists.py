@@ -300,7 +300,7 @@ class TestSnowflakeDropConstraintByKind:
         statement = AlterTableStatement(
             dialect,
             Table(dialect, "t"),
-            [DropTableConstraintAction(dialect, constraint=declaration)],
+            DropTableConstraintAction(dialect, constraint=declaration),
         )
         assert statement.to_sql() == (
             'ALTER TABLE "t" DROP UNIQUE ("a", "b")',
