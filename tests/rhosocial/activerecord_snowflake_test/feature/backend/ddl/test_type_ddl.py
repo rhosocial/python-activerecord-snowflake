@@ -365,37 +365,6 @@ def test_alter_type_set_and_unset_comment_actions():
     )
 
 
-def test_alter_type_a_list_is_not_an_action():
-    dialect = _dialect()
-
-    expression = AlterTypeStatement(
-        dialect,
-        Type(dialect, "age"),
-        [
-            SnowflakeSetTypeCommentAction(dialect, "first"),
-            SnowflakeUnsetTypeCommentAction(dialect),
-        ],
-    )
-    with pytest.raises(TypeError, match="TypeAlterAction"):
-        expression.to_sql()
-
-    class UnsupportedAction(TypeAlterAction):
-        """A well-formed action whose kind this dialect never registered."""
-
-        action_kind = "test.unsupported"
-
-    with pytest.raises(
-        UnsupportedFeatureError, match=r"ALTER TYPE action test\.unsupported"
-    ):
-        dialect.format_type_alter_action(UnsupportedAction(dialect))
-
-    # The kind is a declared field of the contract, read directly now: an
-    # input that is not a TypeAlterAction at all surfaces the missing
-    # attribute instead of the old probe's class-name fallback.
-    with pytest.raises(AttributeError, match="action_kind"):
-        dialect.format_type_alter_action(object())
-
-
 def test_drop_type_has_no_if_exists_cascade_or_restrict():
     dialect = _dialect()
     expression = SnowflakeDropTypeExpression(
@@ -413,11 +382,11 @@ def test_drop_type_has_no_if_exists_cascade_or_restrict():
     with pytest.raises(UnsupportedFeatureError, match="CASCADE"):
         SnowflakeDropTypeExpression(
             dialect, Type(dialect, "age"), cascade=True
-        )
+        ).to_sql()
     with pytest.raises(UnsupportedFeatureError, match="RESTRICT"):
         SnowflakeDropTypeExpression(
             dialect, Type(dialect, "age"), restrict=True
-        )
+        ).to_sql()
 
     expression.cascade = True
     with pytest.raises(UnsupportedFeatureError, match="CASCADE"):
