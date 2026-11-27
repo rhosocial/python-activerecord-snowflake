@@ -255,8 +255,8 @@ class SnowflakeBackend(
         """
         from rhosocial.activerecord.backend.result import QueryResult
 
-        last_insert_id = cursor.lastrowid
-        affected_rows = cursor.rowcount
+        last_insert_id = getattr(cursor, "lastrowid", None)
+        affected_rows = getattr(cursor, "rowcount", 0)
 
         # Detect fakesnow/DuckDB RETURNING quirks
         _FAKESNOW_COLUMNS = {

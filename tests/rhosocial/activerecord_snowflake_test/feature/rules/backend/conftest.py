@@ -221,6 +221,16 @@ SNOWFLAKE_REFLECTION_ENTRIES = {
         2,
         "type-support mixin reads its own optional version, injected at runtime and not declared",
     ),
+    (
+        "snowflake",
+        "backend/backend.py",
+        "SnowflakeBackend",
+        "getattr",
+    ): (
+        2,
+        "cursor is a live driver emulator object, not an expression; lastrowid/rowcount are "
+        "optional across real and emulated cursors, so a declared attribute read raises on fakesnow",
+    ),
 }
 
 
