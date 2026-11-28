@@ -508,12 +508,12 @@ class TestParseRoundTripSweep:
     }
 
     @pytest.fixture(scope="class")
-    def registry(self):
-        """The round-trip module's registry, loaded from the sibling
+    @classmethod
+    def roundtrip_module(cls):
+        """The round-trip module, loaded from the sibling ``expression`` directory.
 
-        ``expression`` directory. Executing it also registers its special
-        constructors, which the sweep's ``make_instance`` consults -- the
-        same registrations the full suite performs at collection time.
+        Loading it has no registration side effects: the module builds a
+        registry in a fixture instead of mutating a module global at import.
         """
         import importlib.util
         from pathlib import Path
@@ -529,11 +529,32 @@ class TestParseRoundTripSweep:
         )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        registry = getattr(module, "ALL_CLASSES", None) or module.REGISTERED
+        return module
+
+    @pytest.fixture(scope="class")
+    @classmethod
+    def registry(cls, roundtrip_module):
+        """The class registry the sweep walks."""
+        registry = getattr(roundtrip_module, "ALL_CLASSES", None) or roundtrip_module.REGISTERED
         assert registry, "the round-trip module exposes no registry"
         return registry
 
-    def test_every_rendered_type_parses_back_coherently(self, registry):
+    @pytest.fixture(scope="class")
+    @classmethod
+    def special_registry(cls, roundtrip_module):
+        """The round-trip module's special constructors, built on demand.
+
+        The sweep must not depend on another module having registered them at
+        import time, so this fixture creates a private registry and fills it
+        explicitly before handing it to the sweep.
+        """
+        from expression_roundtrip_harness import SpecialConstructorRegistry
+
+        registry = SpecialConstructorRegistry()
+        roundtrip_module.register_specials(registry)
+        return registry
+
+    def test_every_rendered_type_parses_back_coherently(self, registry, special_registry):
         # The sweep is vendored beside the matrix: the testsuite deleted its
         # shared one together with its round-trip harness, when round-trip
         # coverage moved to each backend (mysql did the same).
@@ -546,6 +567,7 @@ class TestParseRoundTripSweep:
         failures = parse_roundtrip_failures(
             dialect,
             registry,
+            special_registry=special_registry,
             widening=self.WIDENING_ANSWERS,
         )
         assert failures == [], "\n".join(failures)

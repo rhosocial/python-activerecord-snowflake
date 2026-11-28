@@ -306,12 +306,13 @@ def special_constructors():
     new names is not expressible, because ``endswith`` compares a suffix. A
     class that was split needs one entry per resulting class.
 
-    :func:`register_special_constructor` writes to the module-level
-    ``_SPECIAL_REGISTRY``, which is what :func:`make_instance` reads. Note that
-    this function rebuilds its dict on every call, so a registration made
-    elsewhere is **not** visible to a caller that invokes
-    ``special_constructors()`` directly — core's expression-contract test does
-    exactly that, and therefore sees only the literals below.
+    The literals below are the *base* entries only.
+    :class:`SpecialConstructorRegistry` copies them in ``__init__``, and a
+    backend adds its own entries to that instance through
+    :meth:`~SpecialConstructorRegistry.register`. Nothing writes to a module
+    global, so what a constructor sees depends only on the registrations made
+    to the registry it was handed — not on which test module happened to be
+    imported first.
     """
     return {
         "statements.ddl_table.ColumnDefinition": _column_definition,
@@ -946,36 +947,70 @@ def _datetime_add_expr(dialect):
     return DatetimeAddExpression(dialect, Column(dialect, "a"), IntervalExpression(dialect, 1, "day"))
 
 
-_SPECIAL_REGISTRY: Dict[str, Callable] = special_constructors()
+class SpecialConstructorRegistry:
+    """A caller-owned table of explicit constructors for expression classes.
 
-
-def register_special_constructor(fqn_suffix: str, factory: Callable) -> None:
-    """Register an explicit constructor for an expression class.
-
-    ``fqn_suffix`` must match the tail of the class's fully qualified name
-    (e.g. ``"json.MySQLJSONObjectExpression"``). ``factory(dialect)`` must
-    return an expression instance.
+    Each owner builds its own registry and registers exactly the entries it
+    needs. There is deliberately no module-level default instance: a global
+    table would make construction depend on import order, because the module
+    that registers a constructor may be collected before or after the module
+    that consumes it.
     """
-    _SPECIAL_REGISTRY[fqn_suffix] = factory
+
+    def __init__(self, base=None):
+        """Copy *base*, or the literal entries from :func:`special_constructors`.
+
+        Copying is load-bearing. The defaults are shared knowledge, not shared
+        state: mutating one registry must never be visible in another.
+        """
+        self.entries: Dict[str, Callable] = dict(special_constructors() if base is None else base)
+
+    def register(self, fqn_suffix: str, factory: Callable) -> None:
+        """Add one constructor, keyed by a suffix of the class's full name.
+
+        ``fqn_suffix`` must match the tail of the fully qualified name
+        (e.g. ``"json.SnowflakeVariantExpression"``). ``factory(dialect)`` must
+        return an expression instance.
+        """
+        self.entries[fqn_suffix] = factory
+
+    def make_instance(self, cls: Type[BaseExpression], dialect: Any):
+        """Best-effort construction for *cls* using this registry's entries.
+
+        Returns (instance, source) where source is "special", "heuristic", or
+        (None, "failed").
+        """
+        full_name = f"{cls.__module__}.{cls.__name__}"
+        special = next((fn for s, fn in self.entries.items() if full_name.endswith(s)), None)
+        if special is not None:
+            try:
+                return special(dialect), "special"
+            except Exception:
+                return None, "special-failed"
+        instance = _try_construct(cls, dialect)
+        if instance is None:
+            return None, "failed"
+        return instance, "heuristic"
 
 
-def make_instance(cls: Type[BaseExpression], dialect: Any):
-    """Best-effort construction for an expression class.
+def register_special_constructor(
+    registry: SpecialConstructorRegistry, fqn_suffix: str, factory: Callable
+) -> None:
+    """Adapter: add one constructor to the explicitly supplied *registry*.
 
-    Returns (instance, source) where source is "special", "heuristic", or
-    (None, "failed").
+    ``registry`` is required. A default that resurrected a module global would
+    put the import-order bug straight back.
     """
-    full_name = f"{cls.__module__}.{cls.__name__}"
-    special = next((fn for s, fn in _SPECIAL_REGISTRY.items() if full_name.endswith(s)), None)
-    if special is not None:
-        try:
-            return special(dialect), "special"
-        except Exception:
-            return None, "special-failed"
-    instance = _try_construct(cls, dialect)
-    if instance is None:
-        return None, "failed"
-    return instance, "heuristic"
+    registry.register(fqn_suffix, factory)
+
+
+def make_instance(cls: Type[BaseExpression], dialect: Any, registry: SpecialConstructorRegistry):
+    """Adapter: construct *cls* through the explicitly supplied *registry*.
+
+    ``registry`` is required for the same reason as in
+    :func:`register_special_constructor`.
+    """
+    return registry.make_instance(cls, dialect)
 
 
 def collect_expression_classes(package_path: str) -> Dict[str, Type[BaseExpression]]:
@@ -1113,6 +1148,7 @@ def parse_roundtrip_failures(
     dialect: Any,
     registry: Dict[str, Any],
     *,
+    special_registry: SpecialConstructorRegistry,
     widening: Optional[Dict[str, Any]] = None,
     skip: Any = (),
 ) -> Any:
@@ -1146,6 +1182,10 @@ def parse_roundtrip_failures(
             backend's round-trip module keeps it (``REGISTERED`` or
             ``ALL_CLASSES``). Only concrete ``DataType`` subclasses are
             swept.
+        special_registry: the caller's :class:`SpecialConstructorRegistry`,
+            carrying the special constructors needed to build the swept
+            classes. Required, never defaulted: the sweep must not depend on
+            another module having registered anything.
         widening: the backend's documented answer table,
             ``{declared class name: answer}``. An entry here asserts the
             parse answers with exactly that class and that the answer
@@ -1175,7 +1215,7 @@ def parse_roundtrip_failures(
             continue
         if cls.__name__ in skipped:
             continue
-        instance, source = make_instance(cls, dialect)
+        instance, source = make_instance(cls, dialect, special_registry)
         if instance is None:
             continue  # the matrix's unbuildable list owns this class
         try:
@@ -1249,8 +1289,10 @@ __all__ = [
     "build_read_registry",
     "collect_expression_classes",
     "make_instance",
+    "parse_roundtrip_failures",
     "register_special_constructor",
     "roundtrip_expression",
+    "special_constructors",
+    "SpecialConstructorRegistry",
     "sql_consistent",
-    "parse_roundtrip_failures",
 ]
