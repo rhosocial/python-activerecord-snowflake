@@ -458,6 +458,53 @@ class TestUserDefinedTypeReferenceParsesBack:
         assert parsed.database_name == "db"
 
 
+@pytest.fixture(scope="class")
+def roundtrip_module():
+    """The round-trip module, loaded from the sibling ``expression`` directory.
+
+    Loading it has no registration side effects: the module builds a registry
+    in a fixture instead of mutating a module global at import.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    path = (
+        Path(__file__).resolve().parent.parent
+        / "expression"
+        / "test_expression_roundtrip_all.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "snowflake_rt_registry",
+        path,
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture(scope="class")
+def registry(roundtrip_module):
+    """The class registry the sweep walks."""
+    registry = getattr(roundtrip_module, "ALL_CLASSES", None) or roundtrip_module.REGISTERED
+    assert registry, "the round-trip module exposes no registry"
+    return registry
+
+
+@pytest.fixture(scope="class")
+def special_registry(roundtrip_module):
+    """The round-trip module's special constructors, built on demand.
+
+    The sweep must not depend on another module having registered them at
+    import time, so this fixture creates a private registry and fills it
+    explicitly before handing it to the sweep.
+    """
+    from expression_roundtrip_harness import SpecialConstructorRegistry
+
+    registry = SpecialConstructorRegistry()
+    roundtrip_module.register_specials(registry)
+    return registry
+
+
 class TestParseRoundTripSweep:
     """The shared sweep across this backend's whole declared surface.
 
@@ -506,53 +553,6 @@ class TestParseRoundTripSweep:
         "SnowflakeArrayType": ("JsonType", "VARIANT"),
         "SnowflakeObjectType": ("JsonType", "VARIANT"),
     }
-
-    @pytest.fixture(scope="class")
-    @classmethod
-    def roundtrip_module(cls):
-        """The round-trip module, loaded from the sibling ``expression`` directory.
-
-        Loading it has no registration side effects: the module builds a
-        registry in a fixture instead of mutating a module global at import.
-        """
-        import importlib.util
-        from pathlib import Path
-
-        path = (
-            Path(__file__).resolve().parent.parent
-            / "expression"
-            / "test_expression_roundtrip_all.py"
-        )
-        spec = importlib.util.spec_from_file_location(
-            "snowflake_rt_registry",
-            path,
-        )
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module
-
-    @pytest.fixture(scope="class")
-    @classmethod
-    def registry(cls, roundtrip_module):
-        """The class registry the sweep walks."""
-        registry = getattr(roundtrip_module, "ALL_CLASSES", None) or roundtrip_module.REGISTERED
-        assert registry, "the round-trip module exposes no registry"
-        return registry
-
-    @pytest.fixture(scope="class")
-    @classmethod
-    def special_registry(cls, roundtrip_module):
-        """The round-trip module's special constructors, built on demand.
-
-        The sweep must not depend on another module having registered them at
-        import time, so this fixture creates a private registry and fills it
-        explicitly before handing it to the sweep.
-        """
-        from expression_roundtrip_harness import SpecialConstructorRegistry
-
-        registry = SpecialConstructorRegistry()
-        roundtrip_module.register_specials(registry)
-        return registry
 
     def test_every_rendered_type_parses_back_coherently(self, registry, special_registry):
         # The sweep is vendored beside the matrix: the testsuite deleted its
